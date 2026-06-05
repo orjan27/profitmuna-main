@@ -84,13 +84,43 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmap) | | |
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Pending |
+| AUTH-05 | Phase 1 | Pending |
+| AUTH-06 | Phase 1 | Pending |
+| INC-01 | Phase 2 | Pending |
+| INC-02 | Phase 2 | Pending |
+| INC-03 | Phase 2 | Pending |
+| INC-04 | Phase 2 | Pending |
+| INC-05 | Phase 2 | Pending |
+| INC-06 | Phase 2 | Pending |
+| EXP-01 | Phase 2 | Pending |
+| EXP-02 | Phase 2 | Pending |
+| EXP-03 | Phase 2 | Pending |
+| EXP-04 | Phase 2 | Pending |
+| EXP-05 | Phase 2 | Pending |
+| PF-01 | Phase 3 | Pending |
+| PF-02 | Phase 3 | Pending |
+| PF-03 | Phase 3 | Pending |
+| PF-04 | Phase 3 | Pending |
+| WAL-01 | Phase 4 | Pending |
+| WAL-02 | Phase 4 | Pending |
+| WAL-03 | Phase 4 | Pending |
+| WAL-04 | Phase 4 | Pending |
+| WAL-05 | Phase 4 | Pending |
+| DASH-01 | Phase 5 | Pending |
+| SET-01 | Phase 6 | Pending |
+| SET-02 | Phase 6 | Pending |
+| NOTIF-01 | Phase 6 | Pending |
+| NOTIF-02 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 30 total
-- Mapped to phases: 0
-- Unmapped: 30 ⚠️
+- Mapped to phases: 30
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-05*
-*Last updated: 2026-06-05 after initial definition*
+*Last updated: 2026-06-05 after roadmap creation*
