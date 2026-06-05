@@ -1,0 +1,23 @@
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import { Toaster } from 'sonner';
+import './globals.css';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'Profitmuna Main',
+  description:
+    'A finance app that automatically applies percentage allocations to your income for proper budgeting',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        {children}
+        <Toaster richColors />
+      </body>
+    </html>
+  );
+}
