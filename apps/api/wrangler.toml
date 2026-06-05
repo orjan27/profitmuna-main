@@ -7,6 +7,7 @@ compatibility_date = "2026-04-22"
 binding = "DB"
 database_name = "profitmuna-main-db"
 database_id = "local"
+migrations_dir = "../../packages/db/migrations"
 # Replace database_id with your real D1 database ID for production:
 #   wrangler d1 create profitmuna-main-db
 
