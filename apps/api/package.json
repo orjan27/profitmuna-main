@@ -1,0 +1,27 @@
+{
+  "name": "profitmuna-main-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --port 8793",
+    "build": "wrangler deploy --dry-run",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.6",
+    "arctic": "3.7.0",
+    "bcryptjs": "^3.0.3",
+    "hono": "^4.12.9",
+    "jose": "^6.2.2",
+    "resend": "6.12.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260329.1",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.78.0"
+  }
+}

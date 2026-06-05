@@ -1,0 +1,21 @@
+
+name = "profitmuna-main-api"
+main = "src/index.ts"
+compatibility_date = "2026-04-22"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "profitmuna-main-db"
+database_id = "local"
+# Replace database_id with your real D1 database ID for production:
+#   wrangler d1 create profitmuna-main-db
+
+# Non-secret vars. Secrets are set via `wrangler secret put <NAME>`:
+#   JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, RESEND_API_KEY, GOOGLE_CLIENT_SECRET
+[vars]
+RESEND_FROM_EMAIL = "onboarding@resend.dev"
+GOOGLE_CLIENT_ID = ""
+GOOGLE_REDIRECT_URI = "http://localhost:8793/api/auth/google/callback"
+APP_BASE_URL = "http://localhost:3006"
+NODE_ENV = "development"
+
