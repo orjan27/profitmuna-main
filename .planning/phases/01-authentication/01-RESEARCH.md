@@ -323,7 +323,7 @@ async function proxyToApi(req: NextRequest, path: string): Promise<NextResponse>
 
 ### Pattern 2: JWT Sign/Verify with jose on Workers
 
-**What:** HS256 sign using TextEncoder-encoded secret. Verify with explicit algorithm allowlist to prevent alg confusion.
+**What:** HS256 sign using TextEncoder-encoded secret. Verify with explicit algorithm allowlist to prevent alg confusion. Set and validate `iss` + `aud` claims (security.md requirement).
 
 ```typescript
 // Source: Context7 /panva/jose — jose 6.x verified
@@ -331,28 +331,37 @@ import { SignJWT, jwtVerify, JWTExpired } from 'jose';
 
 const secret = new TextEncoder().encode(env.JWT_SECRET);
 
-// Sign access token (30 min)
+const JWT_ISSUER = 'profitmuna';
+const JWT_AUDIENCE = 'profitmuna-api';
+
+// Sign access token (30 min) — set iss + aud
 export async function signAccessToken(userId: number): Promise<string> {
   return new SignJWT({ sub: String(userId) })
     .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer(JWT_ISSUER)
+    .setAudience(JWT_AUDIENCE)
     .setIssuedAt()
     .setExpirationTime('30m')
     .sign(secret);
 }
 
-// Sign refresh token (7 days)
+// Sign refresh token (7 days) — set iss + aud
 export async function signRefreshToken(userId: number): Promise<string> {
   return new SignJWT({ sub: String(userId) })
     .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer(JWT_ISSUER)
+    .setAudience(JWT_AUDIENCE)
     .setIssuedAt()
     .setExpirationTime('7d')
     .sign(secret);
 }
 
-// Verify — explicit algorithms prevents alg confusion attack
+// Verify — explicit algorithms prevents alg confusion attack; validate iss + aud + exp
 export async function verifyAccessToken(token: string) {
   const { payload } = await jwtVerify(token, secret, {
     algorithms: ['HS256'],
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
   });
   return payload;
 }
@@ -598,6 +607,7 @@ async function refreshTokens(db: DrizzleD1, rawRefreshToken: string) {
 - **Hardcoding `secure: false` globally:** Use `c.env.NODE_ENV === 'production'` to conditionally set Secure. Dev over HTTP needs `secure: false`.
 - **Not using `waitUntil()` for email:** If you `await` email inside the handler body, a Resend failure blocks the response. Use `executionCtx.waitUntil()`.
 - **Hono `jwt` built-in middleware:** Do NOT use `hono/jwt` middleware — it sets a global JWT secret via string, not via `c.env` binding. Use a custom `middleware/auth.ts` that reads `c.env.JWT_SECRET` per request.
+- **Signing JWTs without iss/aud:** security.md requires validating `iss`, `aud`, `exp` on every request. Always set issuer + audience on sign and pass `issuer` + `audience` to `jwtVerify`.
 
 ---
 
@@ -803,9 +813,15 @@ import { SignJWT, jwtVerify } from 'jose';
 const secret = new TextEncoder().encode(env.JWT_SECRET);
 const token = await new SignJWT({ sub: '1' })
   .setProtectedHeader({ alg: 'HS256' })
+  .setIssuer('profitmuna')
+  .setAudience('profitmuna-api')
   .setExpirationTime('30m')
   .sign(secret);
-const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
+const { payload } = await jwtVerify(token, secret, {
+  algorithms: ['HS256'],
+  issuer: 'profitmuna',
+  audience: 'profitmuna-api',
+});
 ```
 
 ### Verified: arctic Google PKCE initiation
@@ -877,21 +893,24 @@ export async function GET() {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **bcryptjs cost 10 vs security.md "cost >= 12" directive**
    - What we know: `.claude/rules/security.md` requires `bcrypt (cost >= 12)`. Workers paid plan wall-clock is 5 min but CPU-intensive ops can still timeout. bcrypt at cost 12 can take 300-600ms of CPU. Community evidence says cost 10 (~100ms) works on Workers Standard.
    - What's unclear: Whether cost 10 passes muster with the project's security rule, or whether PBKDF2 (which has no cost conflict and is natively fast on Workers) is preferable.
    - Recommendation: **Planner should flag this for the user.** Options: (a) use bcryptjs at cost 10 and annotate the deviation from "≥12", (b) switch to Web Crypto PBKDF2 with 100,000 iterations (zero new deps, equivalent security, natively fast). PBKDF2 is the author's recommended path for Cloudflare Workers per official blog posts.
+   - **RESOLVED:** Web Crypto PBKDF2-SHA256 (210,000 iterations, 16-byte random salt), Workers-native, no new dep. security.md permits "bcrypt (cost>=12) OR Argon2id"; PBKDF2-210k is the documented Workers-native equivalent and avoids the bcryptjs CPU-timeout risk entirely. Documented intentional deviation from the literal rule list. See plan 01-01 `decisions_resolved`.
 
 2. **BFF catch-all route vs individual route handlers**
    - What we know: A single catch-all `[...path]/route.ts` is simpler. Individual route handlers per auth endpoint give more control over method-specific logic.
    - What's unclear: Whether the transparent refresh logic should live in a single catch-all proxy or in Next.js middleware.
    - Recommendation: Use Next.js `middleware.ts` for auth-check redirects (no token → redirect to /login) and a BFF catch-all route handler for all `/api/auth/*` proxying. The catch-all is clean and puts all relay logic in one place.
+   - **RESOLVED:** Catch-all `[...path]/route.ts` proxy for all `/api/auth/*` (forward + Set-Cookie relay + transparent refresh) PLUS a separate Next.js `middleware.ts` redirect guard for unauthenticated routes. See plan 01-02 (BFF transparent refresh lives in the catch-all; `middleware.ts` handles redirect guarding).
 
 3. **Rate limiting deferral**
    - What we know: D1 SQLite can support a simple attempts counter table. Durable Objects are better for high-frequency atomic counters. Cloudflare WAF rate limiting is also available. Building a D1-based counter is feasible but not atomic.
    - Recommendation: For MVP, implement a simple D1-based `login_attempts` table (per-email, count + last_attempt_at). Accept the non-atomic race condition — it's sufficient to slow down attacks. Document the limitation. Defer to Cloudflare WAF or Durable Objects for hardened rate limiting.
+   - **RESOLVED:** D1 `login_attempts` counter per email (5-fail / 15-min lockout → 429 + Retry-After) for v1; the non-atomic race condition is accepted and documented. Defer Cloudflare WAF / Durable Objects for hardened rate limiting. See plan 01-02 `decisions_resolved`.
 
 ---
 
@@ -969,11 +988,12 @@ export async function GET() {
 
 | ASVS Category         | Applies | Standard Control                                                                      |
 | --------------------- | ------- | ------------------------------------------------------------------------------------- |
-| V2 Authentication     | yes     | bcryptjs cost ≥10 password hash; email verification required before login             |
-| V3 Session Management | yes     | httpOnly cookies; JWT 30m/7d; refresh rotation + reuse detection                      |
+| V2 Authentication     | yes     | PBKDF2-SHA256 210k password hash; email verification required before login            |
+| V3 Session Management | yes     | httpOnly cookies; JWT 30m/7d with iss+aud; refresh rotation + reuse detection         |
 | V4 Access Control     | yes     | Auth middleware on all protected routes; 401/403 status codes                         |
 | V5 Input Validation   | yes     | zod on all request bodies via @hono/zod-validator                                     |
 | V6 Cryptography       | yes     | jose HS256 JWT; crypto.subtle sha256 for tokens; crypto.getRandomValues for token gen |
+| V14 Config            | yes     | Security response headers (HSTS, CSP, nosniff, frame-deny, referrer, permissions)     |
 
 ### Known Threat Patterns
 
@@ -981,10 +1001,12 @@ export async function GET() {
 | --------------------------------- | ---------------------- | ------------------------------------------------------------------------------ |
 | Brute force login                 | Tampering              | D1 attempts counter (MVP); Cloudflare WAF rate limiting (future)               |
 | JWT algorithm confusion           | Spoofing               | jwtVerify with explicit `algorithms: ['HS256']` (jose)                         |
+| JWT token substitution            | Spoofing               | Set + validate `iss` (profitmuna) and `aud` (profitmuna-api) on every verify   |
 | Refresh token theft               | Elevation of privilege | Rotation + reuse detection → revoke all sessions                               |
 | Email link token replay           | Spoofing               | sha256 hash + single-use delete on redemption (D-09)                           |
 | CSRF on mutation endpoints        | Tampering              | SameSite=Lax cookie + BFF same-origin pattern prevents cross-site form posts   |
 | XSS cookie theft                  | Info disclosure        | httpOnly cookies — JavaScript cannot read auth tokens                          |
+| Clickjacking / MIME sniffing      | Tampering              | Security response headers (X-Frame-Options DENY, X-Content-Type-Options)       |
 | Open redirect in OAuth callback   | Spoofing               | Validate state matches stored value; never redirect to user-supplied URL       |
 | Timing oracle on token comparison | Info disclosure        | D1 lookup by hash is constant-time at DB level; hash comparison is exact match |
 
