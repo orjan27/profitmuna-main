@@ -83,7 +83,11 @@ export function ExpenseForm({ categories, action, initialValues, onSuccess }: Ex
     startQuickAddTransition(async () => {
       const result = await createExpenseCategoryAction(trimmed);
       if ('error' in result) {
-        toast.error('Failed to create category. Please try again.');
+        toast.error(
+          result.error === 'category_exists'
+            ? 'A category with that name already exists.'
+            : 'Failed to create category. Please try again.'
+        );
       } else {
         const newCat: ExpenseCategory = {
           id: result.data.id,

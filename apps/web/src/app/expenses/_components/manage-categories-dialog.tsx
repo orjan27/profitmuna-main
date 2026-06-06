@@ -61,7 +61,9 @@ export function ManageCategoriesDialog({ categories }: ManageCategoriesDialogPro
         toast.error(
           result.error === 'cannot_edit_system_category'
             ? 'System categories cannot be edited.'
-            : 'Failed to rename category. Please try again.'
+            : result.error === 'category_exists'
+              ? 'A category with that name already exists.'
+              : 'Failed to rename category. Please try again.'
         );
       } else {
         toast.success('Category renamed.');
@@ -95,7 +97,11 @@ export function ManageCategoriesDialog({ categories }: ManageCategoriesDialogPro
     startTransition(async () => {
       const result = await createExpenseCategoryAction(trimmed);
       if ('error' in result) {
-        toast.error('Failed to create category. Please try again.');
+        toast.error(
+          result.error === 'category_exists'
+            ? 'A category with that name already exists.'
+            : 'Failed to create category. Please try again.'
+        );
       } else {
         toast.success(`"${trimmed}" added.`);
         setNewName('');

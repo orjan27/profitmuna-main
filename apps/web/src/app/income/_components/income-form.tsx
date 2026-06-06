@@ -73,7 +73,11 @@ export function IncomeForm({
     startQuickAddTransition(async () => {
       const result = await createIncomeCategoryAction(trimmed);
       if ('error' in result) {
-        toast.error('Failed to create category. Please try again.');
+        toast.error(
+          result.error === 'category_exists'
+            ? 'A category with that name already exists.'
+            : 'Failed to create category. Please try again.'
+        );
       } else {
         const newCat: IncomeCategory = {
           id: result.data.id,

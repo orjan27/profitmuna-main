@@ -58,6 +58,15 @@ export function createExpenseCategoryService(db: ReturnType<typeof createDb>) {
      * Create a custom expense category (system: false).
      */
     async create(userId: number, name: string): Promise<ExpenseCategoryRecord> {
+      // Pre-check the (userId, name) unique index so a duplicate surfaces as a
+      // clean 409 instead of an unhandled constraint error → generic 500 (WR-04).
+      const existing = await db.query.expenseCategories.findFirst({
+        where: and(eq(expenseCategories.userId, userId), eq(expenseCategories.name, name)),
+      });
+      if (existing) {
+        throw new HTTPException(409, { message: 'category_exists' });
+      }
+
       const [inserted] = await db
         .insert(expenseCategories)
         .values({ name, system: false, userId })

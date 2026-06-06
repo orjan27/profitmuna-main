@@ -72,6 +72,19 @@ describe('expense category service — create', () => {
     expect(cat.system).toBe(false);
     expect(cat.userId).toBe(userA.id);
   });
+
+  it('throws 409 category_exists on a duplicate name (WR-04)', async () => {
+    const { db, dbD1 } = createTestDb();
+    const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
+
+    const svc = createExpenseCategoryService(dbD1);
+    await svc.list(userA.id); // seed defaults including 'Food'
+
+    await expect(svc.create(userA.id, 'Food')).rejects.toMatchObject({
+      status: 409,
+      message: 'category_exists',
+    });
+  });
 });
 
 // ─── Cascade rename ───────────────────────────────────────────────────────────
