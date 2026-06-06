@@ -1288,7 +1288,7 @@ describe('auth-service: upsertGoogleUser', () => {
     expect(allUsers).toHaveLength(1);
   });
 
-  it('issueSession helper inserts a refresh_tokens row for the upserted user', async () => {
+  it('issueSession helper inserts a refresh_tokens row for the upserted user (via login service)', async () => {
     const { d1, db } = createTestDb();
 
     const userId = await upsertGoogleUser(d1, {
@@ -1320,5 +1320,174 @@ describe('auth-service: upsertGoogleUser', () => {
       .where(eq(schema.refreshTokens.userId, userId))
       .all();
     expect(rtRows).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// slice 01-04 tests: GET /google, GET /google/callback routes (AUTH-03)
+// ---------------------------------------------------------------------------
+
+describe('GET /api/auth/google', () => {
+  it('redirects to Google authorization URL with state and code_verifier cookies set', async () => {
+    const res = await app.request('/api/auth/google', { method: 'GET' }, env, executionCtx);
+
+    // Should redirect (302) to Google
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    expect(location).toContain('accounts.google.com');
+    expect(location).toContain('code_challenge');
+
+    // State and code_verifier cookies must be set as httpOnly, SameSite=Lax
+    const cookies = res.headers.getSetCookie();
+    const stateCookie = cookies.find((c) => c.startsWith('oauth_state='));
+    const verifierCookie = cookies.find((c) => c.startsWith('oauth_code_verifier='));
+    expect(stateCookie).toBeDefined();
+    expect(verifierCookie).toBeDefined();
+    expect(stateCookie?.toLowerCase()).toContain('httponly');
+    expect(verifierCookie?.toLowerCase()).toContain('httponly');
+    expect(stateCookie?.toLowerCase()).toContain('samesite=lax');
+    expect(verifierCookie?.toLowerCase()).toContain('samesite=lax');
+    expect(stateCookie).toContain('Max-Age=600');
+    expect(verifierCookie).toContain('Max-Age=600');
+  });
+});
+
+describe('GET /api/auth/google/callback', () => {
+  // Helper to call the callback route with injected cookies and query params
+  function callbackRequest(
+    params: Record<string, string>,
+    cookies: Record<string, string>,
+    testEnv: Bindings = env
+  ) {
+    const url = new URL('/api/auth/google/callback', 'http://localhost');
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    const cookieHeader = Object.entries(cookies)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+    return app.request(
+      url.toString(),
+      { method: 'GET', headers: { cookie: cookieHeader } },
+      testEnv,
+      executionCtx
+    );
+  }
+
+  it('returns 400 invalid_oauth_state when state does not match stored cookie', async () => {
+    const res = await callbackRequest(
+      { code: 'fake-code', state: 'attacker-state' },
+      { oauth_state: 'real-state', oauth_code_verifier: 'real-verifier' }
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe('invalid_oauth_state');
+  });
+
+  it('returns 400 when code is missing from callback', async () => {
+    const res = await callbackRequest(
+      { state: 'some-state' },
+      { oauth_state: 'some-state', oauth_code_verifier: 'verifier' }
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe('invalid_oauth_state');
+  });
+
+  it('returns 400 when oauth_code_verifier cookie is missing', async () => {
+    const res = await callbackRequest(
+      { code: 'code', state: 'state' },
+      { oauth_state: 'state' } // no verifier cookie
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe('invalid_oauth_state');
+  });
+
+  it('upserts user + sets session cookies + redirects to APP_BASE_URL on valid callback (mocked Google)', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    const state = 'test-csrf-state';
+    const verifier = 'test-code-verifier';
+
+    // Mock arctic token exchange and Google userinfo fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('oauth2.googleapis.com/token') || url.includes('token')) {
+        // arctic validateAuthorizationCode calls the token endpoint
+        return new Response(
+          JSON.stringify({
+            access_token: 'mock-access-token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+            id_token: 'mock-id-token',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.includes('openidconnect.googleapis.com/v1/userinfo')) {
+        return new Response(
+          JSON.stringify({
+            sub: 'google-sub-123',
+            email: 'google@user.test',
+            name: 'Google User',
+            email_verified: true,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      // fallback — should not be reached
+      return new Response('not found', { status: 404 });
+    });
+
+    const res = await callbackRequest(
+      { code: 'auth-code', state },
+      { oauth_state: state, oauth_code_verifier: verifier },
+      testEnv
+    );
+
+    // Restore global fetch
+    vi.unstubAllGlobals();
+
+    // Should redirect to APP_BASE_URL + '/'
+    expect(res.status).toBe(302);
+    const location = res.headers.get('location') ?? '';
+    expect(location).toBe(`${testEnv.APP_BASE_URL}/`);
+
+    // Session cookies must be set
+    const setCookies = res.headers.getSetCookie();
+    const accessCookie = setCookies.find((c) => c.startsWith('access_token='));
+    const refreshCookie = setCookies.find((c) => c.startsWith('refresh_token='));
+    expect(accessCookie).toBeDefined();
+    expect(refreshCookie).toBeDefined();
+    expect(accessCookie?.toLowerCase()).toContain('httponly');
+    expect(refreshCookie?.toLowerCase()).toContain('httponly');
+    expect(accessCookie).toContain('Max-Age=1800');
+    expect(refreshCookie).toContain('Max-Age=604800');
+
+    // State and verifier cookies should be cleared
+    const stateCleared = setCookies.find(
+      (c) =>
+        c.startsWith('oauth_state=') &&
+        (c.includes('Max-Age=0') || c.includes('expires=Thu, 01 Jan 1970'))
+    );
+    expect(stateCleared).toBeDefined();
+
+    // User row should exist in DB
+    const userRows = db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, 'google@user.test'))
+      .all();
+    expect(userRows).toHaveLength(1);
+    expect(userRows[0].googleId).toBe('google-sub-123');
+    expect(userRows[0].emailVerified).toBe(true);
+
+    // Refresh token row should be inserted
+    const rtRows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, userRows[0].id))
+      .all();
+    expect(rtRows).toHaveLength(1);
+    expect(rtRows[0].revokedAt).toBeNull();
   });
 });

@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { setCookie, deleteCookie, getCookie } from 'hono/cookie';
+import { HTTPException } from 'hono/http-exception';
+import * as arctic from 'arctic';
 
 import { createEmailService } from '@/lib/email';
 import {
@@ -20,7 +22,12 @@ import {
   logout,
   forgotPassword,
   resetPassword,
+  upsertGoogleUser,
 } from '@/services/auth-service';
+import { createDb } from '@app/db';
+import { refreshTokens as refreshTokensTable } from '@app/db/schema';
+import { signAccessToken } from '@/lib/jwt';
+import { generateSecureToken, sha256Hash } from '@/lib/token';
 import { requireAuth } from '@/middleware/auth';
 import type { Bindings, Variables } from '@/types';
 
@@ -179,5 +186,114 @@ authRouter.post(
     return c.json({ data: { message: 'password_reset' } });
   }
 );
+
+/** Refresh token lifetime in seconds (7 days) */
+const REFRESH_TOKEN_TTL_S = 7 * 24 * 60 * 60;
+/** Access token lifetime in seconds (30 minutes) */
+const ACCESS_TOKEN_TTL_S = 30 * 60;
+
+// GET /google — initiate Google OAuth PKCE flow
+authRouter.get('/google', (c) => {
+  const google = new arctic.Google(
+    c.env.GOOGLE_CLIENT_ID,
+    c.env.GOOGLE_CLIENT_SECRET,
+    c.env.GOOGLE_REDIRECT_URI
+  );
+  const state = arctic.generateState();
+  const codeVerifier = arctic.generateCodeVerifier();
+  const url = google.createAuthorizationURL(state, codeVerifier, ['openid', 'profile', 'email']);
+
+  const isProduction = c.env.NODE_ENV === 'production';
+  // SameSite=Lax — must survive the cross-site OAuth redirect (Pitfall 6 / T-04-01)
+  setCookie(c, 'oauth_state', state, {
+    httpOnly: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 600,
+    secure: isProduction,
+  });
+  setCookie(c, 'oauth_code_verifier', codeVerifier, {
+    httpOnly: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 600,
+    secure: isProduction,
+  });
+
+  return c.redirect(url.toString());
+});
+
+// GET /google/callback — exchange code, upsert user, issue session
+authRouter.get('/google/callback', async (c) => {
+  const code = c.req.query('code');
+  const state = c.req.query('state');
+  const storedState = getCookie(c, 'oauth_state');
+  const storedVerifier = getCookie(c, 'oauth_code_verifier');
+
+  // T-04-01 CSRF guard: reject missing/mismatched state or missing verifier
+  if (!code || !state || state !== storedState || !storedVerifier) {
+    throw new HTTPException(400, { message: 'invalid_oauth_state' });
+  }
+
+  // T-04-04 PKCE: validate code with stored verifier
+  const google = new arctic.Google(
+    c.env.GOOGLE_CLIENT_ID,
+    c.env.GOOGLE_CLIENT_SECRET,
+    c.env.GOOGLE_REDIRECT_URI
+  );
+  const tokens = await google.validateAuthorizationCode(code, storedVerifier);
+  const accessToken = tokens.accessToken();
+
+  // Fetch userinfo from Google (server-to-server — token never stored, T-04-05)
+  const userRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const googleUser = (await userRes.json()) as {
+    sub: string;
+    email: string;
+    name: string;
+    email_verified: boolean;
+  };
+
+  // Upsert user (T-04-03 account-linking: email is the identity key)
+  const userId = await upsertGoogleUser(c.env.DB, {
+    sub: googleUser.sub,
+    email: googleUser.email,
+    name: googleUser.name,
+  });
+
+  // Issue the same httpOnly session as password login (sign access JWT + insert refresh token row)
+  const jwtAccessToken = await signAccessToken(userId, c.env.JWT_ACCESS_SECRET);
+  const rawRefreshToken = generateSecureToken();
+  const db = createDb(c.env.DB);
+  await db.insert(refreshTokensTable).values({
+    userId,
+    tokenHash: await sha256Hash(rawRefreshToken),
+    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_S * 1000).toISOString(),
+  });
+
+  const isProduction = c.env.NODE_ENV === 'production';
+  setCookie(c, 'access_token', jwtAccessToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: ACCESS_TOKEN_TTL_S,
+  });
+  setCookie(c, 'refresh_token', rawRefreshToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: REFRESH_TOKEN_TTL_S,
+  });
+
+  // Clear state and verifier cookies (consumed once)
+  deleteCookie(c, 'oauth_state', { path: '/' });
+  deleteCookie(c, 'oauth_code_verifier', { path: '/' });
+
+  // T-04-02 open-redirect guard: always redirect to fixed internal path, never a user-supplied URL
+  return c.redirect(`${c.env.APP_BASE_URL}/`);
+});
 
 export { authRouter };
