@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
 import { useQueryState, parseAsString } from 'nuqs';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { useRecordSheet } from '@/components/RecordSheetProvider';
 import type { Income, IncomeCategory } from '@/types/income';
 import { formatCurrency } from '@/lib/format-currency';
 import { IncomeFilters } from './income-filters';
@@ -26,11 +27,14 @@ interface IncomeOverviewProps {
 }
 
 /**
- * Client-side orchestrator for the income list page.
- * Manages accumulated items state (load-more / D-06), filter resets,
- * and dialog open state for edit (D-05) and receive (D-14) flows.
+ * Client-side orchestrator for the income ledger page.
+ * Manages accumulated items state (load-more / D-06), the collapsed filter
+ * row, and dialog open state for edit (D-05) and receive (D-14) flows.
+ * Recording goes through the global Record sheet.
  */
 export function IncomeOverview({ initialData, categories }: IncomeOverviewProps) {
+  const { openRecordSheet } = useRecordSheet();
+
   const [items, setItems] = useState<Income[]>(initialData.content);
   const [currentPage, setCurrentPage] = useState(initialData.page);
   const [isLast, setIsLast] = useState(initialData.last);
@@ -46,6 +50,11 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
   const [moneyStatus] = useQueryState('moneyStatus', parseAsString.withDefault(''));
   const [from] = useQueryState('from', parseAsString.withDefault(''));
   const [to] = useQueryState('to', parseAsString.withDefault(''));
+
+  const activeFilterCount = [search, moneyStatus, from, to].filter(Boolean).length;
+  // Filters stay collapsed until asked for — but a shared/refreshed URL with
+  // filters applied opens them so the state is visible.
+  const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0);
 
   /** Total value of all loaded income items (display only — not a server aggregate). */
   const loadedTotal = items.reduce((sum, i) => sum + i.amount, 0);
@@ -84,30 +93,46 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-7">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Income</h1>
+          <h1 className="text-[20px] leading-tight font-semibold">Income</h1>
           {items.length > 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {items.length} record{items.length !== 1 ? 's' : ''} · Total loaded:{' '}
-              <span className="font-medium">{formatCurrency(loadedTotal)}</span>
+            <p className="mt-1 text-sm text-ink-faint">
+              <span className="font-medium text-ink-soft tabular-nums">
+                {formatCurrency(loadedTotal)}
+              </span>{' '}
+              across {items.length} record{items.length !== 1 ? 's' : ''} in view
             </p>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <ManageCategoriesDialog categories={categories} />
-          <Button asChild>
-            <Link href="/income/new">Add Income</Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
+          >
+            <SlidersHorizontal aria-hidden="true" />
+            Filter
+            {activeFilterCount > 0 ? (
+              <span className="tabular-nums">· {activeFilterCount}</span>
+            ) : null}
+          </Button>
+          <Button size="sm" onClick={() => openRecordSheet('income')}>
+            <Plus aria-hidden="true" />
+            Record income
           </Button>
         </div>
       </div>
 
-      {/* Filters (URL-persisted, debounced search) */}
-      <IncomeFilters onFilterChange={handleFilterChange} />
+      {/* Filters (URL-persisted, debounced search) — collapsed by default */}
+      {filtersOpen ? <IncomeFilters onFilterChange={handleFilterChange} /> : null}
 
-      {/* Income list */}
+      {/* Income ledger */}
       <IncomeList
         items={items}
         onEditRow={(income) => setEditingIncome(income)}
@@ -117,7 +142,7 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
       {/* Load more (D-06 — append on demand, NOT numbered pages) */}
       {!isLast && items.length > 0 ? (
         <div className="flex justify-center pt-2">
-          <Button variant="outline" onClick={handleLoadMore} disabled={isPending}>
+          <Button variant="ghost" onClick={handleLoadMore} disabled={isPending}>
             {isPending ? 'Loading…' : 'Load more'}
           </Button>
         </div>

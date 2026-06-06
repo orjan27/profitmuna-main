@@ -2,68 +2,75 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, TrendingUp, TrendingDown, PieChart, Wallet } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { BrandMark } from '@/components/BrandMark';
+import { useRecordSheet } from '@/components/RecordSheetProvider';
 
 interface NavItem {
   readonly label: string;
   readonly href: string;
-  readonly icon: LucideIcon;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Income', href: '/income', icon: TrendingUp },
-  { label: 'Expenses', href: '/expenses', icon: TrendingDown },
-  { label: 'Profit First', href: '/profit-first', icon: PieChart },
-  { label: 'Wallets', href: '/wallets', icon: Wallet },
+  { label: 'Overview', href: '/overview' },
+  { label: 'Income', href: '/income' },
+  { label: 'Expenses', href: '/expenses' },
+  { label: 'Profit First', href: '/profit-first' },
+  { label: 'Wallets', href: '/wallets' },
 ] as const;
 
 /**
- * Shared navigation bar for all authenticated pages.
+ * Shared top bar for all authenticated pages: brand lockup, five quiet text
+ * links, and the global Record action. Active state is carried by ink color
+ * and weight, not pills or icons — the chrome stays out of the money's way.
  *
- * Renders a horizontal nav with five links: Dashboard, Income, Expenses,
- * Profit First, and Wallets. The link matching the current pathname is
- * highlighted as active.
- *
- * Must be a Client Component because it uses `usePathname` for active-state
- * detection. The parent (dashboard) layout stays a Server Component and
- * renders this component at the top of every authenticated page.
+ * Client Component: usePathname for active state, useRecordSheet for the
+ * Record action. Sits on the deeper chrome gray (paper-deep) so the content
+ * surface reads as the page.
  */
 export function DashboardNav(): React.JSX.Element {
   const pathname = usePathname();
+  const { openRecordSheet } = useRecordSheet();
 
   return (
-    <nav className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <ul className="flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
-          {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-            const isActive =
-              href === '/'
-                ? pathname === '/'
-                : pathname === href || pathname.startsWith(href + '/');
+    <header className="sticky top-0 z-10 border-b border-hairline bg-paper-deep/90 backdrop-blur">
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4 md:gap-7 md:px-8">
+        <Link href="/overview" aria-label="Profitmuna overview" className="shrink-0">
+          <BrandMark wordmarkClassName="max-sm:sr-only" />
+        </Link>
 
-            return (
-              <li key={href} className="flex-shrink-0">
-                <Link
-                  href={href}
-                  className={cn(
-                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-                  )}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  <span>{label}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <nav className="min-w-0 flex-1" aria-label="Primary">
+          <ul className="-mx-2 flex items-center gap-0.5 overflow-x-auto px-2">
+            {NAV_ITEMS.map(({ label, href }) => {
+              const isActive = pathname === href || pathname.startsWith(href + '/');
+              return (
+                <li key={href} className="shrink-0">
+                  <Link
+                    href={href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={cn(
+                      'block rounded-md px-2.5 py-2 text-sm whitespace-nowrap transition-colors',
+                      isActive
+                        ? 'font-medium text-ink'
+                        : 'text-ink-faint hover:text-ink-soft focus-visible:text-ink-soft'
+                    )}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <Button size="sm" className="shrink-0" onClick={() => openRecordSheet('income')}>
+          <Plus aria-hidden="true" />
+          <span className="max-sm:sr-only">Record</span>
+        </Button>
       </div>
-    </nav>
+    </header>
   );
 }

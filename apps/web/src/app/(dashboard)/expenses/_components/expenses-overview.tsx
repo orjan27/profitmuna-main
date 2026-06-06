@@ -2,12 +2,12 @@
 
 import { useState, useTransition, useCallback } from 'react';
 import { useQueryState } from 'nuqs';
-import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, SlidersHorizontal } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useRecordSheet } from '@/components/RecordSheetProvider';
 import { formatCurrency } from '@/lib/format-currency';
 import { fetchExpensesAction } from './expense-actions';
 import { ExpenseList } from './expense-list';
@@ -39,13 +39,17 @@ const PAGE_LIMIT = 20;
 // ── Component ─────────────────────────────────────────────────────────────────
 
 /**
- * Client shell that holds date-range filter state, the expense list, and load-more.
+ * Client shell for the expense ledger: holds the collapsed date-range filter,
+ * the grouped expense list, and load-more. Recording goes through the global
+ * Record sheet.
  *
  * Filter change resets the accumulator to page 0 results (D-07 — date range only, no free-text).
  * "Load more" appends the next page to the accumulated list without resetting (D-06).
- * Totals header sums ACTIVE (non-deleted) amounts only.
+ * The header total sums ACTIVE (non-deleted) amounts only.
  */
 export function ExpensesOverview({ initialData, categories }: ExpensesOverviewProps) {
+  const { openRecordSheet } = useRecordSheet();
+
   // Date-range filter via nuqs (D-07) — synced to URL search params
   const [from, setFrom] = useQueryState('from', { defaultValue: '' });
   const [to, setTo] = useQueryState('to', { defaultValue: '' });
@@ -56,6 +60,10 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
   const [isLast, setIsLast] = useState(initialData.last);
 
   const [isLoadingMore, startLoadMoreTransition] = useTransition();
+
+  const activeFilterCount = [from, to].filter(Boolean).length;
+  // Collapsed unless a shared/refreshed URL already carries a filter
+  const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0);
 
   // Fetch a page with current filter and return the result
   async function fetchPage(
@@ -106,6 +114,7 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
   const activeTotal = expenses
     .filter((e) => e.deletedAt === null)
     .reduce((sum, e) => sum + e.amount, 0);
+  const activeCount = expenses.filter((e) => e.deletedAt === null).length;
 
   function handleFromChange(e: React.ChangeEvent<HTMLInputElement>) {
     void applyFilter(e.target.value, to);
@@ -116,63 +125,89 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Totals header */}
-      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-6 py-4">
+    <div className="flex flex-col gap-7">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">Total (active)</p>
-          <p className="mt-1 text-2xl font-semibold">{formatCurrency(activeTotal)}</p>
+          <h1 className="text-[20px] leading-tight font-semibold">Expenses</h1>
+          {activeCount > 0 ? (
+            <p className="mt-1 text-sm text-ink-faint">
+              <span className="font-medium text-ink-soft tabular-nums">
+                {formatCurrency(activeTotal)}
+              </span>{' '}
+              spent across {activeCount} record{activeCount !== 1 ? 's' : ''} in view
+            </p>
+          ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <ManageCategoriesDialog categories={categories} />
-          <Button asChild size="sm">
-            <Link href="/expenses/new">
-              <Plus className="h-4 w-4 mr-1" aria-hidden="true" />
-              Record Expense
-            </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
+          >
+            <SlidersHorizontal aria-hidden="true" />
+            Filter
+            {activeFilterCount > 0 ? (
+              <span className="tabular-nums">· {activeFilterCount}</span>
+            ) : null}
+          </Button>
+          <Button size="sm" onClick={() => openRecordSheet('expense')}>
+            <Plus aria-hidden="true" />
+            Record expense
           </Button>
         </div>
       </div>
 
       {/* Date-range filter (D-07 — no free-text search for expenses) */}
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="filter-from" className="text-xs">
-            From
-          </Label>
-          <Input
-            id="filter-from"
-            type="date"
-            value={from}
-            onChange={handleFromChange}
-            className="w-40"
-          />
+      {filtersOpen ? (
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="filter-from" className="text-xs">
+              From
+            </Label>
+            <Input
+              id="filter-from"
+              type="date"
+              value={from}
+              onChange={handleFromChange}
+              className="w-40"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="filter-to" className="text-xs">
+              To
+            </Label>
+            <Input
+              id="filter-to"
+              type="date"
+              value={to}
+              onChange={handleToChange}
+              className="w-40"
+            />
+          </div>
+          {(from || to) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void applyFilter('', '')}
+              className="mb-px"
+            >
+              Clear filter
+            </Button>
+          )}
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="filter-to" className="text-xs">
-            To
-          </Label>
-          <Input id="filter-to" type="date" value={to} onChange={handleToChange} className="w-40" />
-        </div>
-        {(from || to) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void applyFilter('', '')}
-            className="mb-px"
-          >
-            Clear filter
-          </Button>
-        )}
-      </div>
+      ) : null}
 
-      {/* Expense list */}
+      {/* Expense ledger */}
       <ExpenseList expenses={expenses} categories={categories} onMutated={handleMutated} />
 
       {/* Load more (D-06 — append-on-demand, not pagination) */}
       {!isLast && (
-        <div className="flex justify-center">
-          <Button variant="outline" onClick={handleLoadMore} disabled={isLoadingMore}>
+        <div className="flex justify-center pt-2">
+          <Button variant="ghost" onClick={handleLoadMore} disabled={isLoadingMore}>
             {isLoadingMore ? 'Loading…' : 'Load more'}
           </Button>
         </div>

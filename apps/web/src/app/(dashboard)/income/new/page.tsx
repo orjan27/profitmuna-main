@@ -13,14 +13,12 @@ export default async function NewIncomePage() {
   const categoriesData = await apiFetch<IncomeCategoryListResponse>('/api/income-categories');
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Record Income</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Add a new income entry to your records.
-        </p>
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-7">
+      <div>
+        <h1 className="text-[20px] font-semibold leading-tight">Record income</h1>
+        <p className="mt-1 text-sm text-ink-faint">Add a new income entry to your records.</p>
       </div>
       <IncomeForm categories={categoriesData.data} action={createIncomeAction} />
-    </main>
+    </div>
   );
 }

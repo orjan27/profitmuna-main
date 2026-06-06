@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -46,55 +46,60 @@ export function ForgotPasswordForm() {
 
   if (submitted) {
     return (
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Check your email</CardTitle>
-          <CardDescription>
-            If an account with that address exists, a reset link has been sent. Check your inbox.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Didn&apos;t receive an email? Check your spam folder or{' '}
-            <button
-              type="button"
-              onClick={() => setSubmitted(false)}
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              try again
-            </button>
-            .
-          </p>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-sm">
+        <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
+        <p className="mt-1 text-sm text-ink-soft">
+          If an account with that address exists, a reset link has been sent. Check your inbox.
+        </p>
+        <p className="mt-6 text-sm text-ink-faint">
+          Didn&apos;t receive an email? Check your spam folder or{' '}
+          <button
+            type="button"
+            onClick={() => setSubmitted(false)}
+            className="text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline"
+          >
+            try again
+          </button>
+          .
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Forgot your password?</CardTitle>
-        <CardDescription>Enter your email and we&apos;ll send you a reset link.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="forgot-email">Email</Label>
-            <Input
-              id="forgot-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            {emailError ? <p className="text-sm text-destructive">{emailError}</p> : null}
-          </div>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Sending…' : 'Send reset link'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="w-full max-w-sm">
+      <h1 className="text-xl font-semibold tracking-tight">Forgot your password?</h1>
+      <p className="mt-1 text-sm text-ink-soft">
+        Enter your email and we&apos;ll send you a reset link.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5" noValidate>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="forgot-email">Email</Label>
+          <Input
+            id="forgot-email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          {emailError ? <p className="text-sm text-destructive">{emailError}</p> : null}
+        </div>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? 'Sending…' : 'Send reset link'}
+        </Button>
+      </form>
+
+      <p className="mt-8 text-sm text-ink-faint">
+        Remembered it?{' '}
+        <Link
+          href="/login"
+          className="text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline"
+        >
+          Sign in
+        </Link>
+      </p>
+    </div>
   );
 }

@@ -23,10 +23,10 @@ export default async function NewExpensePage() {
   const categoriesData = await apiFetch<{ data: ExpenseCategory[] }>('/api/expense-categories');
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-7">
       <div>
-        <h1 className="text-[20px] font-semibold leading-tight">Record Expense</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Add a new business expense.</p>
+        <h1 className="text-[20px] font-semibold leading-tight">Record expense</h1>
+        <p className="mt-1 text-sm text-ink-faint">Add a new business expense.</p>
       </div>
       <ExpenseForm categories={categoriesData.data} action={createExpenseAction} />
     </div>

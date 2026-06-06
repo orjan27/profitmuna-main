@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { RotateCcw, Pencil } from 'lucide-react';
+import { Plus, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useRecordSheet } from '@/components/RecordSheetProvider';
 import { formatCurrency } from '@/lib/format-currency';
-import { formatDate } from '@/lib/format-date';
+import { formatDateGroup } from '@/lib/format-date';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { restoreExpenseAction } from './expense-actions';
 import { EditExpenseDialog, type ExpenseRow } from './edit-expense-dialog';
@@ -35,6 +35,26 @@ function paymentMethodLabel(value: string | null): string | null {
   return match ? match.label : value;
 }
 
+interface DateGroup {
+  label: string;
+  items: ExpenseRow[];
+}
+
+/** Group consecutive rows by their ledger date heading (Today / Yesterday / date). */
+function groupByDate(items: ExpenseRow[]): DateGroup[] {
+  const groups: DateGroup[] = [];
+  for (const expense of items) {
+    const label = formatDateGroup(expense.expenseDate);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) {
+      last.items.push(expense);
+    } else {
+      groups.push({ label, items: [expense] });
+    }
+  }
+  return groups;
+}
+
 // ── Sub-component: deleted row restore affordance ─────────────────────────────
 
 interface DeletedRowProps {
@@ -57,45 +77,30 @@ function DeletedExpenseRow({ expense, onMutated }: DeletedRowProps) {
     });
   }
 
-  const pmLabel = paymentMethodLabel(expense.paymentMethod);
-
   return (
-    <div className="flex items-center gap-4 rounded-md border border-dashed border-muted-foreground/30 bg-muted/30 px-4 py-3 opacity-60">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium line-through text-muted-foreground">
-            {expense.categoryName}
-          </span>
-          <Badge variant="outline" className="text-xs shrink-0">
-            Deleted
-          </Badge>
-          {pmLabel && (
-            <Badge variant="secondary" className="text-xs shrink-0">
-              {pmLabel}
-            </Badge>
-          )}
-        </div>
-        {expense.description && (
-          <p className="mt-0.5 text-xs text-muted-foreground truncate">{expense.description}</p>
-        )}
-      </div>
-      <div className="text-right shrink-0">
-        <p className="text-sm font-medium text-muted-foreground line-through">
-          {formatCurrency(expense.amount)}
+    <li className="flex items-center gap-4 py-3 opacity-60">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-ink-soft line-through">
+          {expense.categoryName}
         </p>
-        <p className="text-xs text-muted-foreground">{formatDate(expense.expenseDate)}</p>
+        {expense.description ? (
+          <p className="mt-0.5 truncate text-xs text-ink-faint">{expense.description}</p>
+        ) : null}
       </div>
+      <span className="shrink-0 text-sm text-ink-faint tabular-nums line-through">
+        −{formatCurrency(expense.amount)}
+      </span>
       <Button
         variant="ghost"
-        size="icon"
-        aria-label="Restore expense"
+        size="icon-sm"
+        aria-label={`Restore expense: ${expense.categoryName}`}
         onClick={handleRestore}
         disabled={isPending}
         className="shrink-0"
       >
-        <RotateCcw className="h-4 w-4" />
+        <RotateCcw aria-hidden="true" />
       </Button>
-    </div>
+    </li>
   );
 }
 
@@ -111,36 +116,31 @@ function ActiveExpenseRow({ expense, categories, onMutated }: ActiveRowProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const pmLabel = paymentMethodLabel(expense.paymentMethod);
 
+  // Second line: description and payment method as quiet text, no badges
+  const detail = [expense.description, pmLabel].filter(Boolean).join(' · ');
+
   return (
-    <>
+    <li>
       <div
-        className="flex items-center gap-4 rounded-md border border-border px-4 py-3 hover:bg-muted/40 cursor-pointer transition-colors"
+        className="group -mx-3 flex cursor-pointer items-center gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-raised/40"
         onClick={() => setDialogOpen(true)}
         role="button"
         tabIndex={0}
-        aria-label={`Edit expense: ${expense.categoryName}`}
+        aria-label={`Edit expense: ${expense.categoryName}, ${formatCurrency(expense.amount)}`}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') setDialogOpen(true);
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setDialogOpen(true);
+          }
         }}
       >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium">{expense.categoryName}</span>
-            {pmLabel && (
-              <Badge variant="secondary" className="text-xs shrink-0">
-                {pmLabel}
-              </Badge>
-            )}
-          </div>
-          {expense.description && (
-            <p className="mt-0.5 text-xs text-muted-foreground truncate">{expense.description}</p>
-          )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{expense.categoryName}</p>
+          {detail ? <p className="mt-0.5 truncate text-xs text-ink-faint">{detail}</p> : null}
         </div>
-        <div className="text-right shrink-0">
-          <p className="text-sm font-semibold">{formatCurrency(expense.amount)}</p>
-          <p className="text-xs text-muted-foreground">{formatDate(expense.expenseDate)}</p>
-        </div>
-        <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+        <span className="shrink-0 text-sm font-semibold text-expense tabular-nums">
+          −{formatCurrency(expense.amount)}
+        </span>
       </div>
 
       <EditExpenseDialog
@@ -150,64 +150,77 @@ function ActiveExpenseRow({ expense, categories, onMutated }: ActiveRowProps) {
         categories={categories}
         onMutated={onMutated}
       />
-    </>
+    </li>
   );
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
 /**
- * Renders the expense list.
- *
- * Active rows are clickable and open the edit dialog (EXP-03).
- * Soft-deleted rows are surfaced below with a restore affordance (EXP-04).
- * Empty state shown when there are no active expenses.
+ * The expense ledger: borderless rows grouped under date headings, amounts in
+ * the expense color always paired with the − sign. Active rows open the edit
+ * dialog (EXP-03); soft-deleted rows surface below with a restore affordance
+ * (EXP-04).
  */
 export function ExpenseList({ expenses, categories, onMutated }: ExpenseListProps) {
+  const { openRecordSheet } = useRecordSheet();
+
   const activeExpenses = expenses.filter((e) => e.deletedAt === null);
   const deletedExpenses = expenses.filter((e) => e.deletedAt !== null);
 
   if (activeExpenses.length === 0 && deletedExpenses.length === 0) {
     return (
-      <div className="rounded-md border border-dashed border-border py-12 text-center">
-        <p className="text-sm text-muted-foreground">No expenses recorded yet.</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Record your first expense using the button above.
+      <div className="py-20 text-center">
+        <p className="text-base font-medium">No expenses recorded yet</p>
+        <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-ink-faint">
+          Record what you spend and keep every bucket honest.
         </p>
+        <Button className="mt-6" onClick={() => openRecordSheet('expense')}>
+          <Plus aria-hidden="true" />
+          Record expense
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Active expenses */}
-      {activeExpenses.map((expense) => (
-        <ActiveExpenseRow
-          key={expense.id}
-          expense={expense}
-          categories={categories}
-          onMutated={onMutated}
-        />
+    <div className="flex flex-col gap-8">
+      {groupByDate(activeExpenses).map((group) => (
+        <section key={group.label} aria-label={group.label}>
+          <h2 className="text-xs font-medium tracking-[0.12em] text-ink-faint uppercase">
+            {group.label}
+          </h2>
+          <ul className="mt-1 divide-y divide-hairline/60">
+            {group.items.map((expense) => (
+              <ActiveExpenseRow
+                key={expense.id}
+                expense={expense}
+                categories={categories}
+                onMutated={onMutated}
+              />
+            ))}
+          </ul>
+        </section>
       ))}
 
       {activeExpenses.length === 0 && deletedExpenses.length > 0 && (
-        <div className="rounded-md border border-dashed border-border py-6 text-center">
-          <p className="text-sm text-muted-foreground">No active expenses in this period.</p>
-        </div>
+        <p className="py-6 text-center text-sm text-ink-faint">
+          No active expenses in this period.
+        </p>
       )}
 
       {/* Soft-deleted expenses */}
       {deletedExpenses.length > 0 && (
-        <div className="mt-4">
-          <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <section aria-label="Deleted expenses">
+          <h2 className="text-xs font-medium tracking-[0.12em] text-ink-faint uppercase">
             Deleted ({deletedExpenses.length})
-          </p>
-          {deletedExpenses.map((expense) => (
-            <div key={expense.id} className="mb-2">
-              <DeletedExpenseRow expense={expense} onMutated={onMutated} />
-            </div>
-          ))}
-        </div>
+          </h2>
+          <ul className="mt-1 divide-y divide-hairline/60">
+            {deletedExpenses.map((expense) => (
+              <DeletedExpenseRow key={expense.id} expense={expense} onMutated={onMutated} />
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

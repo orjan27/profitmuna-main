@@ -3,9 +3,10 @@ import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/auth';
 import { apiFetch } from '@/server/api';
+import { formatCurrency } from '@/lib/format-currency';
 import { Button } from '@/components/ui/button';
 import type { WalletListItem, PfAccount } from '@/types/wallet';
-import { WalletCard } from './_components/WalletCard';
+import { WalletRow } from './_components/WalletRow';
 
 type WalletListResponse = {
   data: WalletListItem[];
@@ -31,6 +32,7 @@ export default async function WalletsPage() {
 
   const wallets = walletsRes.data ?? [];
   const pfAccounts = pfSummaryRes.data?.accounts ?? [];
+  const totalBalanceCents = wallets.reduce((sum, w) => sum + w.balanceCents, 0);
 
   // Determine which PF accounts are unlinked (no wallet yet) for the empty-state quick-create
   const linkedPfAccountIds = new Set(
@@ -41,41 +43,46 @@ export default async function WalletsPage() {
   const unlinkedPfAccounts = pfAccounts.filter((a) => !linkedPfAccountIds.has(a.id));
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-7">
       {/* Page header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Wallets</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Manage your Profit First wallets and track money across accounts.
-          </p>
+          <h1 className="text-[20px] leading-tight font-semibold">Wallets</h1>
+          {wallets.length > 0 ? (
+            <p className="mt-1 text-sm text-ink-faint">
+              <span className="font-medium text-ink-soft tabular-nums">
+                {formatCurrency(totalBalanceCents)}
+              </span>{' '}
+              across {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
+            </p>
+          ) : null}
         </div>
-        <Button asChild>
-          <Link href="/wallets/new">Create Wallet</Link>
+        <Button size="sm" asChild>
+          <Link href="/wallets/new">New wallet</Link>
         </Button>
       </div>
 
       {wallets.length > 0 ? (
-        /* Card grid — sorted by sortOrder (server already returns them in order) */
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        /* Ledger rows — sorted by sortOrder (server already returns them in order) */
+        <ul className="divide-y divide-hairline/60">
           {wallets.map((wallet) => (
-            <WalletCard key={wallet.id} wallet={wallet} />
+            <WalletRow key={wallet.id} wallet={wallet} />
           ))}
-        </div>
+        </ul>
       ) : (
         /* Empty state (D-04) */
-        <div className="flex flex-col items-center rounded-xl border px-6 py-12 text-center">
-          <h2 className="text-base font-semibold">No wallets yet</h2>
-          <p className="text-muted-foreground mt-2 max-w-sm text-sm">
-            Track your Profit First allocations by creating a wallet for each account.
+        <div className="py-20 text-center">
+          <p className="text-base font-medium">No wallets yet</p>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-faint">
+            Track where your money actually sits by creating a wallet for each allocation account.
           </p>
 
           {unlinkedPfAccounts.length > 0 && (
-            <div className="mt-6">
-              <p className="text-muted-foreground mb-3 text-xs">
-                Quick-create for your allocation accounts:
+            <div className="mt-8">
+              <p className="text-xs font-medium tracking-[0.12em] text-ink-faint uppercase">
+                Quick-create from your buckets
               </p>
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
                 {unlinkedPfAccounts.map((account) => (
                   <Button key={account.id} variant="outline" size="sm" asChild>
                     <Link href={`/wallets/new?pfAccountId=${account.id}`}>+ {account.name}</Link>
@@ -85,8 +92,8 @@ export default async function WalletsPage() {
             </div>
           )}
 
-          <Button className="mt-6" asChild>
-            <Link href="/wallets/new">Create Wallet</Link>
+          <Button className="mt-8" asChild>
+            <Link href="/wallets/new">Create wallet</Link>
           </Button>
         </div>
       )}

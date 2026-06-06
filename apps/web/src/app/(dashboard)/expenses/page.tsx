@@ -58,13 +58,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   ]);
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-[20px] font-semibold leading-tight">Expenses</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Record and manage your business expenses.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-3xl">
       <ExpensesOverview initialData={expensesData} categories={categoriesData.data} />
     </div>
   );

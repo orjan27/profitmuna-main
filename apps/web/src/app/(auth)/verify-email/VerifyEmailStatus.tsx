@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -63,68 +62,59 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
 
   if (state === 'verifying') {
     return (
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Verifying…</CardTitle>
-          <CardDescription>Hold on while we confirm your email.</CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="w-full max-w-sm">
+        <h1 className="text-xl font-semibold tracking-tight">Verifying…</h1>
+        <p className="mt-1 text-sm text-ink-soft">Hold on while we confirm your email.</p>
+      </div>
     );
   }
 
   if (state === 'success') {
     return (
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Email verified</CardTitle>
-          <CardDescription>Your email is confirmed — you can sign in now.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild className="w-full">
-            <a href="/login">Go to login</a>
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="w-full max-w-sm">
+        <h1 className="text-xl font-semibold tracking-tight">Email verified</h1>
+        <p className="mt-1 text-sm text-ink-soft">Your email is confirmed. You can sign in now.</p>
+        <Button asChild className="mt-8 w-full">
+          <a href="/login">Go to login</a>
+        </Button>
+      </div>
     );
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        {state === 'failure' ? (
-          <>
-            <CardTitle>Verification failed</CardTitle>
-            <CardDescription>
-              That link is invalid or has expired. Enter your email to get a new one.
-            </CardDescription>
-          </>
-        ) : (
-          <>
-            <CardTitle>Check your email</CardTitle>
-            <CardDescription>
-              We sent you a verification link. Didn&apos;t get it? Resend below.
-            </CardDescription>
-          </>
-        )}
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleResend} className="flex flex-col gap-4" noValidate>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="resend-email">Email</Label>
-            <Input
-              id="resend-email"
-              type="email"
-              autoComplete="email"
-              value={resendEmail}
-              onChange={(e) => setResendEmail(e.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit" variant="outline" disabled={resending}>
-            {resending ? 'Sending…' : 'Resend verification link'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="w-full max-w-sm">
+      {state === 'failure' ? (
+        <>
+          <h1 className="text-xl font-semibold tracking-tight">Verification failed</h1>
+          <p className="mt-1 text-sm text-ink-soft">
+            That link is invalid or has expired. Enter your email to get a new one.
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
+          <p className="mt-1 text-sm text-ink-soft">
+            We sent you a verification link. Didn&apos;t get it? Resend below.
+          </p>
+        </>
+      )}
+
+      <form onSubmit={handleResend} className="mt-8 flex flex-col gap-5" noValidate>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="resend-email">Email</Label>
+          <Input
+            id="resend-email"
+            type="email"
+            autoComplete="email"
+            value={resendEmail}
+            onChange={(e) => setResendEmail(e.target.value)}
+            required
+          />
+        </div>
+        <Button type="submit" variant="outline" disabled={resending}>
+          {resending ? 'Sending…' : 'Resend verification link'}
+        </Button>
+      </form>
+    </div>
   );
 }

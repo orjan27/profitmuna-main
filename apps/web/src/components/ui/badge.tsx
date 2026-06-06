@@ -17,8 +17,10 @@ const badgeVariants = cva(
           'border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         ghost: '[a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 [a&]:hover:underline',
-        success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100',
-        warning: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100',
+        // Money-state badges on the system ramp: received income carries the
+        // income hue (always alongside its text label); pending stays neutral.
+        success: 'bg-income/15 text-income',
+        warning: 'bg-raised text-ink-soft',
       },
     },
     defaultVariants: {
