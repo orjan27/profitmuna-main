@@ -1,0 +1,34 @@
+import { redirect } from 'next/navigation';
+
+import { getSession } from '@/server/auth';
+import { apiFetch } from '@/server/api';
+import { ExpenseForm } from '../_components/expense-form';
+import { createExpenseAction } from './_actions/create-expense';
+
+interface ExpenseCategory {
+  id: number;
+  name: string;
+  system: boolean;
+}
+
+/**
+ * RSC for /expenses/new.
+ * Guards with getSession → redirect to /login when unauthenticated.
+ * Fetches expense categories for the form select.
+ */
+export default async function NewExpensePage() {
+  const session = await getSession();
+  if (!session) redirect('/login');
+
+  const categories = await apiFetch<ExpenseCategory[]>('/api/expense-categories');
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-[20px] font-semibold leading-tight">Record Expense</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Add a new business expense.</p>
+      </div>
+      <ExpenseForm categories={categories} action={createExpenseAction} />
+    </div>
+  );
+}
