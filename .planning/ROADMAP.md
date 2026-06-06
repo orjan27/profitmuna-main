@@ -174,18 +174,26 @@ Plans:
 2. User sees a list of recent transactions (income, expenses, wallet transactions) on the dashboard
 3. Dashboard data reflects the user's current financial state without requiring a manual refresh
 4. All authenticated pages (Dashboard, Income, Expenses, Profit First, Wallets) share a navigation shell with links to each section; a Settings link appears once Phase 6 ships
-   **Plans**: 3 plans
+   **Plans**: 3 gap-closure plans (original 05-01..05-03 never executed — superseded)
 
 Plans:
 
-**Wave 0** _(05-01 and 05-03 run in parallel — no file overlap)_
+**Original plans (never executed — superseded by the gap-closure set below)** _(A redesign session built `/overview` (commit d51c994), adopted as the Phase 5 base instead of executing these. Kept for provenance.)_
 
-- [ ] 05-01-PLAN.md — Dashboard data backend: failing test scaffold → createDashboardService (income CASE aggregate, period-scoped wallet balance, PF summary reuse, unified recent-transactions feed) → /api/dashboard/summary route behind requireAuth + index mount + web DashboardSummary types + BFF proxy (DASH-01)
-- [ ] 05-03-PLAN.md — Nav shell + landing: Dashboard nav entry → /dashboard, authenticated `/` redirects to /dashboard (marketing page preserved for logged-out) (DASH-01)
+- [~] 05-01-PLAN.md — Dashboard data backend (superseded by 05-04)
+- [~] 05-02-PLAN.md — Dashboard UI slice at /dashboard (superseded by 05-05, retargeted to the adopted /overview)
+- [~] 05-03-PLAN.md — Nav shell + landing → /dashboard (superseded by 05-06, retargeted to /overview; nav already points at /overview)
 
-**Wave 1** _(blocked on 05-01 completion)_
+**Gap closure** _(VERIFICATION 2026-06-06: 2/10 must-haves, 8 blockers. Build ON the adopted `/overview` design. Accepted deviations: route is `/overview`, nav label "Overview".)_
 
-- [ ] 05-02-PLAN.md — Dashboard UI slice: DashboardFilters (This Month default, Manila tz, nuqs) + DashboardContent (5 stat cards, read-only PF section, unified color-coded feed with client-side Load more, zeroed/getting-started empty state) + /dashboard RSC page (fresh SSR fetch) (DASH-01)
+**Wave 0** _(05-04 and 05-06 run in parallel — no file overlap)_
+
+- [ ] 05-04-PLAN.md — Dashboard data backend (closes missing /api/dashboard endpoint, service, web types, BFF proxy, tests): RED dashboard.test.ts → createDashboardService (income CASE aggregate, period-scoped wallet balance, PF summary reuse, unified income+expense+wallet-tx feed) → /api/dashboard/summary behind requireAuth + index mount + web DashboardSummary/RecentTransaction types + BFF proxy (DASH-01)
+- [ ] 05-06-PLAN.md — Root landing: authenticated `/` redirects to `/overview` via getSession() (marketing preserved for logged-out); middleware untouched (DASH-01)
+
+**Wave 1** _(blocked on 05-04 completion)_
+
+- [ ] 05-05-PLAN.md — Overview UI gap closure (extends the adopted `/overview`, not a rewrite): overview-filters (This Month/Manila/nuqs date presets) + overview-content (income/pending/expense/net figures, per-account PF computedBalance, unified navigable feed incl. wallet deposits/withdrawals, client-side Load more, period-scoped wallet balance label) + overview/page.tsx rewired to the single summary endpoint (DASH-01)
 
 **UI hint**: yes
 
@@ -228,8 +236,8 @@ Plans:
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 4/4            | Complete    | 2026-06-06 |
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
-| 4. Wallets                  | 4/4 | Complete    | 2026-06-06 |
-| 5. Dashboard                | 0/3            | Planned     | -          |
+| 4. Wallets                  | 4/4            | Complete    | 2026-06-06 |
+| 5. Dashboard                | 0/3            | Gap closure | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
 
 ---
@@ -275,3 +283,4 @@ Plans:
 ---
 
 _Roadmap created: 2026-06-05_
+</content>
