@@ -385,6 +385,30 @@ export async function logout(d1: D1Database, userId: number): Promise<void> {
   await db.delete(refreshTokensTable).where(eq(refreshTokensTable.userId, userId));
 }
 
+/**
+ * Logs out using only the raw refresh token (WR-04). Resilient to an
+ * expired/absent access token — logout is exactly when the access token is
+ * most likely stale. Looks up the token row by hash, and if found deletes ALL
+ * refresh tokens for that user (D-12 global revocation). Idempotent: an
+ * unknown/missing token is a no-op so the route can always clear cookies and
+ * report success.
+ */
+export async function logoutByRefreshToken(
+  d1: D1Database,
+  rawRefreshToken: string | undefined
+): Promise<void> {
+  if (!rawRefreshToken) return;
+  const db = createDb(d1);
+  const tokenHash = await sha256Hash(rawRefreshToken);
+  const rows = await db
+    .select()
+    .from(refreshTokensTable)
+    .where(eq(refreshTokensTable.tokenHash, tokenHash));
+  const stored = rows[0];
+  if (!stored) return;
+  await db.delete(refreshTokensTable).where(eq(refreshTokensTable.userId, stored.userId));
+}
+
 export type ForgotPasswordResult = {
   /** Whether a matching user account exists. Route uses this to decide whether to send email. */
   exists: boolean;

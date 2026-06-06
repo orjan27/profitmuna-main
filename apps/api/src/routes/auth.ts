@@ -20,7 +20,7 @@ import {
   resendVerification,
   login,
   refreshTokens,
-  logout,
+  logoutByRefreshToken,
   forgotPassword,
   resetPassword,
   upsertGoogleUser,
@@ -29,7 +29,6 @@ import { createDb } from '@app/db';
 import { refreshTokens as refreshTokensTable } from '@app/db/schema';
 import { signAccessToken } from '@/lib/jwt';
 import { generateSecureToken, sha256Hash } from '@/lib/token';
-import { requireAuth } from '@/middleware/auth';
 import type { Bindings, Variables } from '@/types';
 
 const authRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -142,11 +141,12 @@ authRouter.post('/refresh', async (c) => {
   return c.json({ data: { userId: result.userId } });
 });
 
-// requireAuth applied only to /logout (and future protected routes — not globally)
-authRouter.use('/logout', requireAuth);
+// Logout is driven by the refresh_token cookie, NOT requireAuth (WR-04):
+// the access token is most likely expired at logout time, and logout must
+// still revoke server-side refresh tokens and clear cookies. Always succeeds.
 authRouter.post('/logout', async (c) => {
-  const userId = c.get('userId');
-  await logout(c.env.DB, userId);
+  const rawRefreshToken = getCookie(c, 'refresh_token');
+  await logoutByRefreshToken(c.env.DB, rawRefreshToken);
   deleteCookie(c, 'access_token', { path: '/' });
   deleteCookie(c, 'refresh_token', { path: '/' });
   return c.json({ data: { message: 'logged_out' } });

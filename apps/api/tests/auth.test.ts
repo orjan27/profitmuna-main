@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { SignJWT } from 'jose';
+import { Hono } from 'hono';
 
 import { schema } from '@app/db';
 
 import app from '../src/index';
+import { requireAuth } from '@/middleware/auth';
+import type { Bindings, Variables } from '@/types';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash, encodeHex } from '@/lib/token';
 import { signAccessToken, verifyAccessToken } from '@/lib/jwt';
@@ -771,8 +774,14 @@ describe('auth-service: logout', () => {
 });
 
 describe('middleware: requireAuth', () => {
+  // Logout is no longer protected (WR-04), so exercise requireAuth against a
+  // dedicated test route that mounts the middleware in isolation.
+  const protectedApp = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+  protectedApp.use('/protected', requireAuth);
+  protectedApp.post('/protected', (c) => c.json({ data: { userId: c.get('userId') } }));
+
   it('returns 401 for a request with no Authorization header', async () => {
-    const res = await app.request('/api/auth/logout', { method: 'POST' }, env, executionCtx);
+    const res = await protectedApp.request('/protected', { method: 'POST' }, env, executionCtx);
     expect(res.status).toBe(401);
   });
 
@@ -786,8 +795,8 @@ describe('middleware: requireAuth', () => {
       .setExpirationTime('30m')
       .sign(key);
 
-    const res = await app.request(
-      '/api/auth/logout',
+    const res = await protectedApp.request(
+      '/protected',
       {
         method: 'POST',
         headers: { authorization: `Bearer ${wrongIssuer}` },
@@ -808,8 +817,8 @@ describe('middleware: requireAuth', () => {
       .setExpirationTime('30m')
       .sign(key);
 
-    const res = await app.request(
-      '/api/auth/logout',
+    const res = await protectedApp.request(
+      '/protected',
       {
         method: 'POST',
         headers: { authorization: `Bearer ${wrongAudience}` },
@@ -821,27 +830,21 @@ describe('middleware: requireAuth', () => {
   });
 
   it('proceeds past requireAuth for a valid JWT with correct iss/aud', async () => {
-    const { d1, db } = createTestDb();
-    const testEnv = mockEnv({}, d1);
-    const user = seedUser(db, {
-      email: 'auth@middleware.test',
-      name: 'Auth Middleware',
-      passwordHash: await hashPassword('testpassword1'),
-      emailVerified: true,
-    });
-    const token = await signAccessToken(user.id, testEnv.JWT_ACCESS_SECRET);
+    const token = await signAccessToken(7, env.JWT_ACCESS_SECRET);
 
-    const res = await app.request(
-      '/api/auth/logout',
+    const res = await protectedApp.request(
+      '/protected',
       {
         method: 'POST',
         headers: { authorization: `Bearer ${token}` },
       },
-      testEnv,
+      env,
       executionCtx
     );
     // 200 = passed auth; 401 would mean middleware rejected
     expect(res.status).toBe(200);
+    const body = (await res.json()) as { data?: { userId?: number } };
+    expect(body.data?.userId).toBe(7);
   });
 });
 
@@ -952,7 +955,7 @@ describe('POST /api/auth/refresh', () => {
 });
 
 describe('POST /api/auth/logout', () => {
-  it('clears both cookies and deletes all refresh tokens for the user', async () => {
+  it('clears both cookies and deletes all refresh tokens via the refresh_token cookie', async () => {
     const { d1, db } = createTestDb();
     const testEnv = mockEnv({}, d1);
     const user = seedUser(db, {
@@ -962,13 +965,12 @@ describe('POST /api/auth/logout', () => {
       emailVerified: true,
     });
 
-    const token = await signAccessToken(user.id, testEnv.JWT_ACCESS_SECRET);
-
-    // Seed a refresh token row
+    // Seed a refresh token row keyed by the hash of a known raw token
+    const rawRefresh = generateSecureToken();
     db.insert(schema.refreshTokens)
       .values({
         userId: user.id,
-        tokenHash: 'logout-hash',
+        tokenHash: await sha256Hash(rawRefresh),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .run();
@@ -977,7 +979,7 @@ describe('POST /api/auth/logout', () => {
       '/api/auth/logout',
       {
         method: 'POST',
-        headers: { authorization: `Bearer ${token}` },
+        headers: { cookie: `refresh_token=${rawRefresh}` },
       },
       testEnv,
       executionCtx
@@ -1006,6 +1008,49 @@ describe('POST /api/auth/logout', () => {
       .where(eq(schema.refreshTokens.userId, user.id))
       .all();
     expect(rows).toHaveLength(0);
+  });
+
+  it('succeeds and clears cookies even with no access token / expired session (WR-04)', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    const user = seedUser(db, {
+      email: 'stalelogout@route.test',
+      name: 'Stale Logout',
+      passwordHash: await hashPassword('pw6'),
+      emailVerified: true,
+    });
+    const rawRefresh = generateSecureToken();
+    db.insert(schema.refreshTokens)
+      .values({
+        userId: user.id,
+        tokenHash: await sha256Hash(rawRefresh),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .run();
+
+    // No Authorization header at all — logout must still work off the cookie
+    const res = await app.request(
+      '/api/auth/logout',
+      {
+        method: 'POST',
+        headers: { cookie: `refresh_token=${rawRefresh}` },
+      },
+      testEnv,
+      executionCtx
+    );
+    expect(res.status).toBe(200);
+
+    const rows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    expect(rows).toHaveLength(0);
+  });
+
+  it('is idempotent — returns 200 even with no refresh_token cookie', async () => {
+    const res = await app.request('/api/auth/logout', { method: 'POST' }, env, executionCtx);
+    expect(res.status).toBe(200);
   });
 });
 
