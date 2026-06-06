@@ -183,3 +183,117 @@ export const expenses = sqliteTable(
     index('expenses_user_category_idx').on(t.userId, t.categoryId),
   ]
 );
+
+// ─── Phase 4: Wallet tables ───────────────────────────────────────────────────
+
+export const wallets = sqliteTable(
+  'wallets',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    sourceType: text('source_type', { enum: ['PROFIT_FIRST', 'BLANK'] }).notNull(),
+    // Nullable — only set for PROFIT_FIRST wallets; no cascade so delete-guard can block (D-01)
+    profitFirstAccountId: integer('profit_first_account_id').references(
+      () => profitFirstAccounts.id
+    ),
+    // When true, all expenses are auto-deducted from this wallet
+    autoDeductAllExpenses: integer('auto_deduct_all_expenses', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    // Hex color string (e.g. #RRGGBB)
+    color: text('color').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at')
+      .$defaultFn(() => new Date().toISOString())
+      .$onUpdateFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index('wallets_user_idx').on(table.userId),
+    // Enforces one wallet per PF account per user (D-01 of WAL-01)
+    uniqueIndex('wallets_user_pf_account_unique').on(table.userId, table.profitFirstAccountId),
+  ]
+);
+
+export const walletIncomeCategoryMappings = sqliteTable(
+  'wallet_income_category_mappings',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    walletId: integer('wallet_id')
+      .notNull()
+      .references(() => wallets.id, { onDelete: 'cascade' }),
+    incomeCategoryId: integer('income_category_id')
+      .notNull()
+      .references(() => incomeCategories.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at')
+      .$defaultFn(() => new Date().toISOString())
+      .$onUpdateFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    // One wallet per income category across all user's wallets (WAL-02)
+    uniqueIndex('wicm_income_category_unique').on(table.incomeCategoryId),
+    index('wicm_user_idx').on(table.userId),
+    index('wicm_wallet_idx').on(table.walletId),
+  ]
+);
+
+export const walletExpenseCategoryMappings = sqliteTable(
+  'wallet_expense_category_mappings',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    walletId: integer('wallet_id')
+      .notNull()
+      .references(() => wallets.id, { onDelete: 'cascade' }),
+    expenseCategoryId: integer('expense_category_id')
+      .notNull()
+      .references(() => expenseCategories.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at')
+      .$defaultFn(() => new Date().toISOString())
+      .$onUpdateFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    // One wallet per expense category across all user's wallets
+    uniqueIndex('wecm_expense_category_unique').on(table.expenseCategoryId),
+    index('wecm_user_idx').on(table.userId),
+    index('wecm_wallet_idx').on(table.walletId),
+  ]
+);
+
+export const walletTransactions = sqliteTable(
+  'wallet_transactions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    walletId: integer('wallet_id')
+      .notNull()
+      .references(() => wallets.id, { onDelete: 'cascade' }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id),
+    type: text('type', { enum: ['DEPOSIT', 'WITHDRAWAL'] }).notNull(),
+    // Amount stored as integer cents, always positive (D-08)
+    amount: integer('amount').notNull(),
+    description: text('description'),
+    transactionDate: text('transaction_date').notNull(),
+    // Soft delete: null = active; ISO string = soft-deleted (D-09)
+    deletedAt: text('deleted_at'),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at')
+      .$defaultFn(() => new Date().toISOString())
+      .$onUpdateFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index('wt_user_wallet_idx').on(table.userId, table.walletId),
+    index('wt_wallet_date_idx').on(table.walletId, table.transactionDate),
+  ]
+);
