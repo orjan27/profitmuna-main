@@ -114,7 +114,7 @@ Plans:
 
 **Wave 3** _(blocked on Wave 2 completion)_
 
-- [ ] 03-03-PLAN.md — View UI: minimal (dashboard) layout, /profit-first RSC page + summary fetch, account cards with derived balances, shared amount-masking, date-range + category filters via nuqs (PF-01, PF-04)
+- [x] 03-03-PLAN.md — View UI: minimal (dashboard) layout, /profit-first RSC page + summary fetch, account cards with derived balances, shared amount-masking, date-range + category filters via nuqs (PF-01, PF-04)
 
 **Wave 4** _(blocked on Wave 3 completion)_
 
@@ -189,7 +189,7 @@ Plans:
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 1/4            | In Progress |            |
-| 3. Profit First Allocation  | 2/4 | In Progress|  |
+| 3. Profit First Allocation  | 3/4            | In Progress |            |
 | 4. Wallets                  | 0/3            | Planned     | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 6 context gathered
-last_updated: "2026-06-06T03:33:00.674Z"
+stopped_at: Phase 03 Plan 03 complete
+last_updated: '2026-06-06T12:00:00.000Z'
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 15
-  completed_plans: 7
-  percent: 17
+  completed_plans: 9
+  percent: 53
 ---
 
 # State: Profitmuna
@@ -32,9 +32,9 @@ progress:
 ## Current Position
 
 Phase: 03 (profit-first-allocation) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 **Phase:** 03
-**Plan:** Plan 02 complete — Plan 03 next
+**Plan:** Plan 03 complete — Plan 04 next
 **Status:** Executing Phase 03
 **Phase goal:** Every user has exactly 4 Profit First allocation accounts; CRUD, percentage editing, and allocation summary with derived balances
 
@@ -63,6 +63,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 01 P04 | 20 min active | 4 commits | 4 files |
 | Phase 03 P01 | ~15 min active | 3 tasks | 7 files |
 | Phase 03 P02 | ~20 min active | 2 tasks | 6 files |
+| Phase 03 P03 | ~30 min active | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -105,8 +106,8 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Phase 6 context gathered
-**Next:** Execute Phase 03 Plan 03 (profit-first UI — page, components, server actions)
+**Stopped at:** Phase 03 Plan 03 complete
+**Next:** Execute Phase 03 Plan 04 (profit-first CRUD mutations — server actions, create/edit/delete dialogs, percentage editor)
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -136,3 +137,6 @@ _State initialized: 2026-06-05_
 - [Phase 03-02]: getSummary returns targetPercentage as percent (bp/100) not basis points — UI editor uses total===100 check (Pitfall 3)
 - [Phase 03-02]: Phase 4 wallet-link guard in deleteAccount stubbed as comment block — wallets table does not exist in Phase 3
 - [Phase 03-02]: BFF proxy has no transparent-refresh or Set-Cookie relay — middleware.ts handles auth redirect for unauthenticated users
+- [Phase 03-03]: RSC page.tsx fetches direct to API_BASE_URL (not BFF proxy) — server-to-server avoids unnecessary hop; BFF reserved for client-side fetches and Plan 04 server actions
+- [Phase 03-03]: PfContent is a thin client wrapper owning useAmountVisibility state; passes visible/mounted to PfOverview and AmountToggle — canonical RSC/client boundary composition pattern
+- [Phase 03-03]: eslint.config.mjs updated with apps/\*\*/.next/ ignore — ESLint 9 flat config resolves ignores relative to config root, so workspace .next/ dirs require explicit glob prefixes
