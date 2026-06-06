@@ -8,6 +8,7 @@ import app from '../src/index';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash, encodeHex } from '@/lib/token';
 import { signAccessToken, signRefreshToken, verifyAccessToken } from '@/lib/jwt';
+import { login, refreshTokens, logout } from '@/services/auth-service';
 
 import { createTestDb, seedUser, mockEnv } from './helpers/db';
 
@@ -392,5 +393,526 @@ describe('POST /api/auth/login (verification gate, D-07)', () => {
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error.code).toBe('invalid_credentials');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// slice 01-02 tests: login/refresh/logout service + requireAuth middleware
+// ---------------------------------------------------------------------------
+
+describe('auth-service: login', () => {
+  it('returns accessToken + refreshToken for a verified user with correct password', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'login@ok.test',
+      name: 'Login OK',
+      passwordHash: await hashPassword('correctpass'),
+      emailVerified: true,
+    });
+
+    const result = await login(d1, env.JWT_ACCESS_SECRET, 'login@ok.test', 'correctpass');
+    expect(result.userId).toBe(user.id);
+    expect(typeof result.accessToken).toBe('string');
+    expect(typeof result.refreshToken).toBe('string');
+
+    // access token verifiable with correct iss/aud
+    const payload = await verifyAccessToken(result.accessToken, env.JWT_ACCESS_SECRET);
+    expect(payload.sub).toBe(String(user.id));
+
+    // refresh_tokens row should exist
+    const rtRows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    expect(rtRows).toHaveLength(1);
+    expect(rtRows[0].revokedAt).toBeNull();
+  });
+
+  it('throws 401 invalid_credentials for wrong password and increments login_attempts', async () => {
+    const { d1, db } = createTestDb();
+    seedUser(db, {
+      email: 'badpass@test.test',
+      name: 'Bad Pass',
+      passwordHash: await hashPassword('correctpass'),
+      emailVerified: true,
+    });
+
+    await expect(
+      login(d1, env.JWT_ACCESS_SECRET, 'badpass@test.test', 'wrongpass')
+    ).rejects.toMatchObject({
+      status: 401,
+      message: 'invalid_credentials',
+    });
+
+    const attempts = db
+      .select()
+      .from(schema.loginAttempts)
+      .where(eq(schema.loginAttempts.email, 'badpass@test.test'))
+      .all();
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0].count).toBe(1);
+  });
+
+  it('throws 403 email_not_verified for an unverified user', async () => {
+    const { d1, db } = createTestDb();
+    seedUser(db, {
+      email: 'unver@login.test',
+      name: 'Unverified',
+      passwordHash: await hashPassword('pass12345'),
+      emailVerified: false,
+    });
+
+    await expect(
+      login(d1, env.JWT_ACCESS_SECRET, 'unver@login.test', 'pass12345')
+    ).rejects.toMatchObject({
+      status: 403,
+      message: 'email_not_verified',
+    });
+  });
+
+  it('throws 429 too_many_requests after 5 failed attempts and sets lockedUntil', async () => {
+    const { d1, db } = createTestDb();
+    seedUser(db, {
+      email: 'locked@login.test',
+      name: 'Locked',
+      passwordHash: await hashPassword('correctpass'),
+      emailVerified: true,
+    });
+
+    // Fail 4 times
+    for (let i = 0; i < 4; i++) {
+      await expect(
+        login(d1, env.JWT_ACCESS_SECRET, 'locked@login.test', 'wrong')
+      ).rejects.toMatchObject({
+        status: 401,
+      });
+    }
+    // 5th failure should lock
+    await expect(
+      login(d1, env.JWT_ACCESS_SECRET, 'locked@login.test', 'wrong')
+    ).rejects.toMatchObject({
+      status: 429,
+      message: 'too_many_requests',
+    });
+
+    // Subsequent attempts (even correct password) still 429 while locked
+    await expect(
+      login(d1, env.JWT_ACCESS_SECRET, 'locked@login.test', 'correctpass')
+    ).rejects.toMatchObject({
+      status: 429,
+    });
+  });
+
+  it('resets login_attempts counter on successful login', async () => {
+    const { d1, db } = createTestDb();
+    seedUser(db, {
+      email: 'reset@attempts.test',
+      name: 'Reset',
+      passwordHash: await hashPassword('goodpass'),
+      emailVerified: true,
+    });
+
+    // Fail a couple times
+    await expect(
+      login(d1, env.JWT_ACCESS_SECRET, 'reset@attempts.test', 'bad')
+    ).rejects.toBeDefined();
+    await expect(
+      login(d1, env.JWT_ACCESS_SECRET, 'reset@attempts.test', 'bad')
+    ).rejects.toBeDefined();
+
+    // Succeed — counter should be gone/reset
+    await login(d1, env.JWT_ACCESS_SECRET, 'reset@attempts.test', 'goodpass');
+
+    const attempts = db
+      .select()
+      .from(schema.loginAttempts)
+      .where(eq(schema.loginAttempts.email, 'reset@attempts.test'))
+      .all();
+    expect(attempts.length === 0 || attempts[0].count === 0).toBe(true);
+  });
+});
+
+describe('auth-service: refreshTokens', () => {
+  it('returns new accessToken + refreshToken and revokes old row (rotation)', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'refresh@rot.test',
+      name: 'Refresh Rot',
+      passwordHash: await hashPassword('pw'),
+      emailVerified: true,
+    });
+    const { refreshToken: rawRefresh } = await login(
+      d1,
+      env.JWT_ACCESS_SECRET,
+      'refresh@rot.test',
+      'pw'
+    );
+
+    const result = await refreshTokens(d1, env.JWT_ACCESS_SECRET, rawRefresh);
+    expect(typeof result.accessToken).toBe('string');
+    expect(typeof result.refreshToken).toBe('string');
+    // new token must differ from old
+    expect(result.refreshToken).not.toBe(rawRefresh);
+
+    // old row should be revoked
+    const allRows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    expect(allRows).toHaveLength(2);
+    const revokedRow = allRows.find((r) => r.revokedAt !== null);
+    expect(revokedRow).toBeDefined();
+    const activeRow = allRows.find((r) => r.revokedAt === null);
+    expect(activeRow).toBeDefined();
+    expect(activeRow?.rotatedFrom).toBe(revokedRow?.id);
+  });
+
+  it('revokes the ENTIRE chain and throws 401 on refresh token reuse (theft detection)', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'reuse@theft.test',
+      name: 'Reuse Theft',
+      passwordHash: await hashPassword('pw2'),
+      emailVerified: true,
+    });
+    const { refreshToken: rawRefresh } = await login(
+      d1,
+      env.JWT_ACCESS_SECRET,
+      'reuse@theft.test',
+      'pw2'
+    );
+
+    // Rotate once — this revokes the original
+    await refreshTokens(d1, env.JWT_ACCESS_SECRET, rawRefresh);
+
+    // Reuse the already-revoked token — triggers theft detection
+    await expect(refreshTokens(d1, env.JWT_ACCESS_SECRET, rawRefresh)).rejects.toMatchObject({
+      status: 401,
+      message: 'refresh_reuse_detected',
+    });
+
+    // ALL rows for this user must now be revoked
+    const allRows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    expect(allRows.length).toBeGreaterThan(0);
+    for (const row of allRows) {
+      expect(row.revokedAt).not.toBeNull();
+    }
+  });
+
+  it('throws 401 for an expired refresh token without chain-revoke', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'expired@refresh.test',
+      name: 'Expired Refresh',
+      passwordHash: null,
+      emailVerified: true,
+    });
+    const rawToken = generateSecureToken();
+    db.insert(schema.refreshTokens)
+      .values({
+        userId: user.id,
+        tokenHash: await sha256Hash(rawToken),
+        expiresAt: new Date(Date.now() - 60_000).toISOString(), // already expired
+        revokedAt: null,
+      })
+      .run();
+
+    await expect(refreshTokens(d1, env.JWT_ACCESS_SECRET, rawToken)).rejects.toMatchObject({
+      status: 401,
+    });
+
+    // Should NOT revoke all rows — just expired, not theft
+    const allRows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    expect(allRows[0].revokedAt).toBeNull();
+  });
+});
+
+describe('auth-service: logout', () => {
+  it('deletes all refresh_tokens rows for the user', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'logout@test.test',
+      name: 'Logout',
+      passwordHash: await hashPassword('pw3'),
+      emailVerified: true,
+    });
+    // Create two refresh token rows
+    await login(d1, env.JWT_ACCESS_SECRET, 'logout@test.test', 'pw3');
+    db.insert(schema.refreshTokens)
+      .values({
+        userId: user.id,
+        tokenHash: 'extra-hash-' + Date.now(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .run();
+
+    await logout(d1, user.id);
+
+    const rows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    expect(rows).toHaveLength(0);
+  });
+
+  it('is idempotent — calling logout twice does not throw', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'logout2@test.test',
+      name: 'Logout2',
+      emailVerified: true,
+    });
+    await logout(d1, user.id);
+    await expect(logout(d1, user.id)).resolves.toBeUndefined();
+  });
+});
+
+describe('middleware: requireAuth', () => {
+  it('returns 401 for a request with no Authorization header', async () => {
+    const res = await app.request('/api/auth/logout', { method: 'POST' }, env, executionCtx);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 for a JWT with wrong issuer', async () => {
+    const key = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
+    const wrongIssuer = await new SignJWT({ sub: '1' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuer('evil-issuer')
+      .setAudience('profitmuna-api')
+      .setIssuedAt()
+      .setExpirationTime('30m')
+      .sign(key);
+
+    const res = await app.request(
+      '/api/auth/logout',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${wrongIssuer}` },
+      },
+      env,
+      executionCtx
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 for a JWT with wrong audience', async () => {
+    const key = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
+    const wrongAudience = await new SignJWT({ sub: '1' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuer('profitmuna')
+      .setAudience('wrong-audience')
+      .setIssuedAt()
+      .setExpirationTime('30m')
+      .sign(key);
+
+    const res = await app.request(
+      '/api/auth/logout',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${wrongAudience}` },
+      },
+      env,
+      executionCtx
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('proceeds past requireAuth for a valid JWT with correct iss/aud', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    const user = seedUser(db, {
+      email: 'auth@middleware.test',
+      name: 'Auth Middleware',
+      passwordHash: await hashPassword('testpassword1'),
+      emailVerified: true,
+    });
+    const token = await signAccessToken(user.id, testEnv.JWT_ACCESS_SECRET);
+
+    const res = await app.request(
+      '/api/auth/logout',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv,
+      executionCtx
+    );
+    // 200 = passed auth; 401 would mean middleware rejected
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('POST /api/auth/login (full session issuance, slice 02)', () => {
+  it('returns 200 with both access_token and refresh_token httpOnly cookies for a verified user', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    seedUser(db, {
+      email: 'verified@login.test',
+      name: 'Verified Login',
+      passwordHash: await hashPassword('goodpassword'),
+      emailVerified: true,
+    });
+
+    const res = await postJson(
+      '/api/auth/login',
+      { email: 'verified@login.test', password: 'goodpassword' },
+      testEnv
+    );
+    expect(res.status).toBe(200);
+
+    const setCookies = res.headers.getSetCookie();
+    const accessCookie = setCookies.find((c) => c.startsWith('access_token='));
+    const refreshCookie = setCookies.find((c) => c.startsWith('refresh_token='));
+
+    expect(accessCookie).toBeDefined();
+    expect(refreshCookie).toBeDefined();
+    expect(accessCookie?.toLowerCase()).toContain('httponly');
+    expect(refreshCookie?.toLowerCase()).toContain('httponly');
+    expect(accessCookie).toContain('Max-Age=1800');
+    expect(refreshCookie).toContain('Max-Age=604800');
+  });
+
+  it('returns 429 after 5 failed login attempts', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    seedUser(db, {
+      email: 'lockout@login.test',
+      name: 'Lockout',
+      passwordHash: await hashPassword('correctpw'),
+      emailVerified: true,
+    });
+
+    for (let i = 0; i < 4; i++) {
+      await postJson(
+        '/api/auth/login',
+        { email: 'lockout@login.test', password: 'wrong' },
+        testEnv
+      );
+    }
+
+    const res = await postJson(
+      '/api/auth/login',
+      { email: 'lockout@login.test', password: 'wrong' },
+      testEnv
+    );
+    expect(res.status).toBe(429);
+  });
+});
+
+describe('POST /api/auth/refresh', () => {
+  it('rotates refresh token and sets new cookies', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    seedUser(db, {
+      email: 'refresh@route.test',
+      name: 'Refresh Route',
+      passwordHash: await hashPassword('pw4'),
+      emailVerified: true,
+    });
+
+    // Login to get initial tokens
+    const loginRes = await postJson(
+      '/api/auth/login',
+      { email: 'refresh@route.test', password: 'pw4' },
+      testEnv
+    );
+    expect(loginRes.status).toBe(200);
+
+    const loginCookies = loginRes.headers.getSetCookie();
+    const refreshCookieHeader = loginCookies.find((c) => c.startsWith('refresh_token='));
+    expect(refreshCookieHeader).toBeDefined();
+
+    // Extract raw refresh token value
+    const rawRefreshToken = refreshCookieHeader!.split(';')[0].replace('refresh_token=', '');
+
+    // Call /refresh with the cookie
+    const refreshRes = await app.request(
+      '/api/auth/refresh',
+      {
+        method: 'POST',
+        headers: { cookie: `refresh_token=${rawRefreshToken}` },
+      },
+      testEnv,
+      executionCtx
+    );
+    expect(refreshRes.status).toBe(200);
+
+    const newCookies = refreshRes.headers.getSetCookie();
+    expect(newCookies.find((c) => c.startsWith('access_token='))).toBeDefined();
+    expect(newCookies.find((c) => c.startsWith('refresh_token='))).toBeDefined();
+  });
+
+  it('returns 401 when no refresh_token cookie is present', async () => {
+    const res = await app.request('/api/auth/refresh', { method: 'POST' }, env, executionCtx);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /api/auth/logout', () => {
+  it('clears both cookies and deletes all refresh tokens for the user', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    const user = seedUser(db, {
+      email: 'logout@route.test',
+      name: 'Logout Route',
+      passwordHash: await hashPassword('pw5'),
+      emailVerified: true,
+    });
+
+    const token = await signAccessToken(user.id, testEnv.JWT_ACCESS_SECRET);
+
+    // Seed a refresh token row
+    db.insert(schema.refreshTokens)
+      .values({
+        userId: user.id,
+        tokenHash: 'logout-hash',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .run();
+
+    const res = await app.request(
+      '/api/auth/logout',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      },
+      testEnv,
+      executionCtx
+    );
+    expect(res.status).toBe(200);
+
+    // Both cookies should be cleared (Max-Age=0 or expires in the past)
+    const setCookies = res.headers.getSetCookie();
+    const accessCleared = setCookies.find(
+      (c) =>
+        c.startsWith('access_token=') &&
+        (c.includes('Max-Age=0') || c.includes('expires=Thu, 01 Jan 1970'))
+    );
+    const refreshCleared = setCookies.find(
+      (c) =>
+        c.startsWith('refresh_token=') &&
+        (c.includes('Max-Age=0') || c.includes('expires=Thu, 01 Jan 1970'))
+    );
+    expect(accessCleared).toBeDefined();
+    expect(refreshCleared).toBeDefined();
+
+    // All refresh token rows should be deleted
+    const rows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    expect(rows).toHaveLength(0);
   });
 });
