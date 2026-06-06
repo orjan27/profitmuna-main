@@ -52,9 +52,9 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   if (params.from) qs.set('from', params.from);
   if (params.to) qs.set('to', params.to);
 
-  const [expensesData, categories] = await Promise.all([
+  const [expensesData, categoriesData] = await Promise.all([
     apiFetch<PaginatedExpenses>(`/api/expenses?${qs.toString()}`),
-    apiFetch<ExpenseCategory[]>('/api/expense-categories'),
+    apiFetch<{ data: ExpenseCategory[] }>('/api/expense-categories'),
   ]);
 
   return (
@@ -65,7 +65,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
           Record and manage your business expenses.
         </p>
       </div>
-      <ExpensesOverview initialData={expensesData} categories={categories} />
+      <ExpensesOverview initialData={expensesData} categories={categoriesData.data} />
     </div>
   );
 }

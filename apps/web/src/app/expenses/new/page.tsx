@@ -20,7 +20,7 @@ export default async function NewExpensePage() {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const categories = await apiFetch<ExpenseCategory[]>('/api/expense-categories');
+  const categoriesData = await apiFetch<{ data: ExpenseCategory[] }>('/api/expense-categories');
 
   return (
     <div className="flex flex-col gap-8">
@@ -28,7 +28,7 @@ export default async function NewExpensePage() {
         <h1 className="text-[20px] font-semibold leading-tight">Record Expense</h1>
         <p className="mt-1 text-sm text-muted-foreground">Add a new business expense.</p>
       </div>
-      <ExpenseForm categories={categories} action={createExpenseAction} />
+      <ExpenseForm categories={categoriesData.data} action={createExpenseAction} />
     </div>
   );
 }
