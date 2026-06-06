@@ -5,7 +5,6 @@ const JWT_ISSUER = 'profitmuna';
 const JWT_AUDIENCE = 'profitmuna-api';
 
 const ACCESS_TOKEN_LIFETIME = '30m';
-const REFRESH_TOKEN_LIFETIME = '7d';
 
 /**
  * Signs a short-lived access token for the given user.
@@ -23,21 +22,9 @@ export async function signAccessToken(userId: number, secret: string): Promise<s
     .sign(new TextEncoder().encode(secret));
 }
 
-/**
- * Signs a long-lived refresh token for the given user.
- * @param userId - The user's numeric id (becomes the `sub` claim)
- * @param secret - HS256 secret, read from c.env at the route — never module scope
- * @returns Signed JWT valid for 7 days with iss/aud claims
- */
-export async function signRefreshToken(userId: number, secret: string): Promise<string> {
-  return new SignJWT({ sub: String(userId) })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuer(JWT_ISSUER)
-    .setAudience(JWT_AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime(REFRESH_TOKEN_LIFETIME)
-    .sign(new TextEncoder().encode(secret));
-}
+// Note: refresh tokens are opaque random strings stored as SHA-256 hashes
+// (see auth-service.ts), not signed JWTs — so there is no signRefreshToken
+// and no JWT_REFRESH_SECRET binding (WR-03).
 
 /**
  * Verifies an access token's signature, algorithm, issuer, audience, and expiry.

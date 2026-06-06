@@ -170,7 +170,6 @@ export function mockEnv(overrides: Partial<Bindings> = {}, d1?: D1Database): Bin
   return {
     DB: d1 ?? createTestDb().d1,
     JWT_ACCESS_SECRET: 'test-access-secret-test-access-secret',
-    JWT_REFRESH_SECRET: 'test-refresh-secret-test-refresh-secret',
     RESEND_API_KEY: 'test-resend-key',
     RESEND_FROM_EMAIL: 'test@profitmuna.test',
     GOOGLE_CLIENT_ID: 'test-google-client-id',

@@ -12,7 +12,8 @@ migrations_dir = "../../packages/db/migrations"
 #   wrangler d1 create profitmuna-main-db
 
 # Non-secret vars. Secrets are set via `wrangler secret put <NAME>`:
-#   JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, RESEND_API_KEY, GOOGLE_CLIENT_SECRET
+#   JWT_ACCESS_SECRET, RESEND_API_KEY, GOOGLE_CLIENT_SECRET
+# (refresh tokens are opaque random strings, not JWTs — no refresh secret)
 [vars]
 RESEND_FROM_EMAIL = "onboarding@resend.dev"
 GOOGLE_CLIENT_ID = ""

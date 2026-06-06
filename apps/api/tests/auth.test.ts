@@ -7,7 +7,7 @@ import { schema } from '@app/db';
 import app from '../src/index';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash, encodeHex } from '@/lib/token';
-import { signAccessToken, signRefreshToken, verifyAccessToken } from '@/lib/jwt';
+import { signAccessToken, verifyAccessToken } from '@/lib/jwt';
 import {
   login,
   refreshTokens,
@@ -103,14 +103,6 @@ describe('lib/jwt (jose, iss/aud)', () => {
     expect(payload.iss).toBe('profitmuna');
     expect(payload.aud).toBe('profitmuna-api');
     expect(payload.exp).toBeDefined();
-  });
-
-  it('signRefreshToken produces a verifiable token with the same claims', async () => {
-    const token = await signRefreshToken(42, secret);
-    const payload = await verifyAccessToken(token, secret);
-    expect(payload.sub).toBe('42');
-    expect(payload.iss).toBe('profitmuna');
-    expect(payload.aud).toBe('profitmuna-api');
   });
 
   it('verification fails with the wrong secret', async () => {
