@@ -140,7 +140,7 @@ Plans:
 3. User can view all wallets with computed balance breakdowns (PF allocation + mapped income − mapped expenses + deposits − withdrawals)
 4. User can record manual DEPOSIT or WITHDRAWAL transactions, edit them, soft-delete them, and restore soft-deleted transactions
 5. User can open a wallet detail view with a paginated transaction history
-   **Plans**: 3 plans
+   **Plans**: 4 plans
 
 Plans:
 
@@ -155,6 +155,10 @@ Plans:
 **Wave 2** _(blocked on Wave 1 completion)_
 
 - [x] 04-03-PLAN.md — Transactions + detail slice: getById (breakdown + merged paginated history), createTransaction/update/remove/restore with assertCanInsertTransaction double-count guard, transaction routes (incl. PATCH restore), detail page with collapsible breakdown + inline soft-delete/restore + add/edit/delete dialogs + nuqs pagination (WAL-04, WAL-05)
+
+**Wave 3** _(gap closure — blocked on Wave 2 completion)_
+
+- [ ] 04-04-PLAN.md — Gap closure (SC-5): order + COUNT-back paginated history in getById, single inArray expense-history query (CR-01/CR-03/WR-02); co-fix CR-02 Zod param 422 validation + WR-04 NewWalletForm redirect-aware error toast; regression tests for >1-page failure mode (WAL-05)
 
 **UI hint**: yes
 
