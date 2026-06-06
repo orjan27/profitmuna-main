@@ -1,5 +1,5 @@
 import { HTTPException } from 'hono/http-exception';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, isNull } from 'drizzle-orm';
 
 import { createDb } from '@app/db';
 import { expenseCategories, expenses } from '@app/db/schema';
@@ -117,11 +117,15 @@ export function createExpenseCategoryService(db: ReturnType<typeof createDb>) {
         throw new HTTPException(400, { message: 'cannot_delete_system_category' });
       }
 
-      // Block delete if any expense uses this category (D-12, RESEARCH Pattern 4)
+      // Block delete only if an ACTIVE (non-soft-deleted) expense uses this
+      // category. Soft-deleted rows are gone from the user's perspective, so
+      // they must not block category deletion (D-12, consistent with cascade).
       const [usageRow] = await db
         .select({ count: sql<number>`COUNT(*)` })
         .from(expenses)
-        .where(and(eq(expenses.categoryId, id), eq(expenses.userId, userId)));
+        .where(
+          and(eq(expenses.categoryId, id), eq(expenses.userId, userId), isNull(expenses.deletedAt))
+        );
 
       const count = Number(usageRow?.count ?? 0);
       if (count > 0) {

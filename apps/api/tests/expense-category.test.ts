@@ -132,6 +132,28 @@ describe('expense category service — block delete in-use (D-12)', () => {
     });
   });
 
+  it('allows deleting a category whose only expenses are soft-deleted (CR-04)', async () => {
+    const { db } = createTestDb();
+    const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
+
+    const svc = createExpenseCategoryService(db);
+    const cat = await svc.create(userA.id, 'Groceries');
+
+    await db.insert(expenses).values({
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 5000,
+      expenseDate: today(),
+      userId: userA.id,
+      deletedAt: new Date().toISOString(),
+    });
+
+    await svc.delete(cat.id, userA.id);
+
+    const remaining = await svc.list(userA.id);
+    expect(remaining.some((c) => c.id === cat.id)).toBe(false);
+  });
+
   it('deletes an unused custom category successfully', async () => {
     const { db } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
