@@ -418,6 +418,70 @@ export async function forgotPassword(
   return { exists: true, resetUrl };
 }
 
+export type GoogleUserInput = {
+  /** Google subject identifier (stable unique ID from the `sub` claim) */
+  sub: string;
+  /** Email address from Google userinfo — provider-verified */
+  email: string;
+  /** Display name from Google userinfo */
+  name: string;
+};
+
+/**
+ * Upserts a user from a Google OAuth callback (T-04-03 account-linking).
+ *
+ * Resolution order:
+ * 1. Look up by googleId — returning Google user → return userId directly.
+ * 2. Look up by email — existing password account → link googleId + mark emailVerified.
+ * 3. No match → create new user (emailVerified=true, passwordHash=null).
+ *
+ * Google emails are provider-verified, so emailVerified is set to true in all paths.
+ *
+ * @returns The userId of the matched or newly created user.
+ */
+export async function upsertGoogleUser(
+  d1: D1Database,
+  googleUser: GoogleUserInput
+): Promise<number> {
+  const db = createDb(d1);
+
+  // 1. Returning Google user — match by googleId
+  const byGoogleId = await db.select().from(users).where(eq(users.googleId, googleUser.sub));
+  if (byGoogleId.length > 0) {
+    return byGoogleId[0].id;
+  }
+
+  // 2. Existing password-based account — link by email
+  const byEmail = await db.select().from(users).where(eq(users.email, googleUser.email));
+  if (byEmail.length > 0) {
+    const user = byEmail[0];
+    await db
+      .update(users)
+      .set({
+        googleId: googleUser.sub,
+        emailVerified: true,
+        // Only set verifiedAt if not already set
+        ...(user.verifiedAt === null ? { verifiedAt: new Date().toISOString() } : {}),
+      })
+      .where(eq(users.id, user.id));
+    return user.id;
+  }
+
+  // 3. Brand-new Google user — auto-create verified account
+  const inserted = await db
+    .insert(users)
+    .values({
+      email: googleUser.email,
+      name: googleUser.name,
+      googleId: googleUser.sub,
+      emailVerified: true,
+      passwordHash: null,
+      verifiedAt: new Date().toISOString(),
+    })
+    .returning();
+  return inserted[0].id;
+}
+
 /**
  * Redeems a password-reset token and sets a new password.
  *
