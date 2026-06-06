@@ -73,6 +73,13 @@ describe('lib/password (PBKDF2)', () => {
     const b = await hashPassword('same-password');
     expect(a).not.toBe(b);
   });
+
+  it('rejects a stored hash with malformed (odd-length / non-hex) salt (WR-09)', async () => {
+    // Odd-length salt hex — previously dropped a nibble and derived a NaN byte
+    expect(await verifyPassword('pw', 'pbkdf2$sha256$210000$abc$00ff')).toBe(false);
+    // Non-hex characters in the salt
+    expect(await verifyPassword('pw', 'pbkdf2$sha256$210000$zzzz$00ff')).toBe(false);
+  });
 });
 
 describe('lib/token', () => {

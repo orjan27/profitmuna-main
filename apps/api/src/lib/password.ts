@@ -70,6 +70,9 @@ export async function verifyPassword(plain: string, stored: string): Promise<boo
   const saltHex = parts[3];
   const expectedHex = parts[4];
   if (!Number.isInteger(iterations) || iterations <= 0 || !saltHex || !expectedHex) return false;
+  // Reject malformed/tampered salt hex explicitly rather than silently parsing
+  // a trailing nibble into a NaN byte (WR-09): must be an even-length hex string.
+  if (!/^[0-9a-f]+$/i.test(saltHex) || saltHex.length % 2 !== 0) return false;
   const salt = new Uint8Array(saltHex.match(/.{2}/g)?.map((h) => parseInt(h, 16)) ?? []);
   if (salt.length === 0) return false;
   const actualHex = await deriveHex(plain, salt, iterations);
