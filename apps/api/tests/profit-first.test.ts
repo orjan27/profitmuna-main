@@ -308,6 +308,47 @@ describe('PF-03: percentage update (sum-to-100% validation)', () => {
     const profitAccount = result.find((a) => a.accountType === 'PROFIT');
     expect(profitAccount?.targetPercentage).toBe(1000);
   });
+
+  it('rejects a partial-set submission (single account) with 400', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'partial@pf.test',
+      name: 'Partial User',
+      emailVerified: true,
+    });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
+    await seedProfitFirstAccounts(drizzleDb, user.id);
+
+    const accounts = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .all();
+
+    const profitAccount = accounts.find((a) => a.accountType === 'PROFIT');
+    const ownersPayAccount = accounts.find((a) => a.accountType === 'OWNERS_PAY');
+    if (!profitAccount || !ownersPayAccount) throw new Error('Seeded accounts not found');
+
+    // Partial-set submission: only one account with 10000 bp — passes old sum check but must fail coverage check
+    await expect(
+      svc.updatePercentages(user.id, {
+        accounts: [{ id: profitAccount.id, targetPercentage: 10000 }],
+      })
+    ).rejects.toThrow('Submit all accounts exactly once.');
+
+    // Assert no partial write occurred — OWNERS_PAY must still have its seeded value (5000 bp)
+    const afterAttempt = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .all();
+    const ownersPayAfter = afterAttempt.find((a) => a.accountType === 'OWNERS_PAY');
+    expect(ownersPayAfter?.targetPercentage).toBe(5000);
+  });
 });
 
 // ─── PF-04: Allocation summary ───────────────────────────────────────────────
