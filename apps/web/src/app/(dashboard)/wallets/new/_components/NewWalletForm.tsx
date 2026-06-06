@@ -67,7 +67,10 @@ export function NewWalletForm({
 
   // Form state
   const [name, setName] = useState('');
-  const [sourceType, setSourceType] = useState<'PROFIT_FIRST' | 'BLANK'>('BLANK');
+  // D-04: a quick-create link arriving with ?pfAccountId implies a Profit First wallet
+  const [sourceType, setSourceType] = useState<'PROFIT_FIRST' | 'BLANK'>(
+    prefilledPfAccountId ? 'PROFIT_FIRST' : 'BLANK'
+  );
   const [pfAccountId, setPfAccountId] = useState<string | undefined>(
     prefilledPfAccountId ? String(prefilledPfAccountId) : undefined
   );
