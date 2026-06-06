@@ -3,7 +3,12 @@ import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 
 import { securityHeaders } from '@/middleware/security-headers';
+import { requireAuth } from '@/middleware/auth';
 import { authRouter } from '@/routes/auth';
+import { incomesRouter } from '@/routes/incomes';
+import { incomeCategoriesRouter } from '@/routes/income-categories';
+import { expensesRouter } from '@/routes/expenses';
+import { expenseCategoriesRouter } from '@/routes/expense-categories';
 import type { Bindings, Variables } from '@/types';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -17,7 +22,7 @@ app.use('/*', (c, next) =>
     // health checks). Falling back to '' allowlists no cross-origin, which is
     // the safe default for an auth API.
     origin: c.env?.APP_BASE_URL ?? '',
-    allowMethods: ['GET', 'POST'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: false,
   })(c, next)
 );
@@ -47,5 +52,19 @@ app.get('/api/hello', (c) => {
 });
 
 app.route('/api/auth', authRouter);
+
+// Income routes — guarded by requireAuth (T-02-01: every route group behind auth)
+app.use('/api/incomes/*', requireAuth);
+app.route('/api/incomes', incomesRouter);
+
+app.use('/api/income-categories/*', requireAuth);
+app.route('/api/income-categories', incomeCategoriesRouter);
+
+// Expense routes — guarded by requireAuth
+app.use('/api/expenses/*', requireAuth);
+app.route('/api/expenses', expensesRouter);
+
+app.use('/api/expense-categories/*', requireAuth);
+app.route('/api/expense-categories', expenseCategoriesRouter);
 
 export default app;
