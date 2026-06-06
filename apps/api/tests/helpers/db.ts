@@ -8,6 +8,7 @@ import type { Bindings } from '@/types';
 type SqliteDb = InstanceType<typeof Database>;
 
 // Raw DDL mirroring packages/db/src/schema.ts — keep in sync with the Drizzle schema.
+// Phase 1: auth tables; Phase 2: income/expense tables.
 const DDL = `
 CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +44,62 @@ CREATE TABLE login_attempts (
   last_attempt_at TEXT NOT NULL,
   locked_until TEXT
 );
+
+-- Phase 2: income/expense tables
+CREATE TABLE income_categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  system INTEGER NOT NULL DEFAULT 0,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX ic_user_idx ON income_categories (user_id);
+CREATE UNIQUE INDEX ic_user_name_unique ON income_categories (user_id, name);
+
+CREATE TABLE incomes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id INTEGER NOT NULL REFERENCES income_categories(id),
+  category_name TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  description TEXT,
+  income_date TEXT NOT NULL,
+  money_status TEXT NOT NULL DEFAULT 'PENDING',
+  expected_release_date TEXT,
+  received_date TEXT,
+  profit_first_allocated INTEGER NOT NULL DEFAULT 1,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX incomes_user_status_idx ON incomes (user_id, money_status);
+CREATE INDEX incomes_user_date_idx ON incomes (user_id, income_date);
+CREATE INDEX incomes_user_status_pf_idx ON incomes (user_id, money_status, profit_first_allocated);
+CREATE INDEX incomes_user_category_idx ON incomes (user_id, category_id);
+
+CREATE TABLE expense_categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  system INTEGER NOT NULL DEFAULT 0,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX ec_user_idx ON expense_categories (user_id);
+CREATE UNIQUE INDEX ec_user_name_unique ON expense_categories (user_id, name);
+
+CREATE TABLE expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id INTEGER NOT NULL REFERENCES expense_categories(id),
+  category_name TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  description TEXT,
+  expense_date TEXT NOT NULL,
+  payment_method TEXT,
+  deleted_at TEXT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX expenses_user_idx ON expenses (user_id);
+CREATE INDEX expenses_user_date_idx ON expenses (user_id, expense_date);
+CREATE INDEX expenses_user_category_idx ON expenses (user_id, category_id);
 `;
 
 function makeStatement(sqlite: SqliteDb, query: string, params: unknown[]) {
