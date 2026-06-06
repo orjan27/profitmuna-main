@@ -116,7 +116,9 @@ export function ExpenseForm({ categories, action, initialValues, onSuccess }: Ex
 
   const defaultDate = initialValues?.expenseDate ?? todayISO();
   const defaultAmount = initialValues?.amount != null ? centsToDecimal(initialValues.amount) : '';
-  const defaultPayment = initialValues?.paymentMethod ?? '';
+  // Radix Select forbids empty-string item values — use 'none' sentinel,
+  // translated back to null in the server actions.
+  const defaultPayment = initialValues?.paymentMethod ?? 'none';
   const defaultDescription = initialValues?.description ?? '';
 
   return (
@@ -219,8 +221,8 @@ export function ExpenseForm({ categories, action, initialValues, onSuccess }: Ex
             <SelectValue placeholder="No payment method" />
           </SelectTrigger>
           <SelectContent>
-            {/* Blank option allows clearing payment method */}
-            <SelectItem value="">None</SelectItem>
+            {/* 'none' sentinel clears the payment method (Radix forbids value="") */}
+            <SelectItem value="none">None</SelectItem>
             {PAYMENT_METHODS.map((pm) => (
               <SelectItem key={pm.value} value={pm.value}>
                 {pm.label}

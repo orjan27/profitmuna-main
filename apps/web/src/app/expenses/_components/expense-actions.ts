@@ -52,7 +52,8 @@ export async function updateExpenseAction(
   const expenseDate = formData.get('expenseDate') as string;
   const description = (formData.get('description') as string) || undefined;
   const paymentMethodRaw = formData.get('paymentMethod') as string | null;
-  const paymentMethod = paymentMethodRaw || null;
+  // 'none' sentinel from the Select means "no payment method" (Radix forbids value="").
+  const paymentMethod = paymentMethodRaw && paymentMethodRaw !== 'none' ? paymentMethodRaw : null;
 
   const amount = toCents(rawAmount);
 

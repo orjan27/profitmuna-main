@@ -48,7 +48,8 @@ export function IncomeFilters({ onFilterChange }: IncomeFiltersProps) {
   }, []);
 
   async function handleStatusChange(value: string) {
-    await setMoneyStatus(value || null);
+    // 'all' sentinel clears the filter (Radix Select forbids value="").
+    await setMoneyStatus(value === 'all' ? null : value || null);
     onFilterChange?.();
   }
 
@@ -76,12 +77,12 @@ export function IncomeFilters({ onFilterChange }: IncomeFiltersProps) {
 
       {/* Status filter */}
       <div className="w-40">
-        <Select value={moneyStatus} onValueChange={handleStatusChange}>
+        <Select value={moneyStatus || 'all'} onValueChange={handleStatusChange}>
           <SelectTrigger aria-label="Filter by status">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Status</SelectItem>
+            <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="PENDING">Pending</SelectItem>
             <SelectItem value="RECEIVED">Received</SelectItem>
           </SelectContent>
