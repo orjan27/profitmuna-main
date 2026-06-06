@@ -4,7 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { apiFetch, ApiError } from '@/server/api';
-import type { CreateWalletInput } from '@/types/wallet';
+import type {
+  CreateWalletInput,
+  CreateTransactionInput,
+  UpdateTransactionInput,
+} from '@/types/wallet';
 
 /**
  * Creates a new wallet via the Workers API.
@@ -43,4 +47,80 @@ export async function deleteWalletAction(walletId: number) {
   }
   revalidatePath('/wallets');
   return result;
+}
+
+/**
+ * Creates a manual transaction on a wallet.
+ * Caller converts pesos → cents via toCents before passing input.amount.
+ * Returns raw error code on ApiError (blocking codes mapped to copy in the component).
+ */
+export async function createTransactionAction(
+  walletId: number,
+  input: CreateTransactionInput
+): Promise<{ error: string } | undefined> {
+  try {
+    await apiFetch(`/api/wallets/${walletId}/transactions`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.code };
+    return { error: 'unknown' };
+  }
+  revalidatePath(`/wallets/${walletId}`);
+}
+
+/**
+ * Updates a manual transaction's mutable fields.
+ * Returns raw error code on ApiError.
+ */
+export async function updateTransactionAction(
+  walletId: number,
+  txId: number,
+  input: UpdateTransactionInput
+): Promise<{ error: string } | undefined> {
+  try {
+    await apiFetch(`/api/wallets/${walletId}/transactions/${txId}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.code };
+    return { error: 'unknown' };
+  }
+  revalidatePath(`/wallets/${walletId}`);
+}
+
+/**
+ * Soft-deletes a manual transaction (sets deletedAt server-side).
+ * Returns raw error code on ApiError.
+ */
+export async function deleteTransactionAction(
+  walletId: number,
+  txId: number
+): Promise<{ error: string } | undefined> {
+  try {
+    await apiFetch(`/api/wallets/${walletId}/transactions/${txId}`, { method: 'DELETE' });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.code };
+    return { error: 'unknown' };
+  }
+  revalidatePath(`/wallets/${walletId}`);
+}
+
+/**
+ * Restores a soft-deleted transaction (clears deletedAt server-side).
+ * Returns raw error code on ApiError.
+ */
+export async function restoreTransactionAction(
+  walletId: number,
+  txId: number
+): Promise<{ error: string } | undefined> {
+  try {
+    await apiFetch(`/api/wallets/${walletId}/transactions/${txId}/restore`, { method: 'PATCH' });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.code };
+    return { error: 'unknown' };
+  }
+  revalidatePath(`/wallets/${walletId}`);
 }
