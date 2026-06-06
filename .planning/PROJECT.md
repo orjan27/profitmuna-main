@@ -25,14 +25,14 @@ The finance functionality must work **exactly like** the existing rentals app at
 
 - ✓ Monorepo scaffold: Next.js 15 web app, Hono API on Cloudflare Workers, Drizzle/D1 db package — existing
 - ✓ Tooling: TypeScript strict, Turbo, ESLint, Vitest, path aliases (`@/*`, `@app/db`) — existing
+- ✓ Email/password registration with email verification (Resend) — Validated in Phase 1: Authentication
+- ✓ Login with JWT auth: 30-min access token, 7-day refresh token (opaque, hashed, rotated), httpOnly cookies, transparent BFF auto-refresh — Validated in Phase 1: Authentication
+- ✓ Google OAuth login (arctic PKCE, email-keyed account linking; live consent flow pending UAT credentials) — Validated in Phase 1: Authentication
+- ✓ Password reset via email link (Resend) — Validated in Phase 1: Authentication
+- ✓ Welcome email after registration (Resend) — Validated in Phase 1: Authentication
 
 ### Active
 
-- [ ] Email/password registration with email verification (Resend)
-- [ ] Login with JWT auth: 30-min access token, 7-day refresh token, httpOnly cookies, auto-refresh
-- [ ] Google OAuth login
-- [ ] Password reset via email link (Resend)
-- [ ] Welcome email after registration (Resend)
 - [ ] Income CRUD with categories, PENDING/RECEIVED status, receive transition
 - [ ] Expense CRUD with categories, payment method, soft delete
 - [ ] Profit First accounts with configurable percentages (sum-to-100% validation), custom accounts
@@ -66,21 +66,22 @@ The finance functionality must work **exactly like** the existing rentals app at
 
 ## Key Decisions
 
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Single-user (no businesses/roles) | Personal finance app; tenancy adds complexity with no v1 value | — Pending |
-| Keep PENDING/RECEIVED income status | User wants reference mechanics preserved minus rentals | — Pending |
-| Derived (not stored) allocation & wallet balances | Matches reference; percentage changes retroactively recompute; simpler schema | — Pending |
-| JWT 30-min access / 7-day refresh, httpOnly cookies | User-specified standard | — Pending |
-| Resend for all email (verification, reset, welcome, reminders) | User-specified provider | — Pending |
-| Reminder emails on user-set schedule instead of per-event emails | User preference from questioning | — Pending |
-| Money in integer cents, percentages in basis points | Matches reference; avoids float errors | — Pending |
+| Decision                                                         | Rationale                                                                     | Outcome   |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------- |
+| Single-user (no businesses/roles)                                | Personal finance app; tenancy adds complexity with no v1 value                | — Pending |
+| Keep PENDING/RECEIVED income status                              | User wants reference mechanics preserved minus rentals                        | — Pending |
+| Derived (not stored) allocation & wallet balances                | Matches reference; percentage changes retroactively recompute; simpler schema | — Pending |
+| JWT 30-min access / 7-day refresh, httpOnly cookies              | User-specified standard                                                       | — Pending |
+| Resend for all email (verification, reset, welcome, reminders)   | User-specified provider                                                       | — Pending |
+| Reminder emails on user-set schedule instead of per-event emails | User preference from questioning                                              | — Pending |
+| Money in integer cents, percentages in basis points              | Matches reference; avoids float errors                                        | — Pending |
 
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
 **After each phase transition** (via `/gsd-transition`):
+
 1. Requirements invalidated? → Move to Out of Scope with reason
 2. Requirements validated? → Move to Validated with phase reference
 3. New requirements emerged? → Add to Active
@@ -88,10 +89,12 @@ This document evolves at phase transitions and milestone boundaries.
 5. "What This Is" still accurate? → Update if drifted
 
 **After each milestone** (via `/gsd:complete-milestone`):
+
 1. Full review of all sections
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-05 after initialization*
+
+_Last updated: 2026-06-06 — Phase 1 (Authentication) complete: register/verify/login/refresh/logout, password reset, Google OAuth; 6 credential-gated UAT items tracked in 01-HUMAN-UAT.md_
