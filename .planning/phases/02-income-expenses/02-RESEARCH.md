@@ -725,12 +725,12 @@ export function formatCurrency(cents: number): string {
 
 ## Open Questions
 
-1. **Load-more: server action vs client fetch**
+1. **Load-more: server action vs client fetch** _(RESOLVED — plans 02-02/02-03 Task 2 implement server actions returning `{ content, last }`)_
    - What we know: Server actions can return data; client components can receive it via `useActionState` or direct call
    - What's unclear: For load-more, calling a server action to fetch the next page of results is clean but unorthodox; the reference uses server components for initial load and numbered pagination
    - Recommendation: Use server actions returning `{ content, last }` for load-more fetches; this avoids creating a new BFF proxy route and keeps all API calls server-side
 
-2. **nuqs NuqsAdapter placement**
+2. **nuqs NuqsAdapter placement** _(RESOLVED — plan 02-01 Task 3 adds `NuqsAdapter` to the root layout)_
    - What we know: nuqs requires `NuqsAdapter` from `nuqs/adapters/next/app` in the layout
    - What's unclear: Whether the root `apps/web/src/app/layout.tsx` already has it (it does not — Phase 1 didn't need it)
    - Recommendation: Add `NuqsAdapter` wrapper in root layout as a Wave 0 task (no UI changes, just provider setup)
