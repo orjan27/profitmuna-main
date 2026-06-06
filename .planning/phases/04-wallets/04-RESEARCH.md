@@ -624,17 +624,19 @@ export function formatCurrency(
 | A4  | `profitFirstAccounts` table will exist in `packages/db/src/schema.ts` after Phase 3 completes                                                               | Schema additions code example     | If Phase 3 uses a different table/column name, the FK reference must be updated                                                                                                            |
 | A5  | `incomeCategories` and `expenseCategories` tables will exist after Phase 2                                                                                  | Schema additions code example     | Phase 2 must complete before Phase 4 can be executed                                                                                                                                       |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Server Action vs. BFF proxy for wallet API calls from Next.js**
    - What we know: Phase 1 uses a BFF catch-all proxy (`/api/auth/[...path]`) for the auth routes. The reference uses Next.js Server Actions calling the API server-side.
    - What's unclear: Phases 2 and 3 haven't been planned yet — they will establish the pattern for all non-auth API calls.
    - Recommendation: Planner should note that the first task of Phase 4 wave 0 must verify Phase 3's established server→API call pattern and conform to it.
+   - **RESOLVED:** Phases 2/3 established a hybrid that Phase 4 conforms to exactly — a per-resource BFF catch-all proxy at `apps/web/src/app/api/<resource>/[...path]/route.ts` (mirroring the auth proxy) for browser-originated calls, AND `'use server'` Server Actions (`apiFetch` + `revalidatePath`) for all mutations. Phase 4: Plan 01 creates the `/api/wallets/[...path]` BFF proxy; all mutations (create/update/delete wallet, transaction create/edit/delete/restore) go through Server Actions (`createWalletAction`, `deleteWalletAction`, `createTransactionAction`, etc.) in `wallet-actions.ts`; server components read via `apiFetch`. The create-wallet submit path is pinned to the `createWalletAction` Server Action for revalidation consistency with `deleteWalletAction` (no direct-browser-fetch alternative).
 
 2. **Timestamps pattern in new tables**
    - What we know: Existing schema uses `createdAt` as a standalone field with `$defaultFn`. The reference uses a `timestamps` spread object.
    - What's unclear: Whether an `updatedAt` column needs a trigger or can be set manually on update.
    - Recommendation: Follow the existing project pattern (manual `createdAt` only, or manually set `updatedAt` in service `update()` calls). Do not add DB triggers (D1 supports them but Drizzle Kit doesn't generate them).
+   - **RESOLVED:** Follow the existing project pattern — no DB triggers. Each new table declares `createdAt: text('created_at').$defaultFn(() => new Date().toISOString())` and `updatedAt: text('updated_at').$defaultFn(() => new Date().toISOString()).$onUpdateFn(() => new Date().toISOString())`. `updatedAt` is maintained by Drizzle's `$onUpdateFn` on every service `update()` call (application-level, not a DB trigger). This matches Plan 01 Task 1's stated `createdAt`/`updatedAt` shapes.
 
 ## Environment Availability
 
