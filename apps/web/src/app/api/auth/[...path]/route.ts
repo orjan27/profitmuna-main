@@ -26,7 +26,7 @@ const UNAUTHED_PATHS = new Set([
  * Verification is the API's responsibility — this is purely for near-expiry detection.
  * Returns true if the token is expiring within 60 seconds or the claim is absent/unreadable.
  */
-export function isTokenNearExpiry(jwt: string): boolean {
+function isTokenNearExpiry(jwt: string): boolean {
   try {
     const parts = jwt.split('.');
     if (parts.length !== 3) return true;
