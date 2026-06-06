@@ -21,6 +21,13 @@ const LOCKOUT_MS = 15 * 60 * 1000;
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h (D-10)
+/** Reset password token lifetime in milliseconds (1 hour, D-10) */
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+/**
+ * Per-email cooldown for password reset requests (5 minutes).
+ * Mitigates T-03-03 email-sending flood; reuses login_attempts table.
+ */
+const RESET_COOLDOWN_MS = 5 * 60 * 1000;
 
 export type RegisterInput = {
   email: string;
@@ -325,4 +332,131 @@ export async function refreshTokens(
 export async function logout(d1: D1Database, userId: number): Promise<void> {
   const db = createDb(d1);
   await db.delete(refreshTokensTable).where(eq(refreshTokensTable.userId, userId));
+}
+
+export type ForgotPasswordResult = {
+  /** Whether a matching user account exists. Route uses this to decide whether to send email. */
+  exists: boolean;
+  /** Reset URL carrying the raw token — only meaningful when exists=true. */
+  resetUrl: string;
+};
+
+/**
+ * Issues a password-reset token for a user.
+ *
+ * - Enumeration-safe: always returns generic success; only `exists` signals whether
+ *   to email (never exposed in the HTTP response body).
+ * - Rate-limited: reuses login_attempts table for per-email cooldown (T-03-03).
+ *   If a reset was requested within RESET_COOLDOWN_MS, skips issuing a new token.
+ * - Single-active-token: deletes any prior reset_password tokens before inserting a new one.
+ * - Stores only the sha256 hash in DB; raw token rides in the email link (D-09/D-10).
+ *
+ * @returns { exists, resetUrl } — route emails only when exists=true; never reveals
+ *          existence to the caller's HTTP response.
+ */
+export async function forgotPassword(
+  d1: D1Database,
+  appBaseUrl: string,
+  email: string
+): Promise<ForgotPasswordResult> {
+  const db = createDb(d1);
+
+  const userRows = await db.select().from(users).where(eq(users.email, email));
+  const user = userRows[0];
+
+  if (!user) {
+    return { exists: false, resetUrl: '' };
+  }
+
+  // Per-email cooldown (T-03-03): if a recent reset request exists, skip issuing a new token.
+  // We reuse the login_attempts table (keyed by email) for lightweight rate-limiting.
+  const attemptRows = await db
+    .select()
+    .from(loginAttempts)
+    .where(eq(loginAttempts.email, `__reset__${email}`));
+  const lastAttempt = attemptRows[0];
+
+  if (
+    lastAttempt?.lastAttemptAt &&
+    new Date(lastAttempt.lastAttemptAt).getTime() + RESET_COOLDOWN_MS > Date.now()
+  ) {
+    // Still in cooldown — return generic success without issuing a new token.
+    // The last token (if any) remains valid and the email was already sent.
+    return { exists: true, resetUrl: '' };
+  }
+
+  // Record this reset attempt (upsert by keyed email)
+  const now = new Date().toISOString();
+  if (lastAttempt) {
+    await db
+      .update(loginAttempts)
+      .set({ count: lastAttempt.count + 1, lastAttemptAt: now })
+      .where(eq(loginAttempts.email, `__reset__${email}`));
+  } else {
+    await db.insert(loginAttempts).values({
+      email: `__reset__${email}`,
+      count: 1,
+      lastAttemptAt: now,
+    });
+  }
+
+  // Delete any prior reset_password tokens for this user (single-active-token invariant)
+  await db
+    .delete(authTokens)
+    .where(and(eq(authTokens.userId, user.id), eq(authTokens.purpose, 'reset_password')));
+
+  // Issue a new reset token (raw in link, sha256 hash in DB)
+  const rawToken = generateSecureToken();
+  await db.insert(authTokens).values({
+    userId: user.id,
+    tokenHash: await sha256Hash(rawToken),
+    purpose: 'reset_password',
+    expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS).toISOString(),
+  });
+
+  const resetUrl = `${appBaseUrl}/reset-password?token=${rawToken}`;
+  return { exists: true, resetUrl };
+}
+
+/**
+ * Redeems a password-reset token and sets a new password.
+ *
+ * - Hashes the raw token and looks up the auth_tokens row (purpose=reset_password).
+ * - Rejects missing/expired tokens with 400 (T-03-01 replay safety).
+ * - Single-use: deletes the token row on success.
+ * - Post-reset session invalidation: deletes ALL refresh_tokens for the user (T-03-04).
+ * - Stores the new password as a PBKDF2-SHA256 hash (same scheme as registration).
+ *
+ * @throws HTTPException 400 invalid_or_expired_token when token is missing or expired
+ * @returns The userId whose password was reset
+ */
+export async function resetPassword(
+  d1: D1Database,
+  rawToken: string,
+  newPassword: string
+): Promise<number> {
+  const db = createDb(d1);
+  const tokenHash = await sha256Hash(rawToken);
+
+  const tokenRows = await db
+    .select()
+    .from(authTokens)
+    .where(and(eq(authTokens.tokenHash, tokenHash), eq(authTokens.purpose, 'reset_password')));
+  const token = tokenRows[0];
+
+  if (!token || token.expiresAt < new Date().toISOString()) {
+    throw new HTTPException(400, { message: 'invalid_or_expired_token' });
+  }
+
+  // Update password hash
+  const passwordHash = await hashPassword(newPassword);
+  await db.update(users).set({ passwordHash }).where(eq(users.id, token.userId));
+
+  // Single-use: delete the token row
+  await db.delete(authTokens).where(eq(authTokens.id, token.id));
+
+  // Revoke all sessions (T-03-04: force re-login everywhere after password change)
+  await db.delete(refreshTokensTable).where(eq(refreshTokensTable.userId, token.userId));
+
+  return token.userId;
 }
