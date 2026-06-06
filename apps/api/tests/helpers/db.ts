@@ -100,6 +100,20 @@ CREATE TABLE expenses (
 CREATE INDEX expenses_user_idx ON expenses (user_id);
 CREATE INDEX expenses_user_date_idx ON expenses (user_id, expense_date);
 CREATE INDEX expenses_user_category_idx ON expenses (user_id, category_id);
+
+-- Phase 3: Profit First Allocation tables
+CREATE TABLE profit_first_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  target_percentage INTEGER NOT NULL,
+  color TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  account_type TEXT NOT NULL DEFAULT 'CUSTOM',
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE UNIQUE INDEX pfa_user_name_unique ON profit_first_accounts (user_id, name);
 `;
 
 function makeStatement(sqlite: SqliteDb, query: string, params: unknown[]) {

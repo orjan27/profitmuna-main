@@ -9,6 +9,7 @@ import {
   loginAttempts,
 } from '@app/db/schema';
 
+import { seedProfitFirstAccounts } from '@/services/profit-first-service';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash } from '@/lib/token';
 import { signAccessToken } from '@/lib/jwt';
@@ -148,6 +149,8 @@ export async function register(
     })
     .returning();
   const user = inserted[0];
+
+  await seedProfitFirstAccounts(db, user.id);
 
   const verifyUrl = await issueVerifyToken(db, user.id, appBaseUrl);
   return { verifyUrl, email: user.email, name: user.name };
@@ -554,6 +557,8 @@ export async function upsertGoogleUser(
       verifiedAt: new Date().toISOString(),
     })
     .returning();
+  // Seed Profit First defaults for new Google users only (Pitfall 4 — branches 1/2 are returning users)
+  await seedProfitFirstAccounts(db, inserted[0].id);
   return inserted[0].id;
 }
 
