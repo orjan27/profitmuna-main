@@ -15,6 +15,14 @@ export const createExpenseSchema = z.object({
 /** Partial schema for updating an expense (all fields optional). */
 export const updateExpenseSchema = createExpenseSchema.partial();
 
+/** Schema for creating an expense category. Does NOT expose system — seeder controls that field. */
+export const createExpenseCategorySchema = z.object({
+  name: z.string().min(1).max(100),
+});
+
+/** Schema for renaming an expense category. */
+export const updateExpenseCategorySchema = createExpenseCategorySchema;
+
 /** Query schema for listing expenses with pagination and optional date range. */
 export const expenseQuerySchema = z.object({
   page: z.coerce.number().int().min(0).default(0),
