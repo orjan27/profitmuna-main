@@ -8,30 +8,32 @@ export const expenseModeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('CATEGORIES'), ids: z.array(z.number().int().positive()).min(1) }),
 ]);
 
-export const createWalletSchema = z
-  .object({
-    name: z.string().min(1).max(80),
-    sourceType: z.enum(['PROFIT_FIRST', 'BLANK']),
-    profitFirstAccountId: z.number().int().positive().optional().nullable(),
-    color: z
-      .string()
-      .regex(/^#[0-9a-fA-F]{6}$/)
-      .optional(),
-    sortOrder: z.number().int().optional(),
-    incomeCategoryIds: z.array(z.number().int().positive()).optional(),
-    expenseMode: expenseModeSchema.optional(),
-  })
-  .refine(
-    (d) =>
-      d.sourceType !== 'PROFIT_FIRST' ||
-      (d.profitFirstAccountId !== undefined && d.profitFirstAccountId !== null),
-    {
-      message: 'profitFirstAccountId is required when sourceType is PROFIT_FIRST',
-      path: ['profitFirstAccountId'],
-    }
-  );
+// Base object without refine — needed so .partial() works on update (Zod v4 disallows .partial() on refined schemas)
+const walletBaseSchema = z.object({
+  name: z.string().min(1).max(80),
+  sourceType: z.enum(['PROFIT_FIRST', 'BLANK']),
+  profitFirstAccountId: z.number().int().positive().optional().nullable(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
+  sortOrder: z.number().int().optional(),
+  incomeCategoryIds: z.array(z.number().int().positive()).optional(),
+  expenseMode: expenseModeSchema.optional(),
+});
 
-export const updateWalletSchema = createWalletSchema.partial();
+export const createWalletSchema = walletBaseSchema.refine(
+  (d) =>
+    d.sourceType !== 'PROFIT_FIRST' ||
+    (d.profitFirstAccountId !== undefined && d.profitFirstAccountId !== null),
+  {
+    message: 'profitFirstAccountId is required when sourceType is PROFIT_FIRST',
+    path: ['profitFirstAccountId'],
+  }
+);
+
+// Update schema: all fields optional; no PF-account refine needed (partial edits are valid)
+export const updateWalletSchema = walletBaseSchema.partial();
 
 export const walletTransactionSchema = z.object({
   type: z.enum(['DEPOSIT', 'WITHDRAWAL']),
