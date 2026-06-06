@@ -62,7 +62,7 @@ None — discussion stayed within phase scope.
 
 Phase 6 adds the two remaining utility pillars of Profitmuna: user-configurable settings (display currency, reminder schedule) and a notification system (in-app center + scheduled email reminders). Unlike Phases 2–4, the reference implementation is only a partial guide — its `notifications` table and service surface are directly reusable shapes, but the Profitmuna type enum, all notification UI, the reminder email, user settings storage, and the Workers cron are net-new.
 
-The most technically novel piece is the hourly Cloudflare Workers cron trigger. Wrangler's `[triggers] crons` configuration and the `scheduled` handler export alongside `fetch` are well-documented and verified against official Cloudflare docs. The Manila-time bucketing uses `@date-fns/tz` (`TZDate` class) which is already pinned in the project (`@date-fns/tz ^1.4.1`). No new runtime dependencies are required — Resend SDK (6.12.4) and all date utilities are already installed.
+The most technically novel piece is the hourly Cloudflare Workers cron trigger. Wrangler's `[triggers] crons` configuration and the `scheduled` handler export alongside `fetch` are well-documented and verified against official Cloudflare docs. The Manila-time bucketing was originally researched against `@date-fns/tz` (`TZDate` class), but that package is NOT present in `apps/api/package.json` — see Open Question / Pattern 2 note. Because Manila has no DST (fixed UTC+8), the plan uses a dependency-free local UTC+8 offset helper instead (`apps/api/src/lib/manila-time.ts`). No new runtime dependencies are required — Resend SDK (6.12.4) is already installed.
 
 The settings storage decision is left to the planner (columns on `users` table vs. a dedicated `user_settings` table). Research recommends columns on `users` for simplicity: three columns (`reminderFrequency`, `reminderDayOrHour`, `reminderHour`, `reminderEnabled`, `displayCurrency`) follow the project's existing schema pattern and avoid a join. The notification dedup for pending-income-due should use a `uniqueIndex` on `(userId, sourceIncomeId)` or a flag column on the `incomes` table.
 
@@ -93,11 +93,12 @@ The settings storage decision is left to the planner (columns on `users` table v
 | Library              | Version | Purpose                                          | Why Standard                                                                                      |
 | -------------------- | ------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | Resend SDK           | 6.12.4  | Reminder email delivery                          | [VERIFIED: npm registry] Already installed in `apps/api`; confirmed via `npm view resend version` |
-| `@date-fns/tz`       | 1.4.1   | Manila-time bucketing in cron handler            | [VERIFIED: npm registry] Pinned in `apps/web`; `TZDate` class converts UTC → Asia/Manila          |
-| `date-fns`           | 4.1.0   | Date arithmetic for cron due-user logic          | [VERIFIED: npm registry] Already pinned project-wide                                              |
+| `date-fns`           | 4.1.0   | Date arithmetic (web only — see note)            | [VERIFIED: npm registry] Pinned in `apps/web`; NOT in `apps/api`                                  |
 | Drizzle ORM          | 0.45.2  | `notifications` + settings schema + queries      | [VERIFIED: codebase] Existing project ORM                                                         |
 | Hono 4.12.9          | 4.12.9  | `/api/settings` and `/api/notifications` routes  | [VERIFIED: codebase] Existing project framework                                                   |
 | shadcn/ui + Tailwind | pinned  | Notification center bell dropdown, settings form | [VERIFIED: codebase] Existing design system                                                       |
+
+> **Manila-time bucketing — corrected:** `@date-fns/tz` (`TZDate`) is pinned only in `apps/web`, NOT in `apps/api/package.json`. The cron handler lives in `apps/api`. Per CLAUDE.md (no new deps without approval), the plan uses a dependency-free local UTC+8 offset helper (`apps/api/src/lib/manila-time.ts`) instead of `TZDate`. Manila has no DST (fixed UTC+8, see Assumption A1), so pure offset arithmetic is correct. See Pattern 2 and Open Question (RESOLVED) below.
 
 ### No New Dependencies Required
 
@@ -112,8 +113,8 @@ No new packages are required for this phase. All libraries used are already inst
 | Package            | Registry | Status                                 |
 | ------------------ | -------- | -------------------------------------- |
 | resend 6.12.4      | npm      | Already installed — no re-audit needed |
-| @date-fns/tz 1.4.1 | npm      | Already installed — no re-audit needed |
-| date-fns 4.1.0     | npm      | Already installed — no re-audit needed |
+| @date-fns/tz 1.4.1 | npm      | Web-only — NOT used by apps/api cron   |
+| date-fns 4.1.0     | npm      | Web-only — NOT used by apps/api cron   |
 
 **Packages removed due to slopcheck [SLOP] verdict:** none
 **Packages flagged as suspicious [SUS]:** none
@@ -147,7 +148,7 @@ Workers Cron (`0 * * * *` UTC)
   |
   |-- scheduled handler (env: Bindings)
        |-- createDb(env.DB)
-       |-- convert now() → Manila TZDate
+       |-- convert now() → Manila (UTC+8 offset helper)
        |-- query users WHERE reminderEnabled=true AND due in current Manila hour/day
        |-- for each due user:
        |     |-- send Resend reminder email (env.RESEND_API_KEY)
@@ -169,17 +170,18 @@ packages/db/src/
 apps/api/src/
 ├── index.ts                          # Add scheduled export, mount /api/settings + /api/notifications
 ├── routes/
-│   ├── notifications.ts              # GET /, GET /unread-count, PUT /:id/read, PUT /read-all
+│   ├── notifications.ts              # GET /, GET /unread-count, PUT /read-all, PUT /:id/read
 │   └── settings.ts                   # GET /, PUT /
 ├── services/
 │   ├── notification-service.ts       # createNotificationService(db) — list, getUnreadCount, markAsRead, markAllAsRead, create
 │   ├── settings-service.ts           # createSettingsService(db) — getSettings, updateSettings
-│   └── cron-service.ts               # runCron(db, email, appBaseUrl) — due-user query, reminder send, pending-due check
+│   └── cron-service.ts               # runCron(env) — due-user query, reminder send, pending-due check
 ├── schemas/
 │   ├── notifications.ts              # notificationQuerySchema (unreadOnly, limit)
 │   └── settings.ts                   # updateSettingsSchema (displayCurrency, reminderEnabled, reminderFrequency, etc.)
 └── lib/
-    └── email.ts                      # Extend EmailService type + sendIncomeReminderEmail in createEmailService
+    ├── email.ts                      # Extend EmailService type + sendIncomeReminderEmail in createEmailService
+    └── manila-time.ts                # Dependency-free UTC+8 offset helper (NOT @date-fns/tz)
 
 apps/web/src/
 ├── app/
@@ -225,28 +227,39 @@ crons = ["0 * * * *"]
 
 **Testing cron locally:** `curl "http://localhost:8793/cdn-cgi/handler/scheduled"` [CITED: developers.cloudflare.com/workers/configuration/cron-triggers/]
 
-### Pattern 2: Manila-Time Bucketing with @date-fns/tz
+### Pattern 2: Manila-Time Bucketing (dependency-free UTC+8 offset)
 
-[VERIFIED: github.com/date-fns/tz — TZDate class]
+> **CORRECTION (resolves checker warning):** `@date-fns/tz` is NOT in `apps/api/package.json`. Do NOT use `TZDate` in the cron handler. The original `TZDate` example below is retained only for historical reference — the actual implementation uses the dependency-free UTC+8 helper shown first.
 
-The cron fires at the top of every UTC hour. The handler converts to Manila time to determine the current Manila hour, day of week, and day of month for matching user schedules.
+Because Manila is fixed at UTC+8 with no DST, the cron handler adds an 8-hour offset and reads UTC getters. This is what `apps/api/src/lib/manila-time.ts` implements (no external dependency):
 
 ```typescript
-// Source: @date-fns/tz TZDate API
-import { TZDate } from '@date-fns/tz';
+// apps/api/src/lib/manila-time.ts — the ACTUAL approach (no dependency)
+const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
 
-const MANILA_TZ = 'Asia/Manila'; // UTC+8, no DST
-
-function getManilaTime(now: Date): TZDate {
-  return new TZDate(now, MANILA_TZ);
+export function getManilaParts(now: Date): {
+  hour: number;
+  dayOfWeek: number;
+  dayOfMonth: number;
+  dateStr: string;
+} {
+  const m = new Date(now.getTime() + MANILA_OFFSET_MS);
+  const year = m.getUTCFullYear();
+  const month0 = m.getUTCMonth();
+  const day = m.getUTCDate();
+  return {
+    hour: m.getUTCHours(),
+    dayOfWeek: m.getUTCDay(),
+    dayOfMonth: day,
+    dateStr: `${year}-${String(month0 + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  };
 }
+```
 
-// Usage in cron handler:
-const manilaTime = getManilaTime(new Date());
-const manilaHour = manilaTime.getHours(); // 0–23
-const manilaDayOfWeek = manilaTime.getDay(); // 0=Sun..6=Sat
-const manilaDayOfMonth = manilaTime.getDate(); // 1–31
-const manilaDateStr = manilaTime.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+```typescript
+// HISTORICAL REFERENCE ONLY — @date-fns/tz is NOT available in apps/api. Do not use.
+// import { TZDate } from '@date-fns/tz';
+// const manilaTime = new TZDate(now, 'Asia/Manila');
 ```
 
 Note: `Asia/Manila` is always UTC+8 with no DST — Manila never shifts. [ASSUMED based on IANA tz database knowledge; low risk]
@@ -328,13 +341,14 @@ The existing `formatCurrency(cents)` in `apps/web/src/lib/format-currency.ts` is
 
 ## Don't Hand-Roll
 
-| Problem                      | Don't Build                              | Use Instead                                                                 | Why                                                                                 |
-| ---------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Email delivery               | Custom SMTP or fetch to email API        | Resend SDK (already installed)                                              | Already used in `email.ts`; consistent error handling, delivery tracking            |
-| Timezone conversion          | Manual UTC offset arithmetic             | `TZDate` from `@date-fns/tz`                                                | DST-safe (Manila has no DST, but TZDate is correct-by-construction); already pinned |
-| Notification list pagination | Custom cursor logic                      | Drizzle `.limit()` + `.orderBy(desc(createdAt))`                            | Reference service already shows the pattern; cap at 50 per the reference            |
-| Currency formatting          | Custom number formatter                  | `Intl.NumberFormat` via `toLocaleString` (already used in `formatCurrency`) | Locale-aware decimal/grouping separators; handles all target currencies             |
-| Cron scheduling              | setTimeout loops, external cron services | Workers cron triggers (`[triggers]` in wrangler.toml)                       | Native to the edge runtime; free tier includes cron; no external dependency         |
+| Problem                      | Don't Build                              | Use Instead                                                                 | Why                                                                         |
+| ---------------------------- | ---------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Email delivery               | Custom SMTP or fetch to email API        | Resend SDK (already installed)                                              | Already used in `email.ts`; consistent error handling, delivery tracking    |
+| Notification list pagination | Custom cursor logic                      | Drizzle `.limit()` + `.orderBy(desc(createdAt))`                            | Reference service already shows the pattern; cap at 50 per the reference    |
+| Currency formatting          | Custom number formatter                  | `Intl.NumberFormat` via `toLocaleString` (already used in `formatCurrency`) | Locale-aware decimal/grouping separators; handles all target currencies     |
+| Cron scheduling              | setTimeout loops, external cron services | Workers cron triggers (`[triggers]` in wrangler.toml)                       | Native to the edge runtime; free tier includes cron; no external dependency |
+
+> **Timezone conversion exception:** Normally `TZDate` from `@date-fns/tz` would be the "don't hand-roll" answer, but that package is not in `apps/api`. Because Manila has no DST, the dependency-free UTC+8 offset helper is correct-by-construction and avoids adding a dependency.
 
 **Key insight:** All the scaffolding for this phase already exists in the project — the main work is connecting existing pieces (cron → existing Resend pattern, notification service → existing route pattern, settings → existing user table).
 
@@ -353,7 +367,7 @@ The existing `formatCurrency(cents)` in `apps/web/src/lib/format-currency.ts` is
 
 **What goes wrong:** A user schedules a "9 AM Manila daily reminder." The cron at 0:00 UTC (which is 8:00 AM Manila, one hour early) does NOT fire it. But if the handler doesn't correctly convert to Manila time, it might either miss the run or double-fire at the boundary.
 **Why it happens:** Developers check `new Date().getHours()` (UTC) instead of the Manila equivalent.
-**How to avoid:** Always derive Manila hour via `new TZDate(new Date(), 'Asia/Manila').getHours()` — never use `new Date().getHours()` in the cron handler.
+**How to avoid:** Always derive Manila hour via the UTC+8 offset helper (`getManilaParts(new Date()).hour`) — never use `new Date().getHours()` in the cron handler.
 **Warning signs:** Users report reminders arriving at wrong times.
 
 ### Pitfall 3: Pending-due dedup failure across cron runs
@@ -381,7 +395,7 @@ The existing `formatCurrency(cents)` in `apps/web/src/lib/format-currency.ts` is
 
 **What goes wrong:** User sets monthly reminder for day 31. In February (28/29 days), no day-31 exists — the reminder never fires. User thinks the feature is broken.
 **Why it happens:** `manilaDayOfMonth === 31` never matches in short months.
-**How to avoid:** In the cron handler, when a user's `reminderDayOfMonth > lastDayOfCurrentMonth`, also fire if `manilaDayOfMonth === lastDayOfCurrentMonth`. Alternatively, cap stored value at 28 in the settings schema (simpler but loses fidelity).
+**How to avoid:** In the cron handler, when a user's `reminderDayOfMonth > lastDayOfCurrentMonth`, also fire if `manilaDayOfMonth === lastDayOfCurrentMonth`. The settings schema additionally caps stored value at 28 (simpler boundary guard).
 **Warning signs:** Users with day > 28 monthly schedule miss reminders in short months.
 
 ---
@@ -462,17 +476,16 @@ export default {
 };
 ```
 
-#### TZDate Manila conversion
+#### Manila conversion (dependency-free UTC+8 offset)
 
 ```typescript
-// Source: github.com/date-fns/tz TZDate API [VERIFIED]
-import { TZDate } from '@date-fns/tz';
-
-const manilaTime = new TZDate(new Date(), 'Asia/Manila');
-const hour = manilaTime.getHours();
-const dayOfWeek = manilaTime.getDay();
-const dayOfMonth = manilaTime.getDate();
-const dateStr = `${manilaTime.getFullYear()}-${String(manilaTime.getMonth() + 1).padStart(2, '0')}-${String(manilaTime.getDate()).padStart(2, '0')}`;
+// apps/api/src/lib/manila-time.ts — no external dependency (@date-fns/tz NOT in apps/api)
+const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+const m = new Date(new Date().getTime() + MANILA_OFFSET_MS);
+const hour = m.getUTCHours();
+const dayOfWeek = m.getUTCDay();
+const dayOfMonth = m.getUTCDate();
+const dateStr = `${m.getUTCFullYear()}-${String(m.getUTCMonth() + 1).padStart(2, '0')}-${String(m.getUTCDate()).padStart(2, '0')}`;
 ```
 
 #### Cron trigger config
@@ -528,14 +541,16 @@ export const notificationsRouter = new Hono<{ Bindings: Bindings; Variables: Var
     const count = await service.getUnreadCount(c.get('userId'));
     return c.json({ count }, 200);
   })
-  .put('/:id/read', async (c) => {
-    const service = createNotificationService(createDb(c.env.DB));
-    await service.markAsRead(Number(c.req.param('id')), c.get('userId'));
-    return c.json({ success: true }, 200);
-  })
+  // CRITICAL: register the static /read-all route BEFORE the dynamic /:id/read route
+  // so 'read-all' is not captured as an :id param.
   .put('/read-all', async (c) => {
     const service = createNotificationService(createDb(c.env.DB));
     await service.markAllAsRead(c.get('userId'));
+    return c.json({ success: true }, 200);
+  })
+  .put('/:id/read', async (c) => {
+    const service = createNotificationService(createDb(c.env.DB));
+    await service.markAsRead(Number(c.req.param('id')), c.get('userId'));
     return c.json({ success: true }, 200);
   });
 ```
@@ -544,10 +559,10 @@ export const notificationsRouter = new Hono<{ Bindings: Bindings; Variables: Var
 
 ## State of the Art
 
-| Old Approach                                  | Current Approach                                                      | When Changed                           | Impact                                                                                                            |
-| --------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `export default app` (Hono Workers shorthand) | `export default { fetch: app.fetch, scheduled: ... }` (Module Worker) | Required when adding scheduled handler | The existing `export default app` in `index.ts` must be replaced — this is a structural change to the entry point |
-| Manual UTC offset for Manila time             | `TZDate` from `@date-fns/tz`                                          | Library pinned in Phase 4              | Correct and DST-safe; use `new TZDate(now, 'Asia/Manila')`                                                        |
+| Old Approach                                  | Current Approach                                                      | When Changed                           | Impact                                                                                                             |
+| --------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `export default app` (Hono Workers shorthand) | `export default { fetch: app.fetch, scheduled: ... }` (Module Worker) | Required when adding scheduled handler | The existing `export default app` in `index.ts` must be replaced — this is a structural change to the entry point  |
+| Manual UTC offset for Manila time             | Dependency-free UTC+8 offset helper (`manila-time.ts`)                | This phase                             | `@date-fns/tz` is NOT in `apps/api`; since Manila has no DST, a local UTC+8 helper is correct and avoids a new dep |
 
 ---
 
@@ -563,39 +578,37 @@ export const notificationsRouter = new Hono<{ Bindings: Bindings; Variables: Var
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Currency list scope for SET-01**
+1. **Currency list scope for SET-01** — RESOLVED
    - What we know: PHP (₱) is default. USD, EUR are mentioned as "common picks" in CONTEXT.md.
-   - What's unclear: Exact list size. 3 currencies? 10? Full ISO 4217?
-   - Recommendation: Curated list of 5–8 currencies common in the Philippines context (PHP, USD, EUR, GBP, JPY, SGD, AUD, CAD). Planner decides; store as ISO 4217 3-letter code.
+   - What was unclear: Exact list size. 3 currencies? 10? Full ISO 4217?
+   - **RESOLVED:** Curated 8-currency list, stored as ISO 4217 3-letter codes: PHP, USD, EUR, GBP, SGD, AUD, JPY, CAD (PHP default). Reflected in `06-02` schema (`updateSettingsSchema` enum) and `CURRENCY_LOCALES` in `format-currency.ts`. Display-only — no FX conversion.
 
-2. **Notification retention policy**
+2. **Notification retention policy** — RESOLVED
    - What we know: Reference caps list at 50. No retention/deletion policy in CONTEXT.md.
-   - What's unclear: Should old notifications be auto-deleted? After how long?
-   - Recommendation: No auto-deletion in v1 — cap the list view at 50 (reference pattern). Add a comment noting a future cleanup job could prune notifications older than 90 days.
+   - What was unclear: Should old notifications be auto-deleted? After how long?
+   - **RESOLVED:** No auto-deletion in v1. The list view is capped at 50 (`notificationQuerySchema` limit max 50, reference pattern). A future cleanup job could prune notifications older than 90 days — out of scope for Phase 6.
 
-3. **Settings page location in nav**
-   - What we know: Dashboard layout exists at `(dashboard)/layout.tsx` — minimal chrome, no nav yet. Phase 5 adds sidebar nav.
-   - What's unclear: Phase 6 implements before Phase 5 (settings doesn't depend on dashboard). How does the user reach the settings page?
-   - Recommendation: Add a settings link to the dashboard layout header for Phase 6. Phase 5 can absorb it into the sidebar nav.
+3. **Settings page location in nav** — RESOLVED
+   - What we know: Dashboard layout exists at `(dashboard)/layout.tsx`; nav lives in `DashboardNav.tsx`. Phase 5 adds richer nav.
+   - What was unclear: Phase 6 implements before Phase 5. How does the user reach the settings page?
+   - **RESOLVED:** Add a Settings nav item (lucide `Settings` icon, href `/settings`) to `NAV_ITEMS` in `DashboardNav.tsx` — implemented in `06-02` Task 3. Phase 5 can later absorb it into the sidebar nav.
 
 ---
 
 ## Environment Availability
 
-| Dependency            | Required By                | Available          | Version                  | Fallback |
-| --------------------- | -------------------------- | ------------------ | ------------------------ | -------- |
-| Node.js 22            | Build tooling              | ✓                  | 24.15.0                  | —        |
-| npm                   | Package management         | ✓                  | 11.12.1                  | —        |
-| Wrangler 4.78.0       | Cron trigger local testing | ✓                  | 4.98.0                   | —        |
-| `@date-fns/tz`        | Manila-time bucketing      | ✓                  | 1.4.1 (installed in web) | —        |
-| `date-fns`            | Date arithmetic            | ✓                  | 4.1.0                    | —        |
-| Resend SDK            | Email delivery             | ✓                  | 6.12.4                   | —        |
-| RESEND_API_KEY secret | Email delivery             | ✓ (set in Phase 1) | —                        | —        |
+| Dependency            | Required By                | Available          | Version | Fallback |
+| --------------------- | -------------------------- | ------------------ | ------- | -------- |
+| Node.js 22            | Build tooling              | ✓                  | 24.15.0 | —        |
+| npm                   | Package management         | ✓                  | 11.12.1 | —        |
+| Wrangler 4.78.0       | Cron trigger local testing | ✓                  | 4.98.0  | —        |
+| Resend SDK            | Email delivery             | ✓                  | 6.12.4  | —        |
+| RESEND_API_KEY secret | Email delivery             | ✓ (set in Phase 1) | —       | —        |
 
 **Missing dependencies with no fallback:** None.
-**Notes:** `@date-fns/tz` is installed in `apps/web`. The cron handler lives in `apps/api`. The API's `package.json` must also list `@date-fns/tz` as a dependency, or the handler must be structured to import only from `date-fns` (which IS in `apps/api`). Planner must verify whether `@date-fns/tz` is already in `apps/api/package.json` or whether it needs to be added to that workspace.
+**Notes:** `@date-fns/tz` and `date-fns` are installed in `apps/web` only, NOT in `apps/api`. The cron handler lives in `apps/api`. Rather than add a dependency (CLAUDE.md: no new deps without approval), the cron uses a dependency-free local UTC+8 offset helper (`apps/api/src/lib/manila-time.ts`). Manila has no DST so this is correct-by-construction.
 
 ---
 
@@ -677,9 +690,9 @@ Security enforcement is enabled (`security_enforcement: true`, ASVS level 1).
 | Directive                                                               | Impact on Phase 6                                                                                                                                       |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | No new top-level directories                                            | All new files go in existing `routes/`, `services/`, `schemas/`, `lib/` folders in API; `components/notifications/`, `app/(dashboard)/settings/` in web |
-| No new dependencies without user approval                               | No new dependencies needed — all required packages already installed                                                                                    |
+| No new dependencies without user approval                               | No new dependencies needed — all required packages already installed; cron uses a local UTC+8 helper instead of adding `@date-fns/tz` to `apps/api`     |
 | Business logic in `services/`, not `routes/`                            | `cron-service.ts`, `notification-service.ts`, `settings-service.ts` — routes stay thin                                                                  |
-| Edge runtime: no Node-only APIs                                         | `TZDate` and `date-fns` are pure JS, edge-compatible; Resend SDK is edge-compatible                                                                     |
+| Edge runtime: no Node-only APIs                                         | `manila-time.ts` is pure JS, edge-compatible; Resend SDK is edge-compatible                                                                             |
 | TypeScript strict mode, no `any`                                        | All service functions must have explicit return types; reference service uses `as any` cast — do NOT copy that pattern                                  |
 | Path aliases `@/*` and `@app/db`                                        | Use `@app/db` for schema imports, `@/` for within-API imports                                                                                           |
 | Drizzle schema is single source of truth in `packages/db/src/schema.ts` | `notifications` table and user settings columns go in schema.ts only                                                                                    |
@@ -693,8 +706,7 @@ Security enforcement is enabled (`security_enforcement: true`, ASVS level 1).
 
 - Hono official docs (hono.dev/docs/getting-started/cloudflare-workers) — scheduled handler export pattern alongside fetch
 - Cloudflare Workers cron trigger docs (developers.cloudflare.com/workers/configuration/cron-triggers/) — wrangler.toml syntax, scheduled handler signature, local testing
-- `@date-fns/tz` Context7 (github.com/date-fns/tz) — TZDate class, withTimeZone, constructor patterns
-- Profitmuna codebase — `apps/api/src/lib/email.ts`, `apps/api/src/middleware/auth.ts`, `apps/api/src/index.ts`, `packages/db/src/schema.ts`, `apps/api/tests/helpers/db.ts`
+- Profitmuna codebase — `apps/api/src/lib/email.ts`, `apps/api/src/middleware/auth.ts`, `apps/api/src/index.ts`, `packages/db/src/schema.ts`, `apps/api/tests/helpers/db.ts`, `apps/api/package.json` (confirms `@date-fns/tz` absent)
 - Reference implementation — `/mnt/c/dev/profitfirst/practice/src/server/db/schema.ts` §notifications, `notification-service.ts`, `routes/notifications.ts`
 
 ### Secondary (MEDIUM confidence)
