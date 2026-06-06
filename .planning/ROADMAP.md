@@ -100,8 +100,27 @@ Plans:
 2. User can update allocation percentages, with the system validating that all percentages sum to exactly 100% (stored as basis points)
 3. User can create and delete custom allocation accounts; default accounts cannot be deleted; an account linked to a wallet cannot be deleted
 4. User can view an allocation summary showing the derived balance per account (totalReceivedAllocatedIncome × targetPercentage / 10000), filterable by date range and income category
-   **Plans**: TBD
-   **UI hint**: yes
+   **Plans**: 4 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Data foundation: profit_first_accounts + minimal incomes table, seedProfitFirstAccounts wired into register + Google first-login, additive migration + idempotent backfill, Wave 0 test scaffold + web leaf utilities (PF-01)
+
+**Wave 2** _(blocked on Wave 1 completion)_
+
+- [ ] 03-02-PLAN.md — API layer: createProfitFirstService (summary/CRUD/percentages), Zod schemas, thin Hono router behind requireAuth, index registration + CORS methods, BFF proxy (PF-02, PF-03, PF-04)
+
+**Wave 3** _(blocked on Wave 2 completion)_
+
+- [ ] 03-03-PLAN.md — View UI: minimal (dashboard) layout, /profit-first RSC page + summary fetch, account cards with derived balances, shared amount-masking, date-range + category filters via nuqs (PF-01, PF-04)
+
+**Wave 4** _(blocked on Wave 3 completion)_
+
+- [ ] 03-04-PLAN.md — Mutation UI: percent→bp server actions, bulk percentage editor (100% gate), create/edit/delete account dialogs with preset swatches, wired per-account dropdown (PF-02, PF-03)
+
+**UI hint**: yes
 
 ### Phase 4: Wallets
 
@@ -155,7 +174,7 @@ Plans:
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 0/4            | Planned     | -          |
-| 3. Profit First Allocation  | 0/0            | Not started | -          |
+| 3. Profit First Allocation  | 0/4            | Planned     | -          |
 | 4. Wallets                  | 0/0            | Not started | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
