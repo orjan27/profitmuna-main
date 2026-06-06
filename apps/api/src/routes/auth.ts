@@ -12,6 +12,7 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  googleUserinfoSchema,
 } from '@/schemas/auth';
 import {
   register,
@@ -248,12 +249,18 @@ authRouter.get('/google/callback', async (c) => {
   const userRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const googleUser = (await userRes.json()) as {
-    sub: string;
-    email: string;
-    name: string;
-    email_verified: boolean;
-  };
+  // A non-200 (revoked token, rate limit) must not be parsed as a user (CR-01)
+  if (!userRes.ok) {
+    throw new HTTPException(400, { message: 'oauth_userinfo_failed' });
+  }
+  // Narrow the untrusted external payload at the boundary (CR-01 / WR-05).
+  // A malformed body throws via Zod rather than leaking undefined fields.
+  const googleUser = googleUserinfoSchema.parse(await userRes.json());
+  // Email is only an identity key when the provider asserts it is verified —
+  // otherwise an unverified Google identity could hijack a local account (CR-01).
+  if (!googleUser.email_verified) {
+    throw new HTTPException(400, { message: 'email_not_verified' });
+  }
 
   // Upsert user (T-04-03 account-linking: email is the identity key)
   const userId = await upsertGoogleUser(c.env.DB, {

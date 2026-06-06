@@ -1490,4 +1490,90 @@ describe('GET /api/auth/google/callback', () => {
     expect(rtRows).toHaveLength(1);
     expect(rtRows[0].revokedAt).toBeNull();
   });
+
+  it('rejects an unverified Google email (email_verified=false) and creates no user (CR-01)', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    const state = 'unverified-state';
+    const verifier = 'unverified-verifier';
+
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('token')) {
+        return new Response(
+          JSON.stringify({ access_token: 'mock-access-token', token_type: 'Bearer' }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.includes('openidconnect.googleapis.com/v1/userinfo')) {
+        return new Response(
+          JSON.stringify({
+            sub: 'google-sub-unverified',
+            email: 'victim@user.test',
+            name: 'Victim',
+            email_verified: false,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      return new Response('not found', { status: 404 });
+    });
+
+    const res = await callbackRequest(
+      { code: 'auth-code', state },
+      { oauth_state: state, oauth_code_verifier: verifier },
+      testEnv
+    );
+    vi.unstubAllGlobals();
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe('email_not_verified');
+
+    // No account should have been created or linked
+    const userRows = db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, 'victim@user.test'))
+      .all();
+    expect(userRows).toHaveLength(0);
+  });
+
+  it('rejects a non-200 userinfo response without creating a user (CR-01)', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    const state = 'failed-state';
+    const verifier = 'failed-verifier';
+
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('token')) {
+        return new Response(
+          JSON.stringify({ access_token: 'mock-access-token', token_type: 'Bearer' }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.includes('openidconnect.googleapis.com/v1/userinfo')) {
+        return new Response(JSON.stringify({ error: 'invalid_token' }), {
+          status: 401,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('not found', { status: 404 });
+    });
+
+    const res = await callbackRequest(
+      { code: 'auth-code', state },
+      { oauth_state: state, oauth_code_verifier: verifier },
+      testEnv
+    );
+    vi.unstubAllGlobals();
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: { code?: string } };
+    expect(body.error?.code).toBe('oauth_userinfo_failed');
+
+    const allUsers = db.select().from(schema.users).all();
+    expect(allUsers).toHaveLength(0);
+  });
 });
