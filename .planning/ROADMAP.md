@@ -200,7 +200,23 @@ Plans:
 1. User can select their display currency and see all monetary values formatted in that currency throughout the app
 2. User can configure an income reminder schedule and have reminder emails delivered on that schedule via Workers cron + Resend
 3. User can open an in-app notification center, see unread notifications highlighted, and mark them as read
-   **Plans**: TBD
+   **Plans**: 4 plans
+
+Plans:
+
+**Wave 0**
+
+- [ ] 06-01-PLAN.md — Foundation: notifications table + users settings columns + incomes.pendingDueNotifiedAt [BLOCKING migration], test DDL sync, RED test scaffolds, currency-aware formatCurrency + shared web contract types (SET-01, SET-02, NOTIF-01, NOTIF-02 infra)
+
+**Wave 1** _(blocked on 06-01; 06-02 and 06-03 run in parallel — no file overlap)_
+
+- [ ] 06-02-PLAN.md — Settings slice: settings service/schema/router behind requireAuth, BFF proxy, SSR settings page + form (currency + Daily/Weekly/Monthly reminder schedule), CurrencyProvider wired into layout, Settings nav link (SET-01, SET-02)
+- [ ] 06-03-PLAN.md — Notification center slice: notification service (list/unread-count/markAsRead/markAllAsRead/create)/router behind requireAuth, BFF proxy, NotificationBell + NotificationList, bell wired into nav with SSR unread count (NOTIF-01)
+
+**Wave 2** _(blocked on 06-02 + 06-03 completion)_
+
+- [ ] 06-04-PLAN.md — Cron slice: dependency-free Manila-time helper + runCron (due-user reminders mirrored as INCOME_REMINDER, one-time PENDING_INCOME_DUE dedup), sendIncomeReminderEmail, Module Worker scheduled export + hourly cron trigger (NOTIF-02)
+
    **UI hint**: yes
 
 ---
