@@ -110,25 +110,21 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
       const where = and(...conditions);
       const offset = page * limit;
 
-      const [countRows, rows] = await Promise.all([
-        db
-          .select({ count: sql<number>`COUNT(*)` })
-          .from(incomes)
-          .where(where),
-        db
-          .select()
-          .from(incomes)
-          .where(where)
-          .orderBy(desc(incomes.incomeDate), desc(incomes.createdAt))
-          .limit(limit)
-          .offset(offset),
-      ]);
+      // Fetch one extra row to determine if there's a next page (limit+1
+      // look-ahead). This matches the expense service and avoids a second COUNT
+      // query while giving unambiguous `last` semantics (WR-09).
+      const rows = await db
+        .select()
+        .from(incomes)
+        .where(where)
+        .orderBy(desc(incomes.incomeDate), desc(incomes.createdAt))
+        .limit(limit + 1)
+        .offset(offset);
 
-      const total = Number(countRows[0]?.count ?? 0);
-      const content = rows.map(toRecord);
-      const last = offset + content.length >= total;
+      const hasMore = rows.length > limit;
+      const content = (hasMore ? rows.slice(0, limit) : rows).map(toRecord);
 
-      return { content, page, last };
+      return { content, page, last: !hasMore };
     },
 
     /**
