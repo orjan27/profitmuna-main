@@ -377,14 +377,36 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
 
     /**
      * Bulk-updates targetPercentage for all submitted accounts.
-     * Validates that the submitted set sums to exactly 10000 bp.
+     * Server-enforced: the submitted set must cover exactly the user's owned accounts
+     * (no missing, no foreign, no duplicates), then the total must equal exactly 10000 bp.
      *
-     * Note: Only updates the accounts in the input array. The caller is responsible
-     * for submitting ALL accounts so the sum validation is accurate.
-     *
+     * @throws HTTPException 400 if the submitted set does not cover exactly the user's owned accounts
      * @throws HTTPException 400 if the submitted percentages do not sum to exactly 10000 bp
      */
     async updatePercentages(userId: number, input: UpdatePercentagesInput) {
+      // Step 1 — Fetch all account IDs owned by this user (server-authoritative set)
+      const owned = await db
+        .select({ id: profitFirstAccounts.id })
+        .from(profitFirstAccounts)
+        .where(eq(profitFirstAccounts.userId, userId));
+      const ownedIds = new Set<number>(owned.map((a) => a.id));
+
+      // Step 2 — Build the submitted ID set
+      const submittedIds = new Set<number>(input.accounts.map((a) => a.id));
+
+      // Step 3 — Reject if submitted set does not exactly cover the owned set
+      // Covers: duplicate ids in payload, missing owned ids, foreign ids, count mismatches
+      if (
+        submittedIds.size !== input.accounts.length ||
+        ownedIds.size !== submittedIds.size ||
+        [...submittedIds].some((id) => !ownedIds.has(id))
+      ) {
+        throw new HTTPException(400, {
+          message: 'Submit all accounts exactly once.',
+        });
+      }
+
+      // Step 4 — Validate sum after coverage check passes
       const sum = input.accounts.reduce((acc, a) => acc + a.targetPercentage, 0);
 
       if (sum !== 10000) {
