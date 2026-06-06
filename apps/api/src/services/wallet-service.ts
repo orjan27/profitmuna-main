@@ -15,11 +15,19 @@ import {
 } from '@app/db/schema';
 
 import type { z } from 'zod';
-import type { createWalletSchema, updateWalletSchema, expenseModeSchema } from '@/schemas/wallets';
+import type {
+  createWalletSchema,
+  updateWalletSchema,
+  expenseModeSchema,
+  walletTransactionSchema,
+  updateWalletTransactionSchema,
+} from '@/schemas/wallets';
 
 type CreateWalletInput = z.infer<typeof createWalletSchema>;
 type UpdateWalletInput = z.infer<typeof updateWalletSchema>;
 type ExpenseMode = z.infer<typeof expenseModeSchema>;
+type CreateTransactionInput = z.infer<typeof walletTransactionSchema>;
+type UpdateTransactionInput = z.infer<typeof updateWalletTransactionSchema>;
 
 /** Balance formula (locked): pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals */
 function computeBalanceCents({
@@ -37,6 +45,31 @@ function computeBalanceCents({
 }): number {
   // Never clamp — D-13 negative balances are valid
   return pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals;
+}
+
+/**
+ * Blocking guard: prevents manual transactions that would double-count automatically sourced money.
+ * DEPOSIT blocked when wallet is PROFIT_FIRST or has income category mappings.
+ * WITHDRAWAL blocked when wallet has expense mappings or autoDeductAllExpenses=true.
+ * Port of RESEARCH Pattern 3 verbatim.
+ */
+function assertCanInsertTransaction(
+  type: 'DEPOSIT' | 'WITHDRAWAL',
+  wallet: typeof wallets.$inferSelect,
+  mappings: { incomeCategories: number[]; expenseCategories: number[] }
+): void {
+  const incomeAuto = mappings.incomeCategories.length > 0;
+  const expenseAuto = wallet.autoDeductAllExpenses || mappings.expenseCategories.length > 0;
+  const hasPf = !!wallet.profitFirstAccountId;
+
+  if (type === 'DEPOSIT') {
+    if (hasPf) throw new HTTPException(400, { message: 'manual_deposit_blocked_pf_wallet' });
+    if (incomeAuto)
+      throw new HTTPException(400, { message: 'manual_deposit_blocked_income_mapped' });
+  } else {
+    if (expenseAuto)
+      throw new HTTPException(400, { message: 'manual_withdrawal_blocked_expense_mapped' });
+  }
 }
 
 export function createWalletService(db: ReturnType<typeof createDb>) {
@@ -617,5 +650,458 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
 
     setIncomeCategoryMappings,
     setExpenseMappings,
+
+    /**
+     * Returns wallet detail, balance breakdown, and paginated merged transaction history.
+     * History includes soft-deleted rows (D-09); balance excludes them (Pitfall 4).
+     * Merge pattern: [income_auto, expense_auto, manual].sort(date DESC, id DESC).slice(page).
+     */
+    async getById(walletId: number, userId: number, params: { page: number; size: number }) {
+      const { page, size } = params;
+
+      // Ownership-scoped wallet fetch
+      const rows = await db
+        .select()
+        .from(wallets)
+        .where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
+      const wallet = rows[0];
+      if (!wallet) throw new HTTPException(404, { message: 'not_found' });
+
+      // Load mappings for this wallet
+      const [incomeMappings, expenseMappings] = await Promise.all([
+        db
+          .select({ catId: walletIncomeCategoryMappings.incomeCategoryId })
+          .from(walletIncomeCategoryMappings)
+          .where(
+            and(
+              eq(walletIncomeCategoryMappings.walletId, walletId),
+              eq(walletIncomeCategoryMappings.userId, userId)
+            )
+          ),
+        db
+          .select({ catId: walletExpenseCategoryMappings.expenseCategoryId })
+          .from(walletExpenseCategoryMappings)
+          .where(
+            and(
+              eq(walletExpenseCategoryMappings.walletId, walletId),
+              eq(walletExpenseCategoryMappings.userId, userId)
+            )
+          ),
+      ]);
+
+      const incomeCatIds = incomeMappings.map((r) => r.catId);
+      const expenseCatIds = expenseMappings.map((r) => r.catId);
+
+      // ── Breakdown (balance components) ────────────────────────────────────
+      // These queries EXCLUDE soft-deleted transactions (Pitfall 4)
+
+      // pfAllocation: only for PROFIT_FIRST wallets
+      let pfAllocationCents = 0;
+      if (wallet.sourceType === 'PROFIT_FIRST' && wallet.profitFirstAccountId != null) {
+        const pfRows = await db
+          .select()
+          .from(profitFirstAccounts)
+          .where(
+            and(
+              eq(profitFirstAccounts.id, wallet.profitFirstAccountId),
+              eq(profitFirstAccounts.userId, userId)
+            )
+          );
+        const pfAccount = pfRows[0];
+        if (pfAccount) {
+          const totalReceived = await getTotalReceivedIncomeCents(userId);
+          pfAllocationCents = Math.round((totalReceived * pfAccount.targetPercentage) / 10000);
+        }
+      }
+
+      // mappedIncomeCents: sum of RECEIVED incomes for mapped income categories
+      let mappedIncomeCents = 0;
+      if (incomeCatIds.length > 0) {
+        const incomeByCategory = await getReceivedIncomeByCategoryCents(userId);
+        mappedIncomeCents = incomeCatIds.reduce(
+          (sum, catId) => sum + (incomeByCategory.get(catId) ?? 0),
+          0
+        );
+      }
+
+      // mappedExpensesCents: sum of non-deleted expenses for mapped categories
+      let mappedExpensesCents = 0;
+      if (wallet.autoDeductAllExpenses) {
+        const expenseByCategory = await getExpensesByCategoryCents(userId);
+        mappedExpensesCents = Array.from(expenseByCategory.values()).reduce((s, v) => s + v, 0);
+      } else if (expenseCatIds.length > 0) {
+        const expenseByCategory = await getExpensesByCategoryCents(userId);
+        mappedExpensesCents = expenseCatIds.reduce(
+          (sum, catId) => sum + (expenseByCategory.get(catId) ?? 0),
+          0
+        );
+      }
+
+      // depositsCents + withdrawalsCents: non-deleted manual transactions for this wallet
+      const txSumRows = await db
+        .select({
+          type: walletTransactions.type,
+          total: sql<number>`COALESCE(SUM(${walletTransactions.amount}), 0)`,
+        })
+        .from(walletTransactions)
+        .where(
+          and(
+            eq(walletTransactions.walletId, walletId),
+            eq(walletTransactions.userId, userId),
+            isNull(walletTransactions.deletedAt)
+          )
+        )
+        .groupBy(walletTransactions.type);
+
+      let depositsCents = 0;
+      let withdrawalsCents = 0;
+      for (const row of txSumRows) {
+        if (row.type === 'DEPOSIT') depositsCents = Number(row.total ?? 0);
+        else withdrawalsCents = Number(row.total ?? 0);
+      }
+
+      // ── Transaction history merge (Pattern 5) ─────────────────────────────
+      // fetchLimit caps each source to avoid unbounded reads (Pitfall 3)
+      const fetchLimit = (page + 1) * size;
+
+      // Auto-income entries: RECEIVED incomes mapped to this wallet's income categories
+      const incomeEntries: Array<{
+        id: number;
+        type: 'INCOME_AUTO';
+        amount: number;
+        description: string | null;
+        transactionDate: string;
+        deletedAt: null;
+        source: 'income';
+      }> = [];
+
+      if (incomeCatIds.length > 0) {
+        for (const catId of incomeCatIds) {
+          const rows = await db
+            .select({
+              id: incomes.id,
+              amount: incomes.amount,
+              description: incomes.description,
+              transactionDate: incomes.incomeDate,
+            })
+            .from(incomes)
+            .where(
+              and(
+                eq(incomes.userId, userId),
+                eq(incomes.categoryId, catId),
+                eq(incomes.moneyStatus, 'RECEIVED')
+              )
+            )
+            .limit(fetchLimit);
+          for (const row of rows) {
+            incomeEntries.push({
+              id: row.id,
+              type: 'INCOME_AUTO',
+              amount: row.amount,
+              description: row.description ?? null,
+              transactionDate: row.transactionDate,
+              deletedAt: null,
+              source: 'income',
+            });
+          }
+        }
+      }
+
+      // Auto-expense entries: non-deleted expenses mapped to this wallet's expense categories
+      const expenseEntries: Array<{
+        id: number;
+        type: 'EXPENSE_AUTO';
+        amount: number;
+        description: string | null;
+        transactionDate: string;
+        deletedAt: null;
+        source: 'expense';
+      }> = [];
+
+      const expenseCatIdsForHistory = wallet.autoDeductAllExpenses
+        ? (
+            await db
+              .select({ id: expenseCategories.id })
+              .from(expenseCategories)
+              .where(eq(expenseCategories.userId, userId))
+          ).map((r) => r.id)
+        : expenseCatIds;
+
+      if (expenseCatIdsForHistory.length > 0) {
+        for (const catId of expenseCatIdsForHistory) {
+          const rows = await db
+            .select({
+              id: expenses.id,
+              amount: expenses.amount,
+              description: expenses.description,
+              transactionDate: expenses.expenseDate,
+            })
+            .from(expenses)
+            .where(
+              and(
+                eq(expenses.userId, userId),
+                eq(expenses.categoryId, catId),
+                isNull(expenses.deletedAt)
+              )
+            )
+            .limit(fetchLimit);
+          for (const row of rows) {
+            expenseEntries.push({
+              id: row.id,
+              type: 'EXPENSE_AUTO',
+              amount: row.amount,
+              description: row.description ?? null,
+              transactionDate: row.transactionDate,
+              deletedAt: null,
+              source: 'expense',
+            });
+          }
+        }
+      }
+
+      // Manual transactions: ALL (including soft-deleted) for this wallet (D-09)
+      const manualRows = await db
+        .select()
+        .from(walletTransactions)
+        .where(
+          and(eq(walletTransactions.walletId, walletId), eq(walletTransactions.userId, userId))
+        )
+        .limit(fetchLimit);
+
+      const manualEntries = manualRows.map((row) => ({
+        id: row.id,
+        type: row.type as 'DEPOSIT' | 'WITHDRAWAL',
+        amount: row.amount,
+        description: row.description ?? null,
+        transactionDate: row.transactionDate,
+        deletedAt: row.deletedAt ?? null,
+        source: 'manual' as const,
+      }));
+
+      // Merge + sort by transactionDate DESC, then id DESC (RESEARCH Pattern 5)
+      const merged = [...incomeEntries, ...expenseEntries, ...manualEntries];
+      merged.sort((a, b) => {
+        if (a.transactionDate < b.transactionDate) return 1;
+        if (a.transactionDate > b.transactionDate) return -1;
+        return b.id - a.id;
+      });
+
+      const total = merged.length;
+      const totalPages = Math.ceil(total / size) || 1;
+      const content = merged.slice(page * size, (page + 1) * size);
+
+      // Rebuild balanceCents using the same formula as list()
+      const balanceCents = computeBalanceCents({
+        pfAllocation: pfAllocationCents,
+        mappedIncome: mappedIncomeCents,
+        mappedExpenses: mappedExpensesCents,
+        deposits: depositsCents,
+        withdrawals: withdrawalsCents,
+      });
+
+      return {
+        wallet: {
+          ...wallet,
+          balanceCents,
+          transactionCount: manualRows.filter((r) => !r.deletedAt).length,
+          mappingCount: incomeCatIds.length + expenseCatIds.length,
+        },
+        breakdown: {
+          pfAllocationCents,
+          mappedIncomeCents,
+          mappedExpensesCents,
+          depositsCents,
+          withdrawalsCents,
+        },
+        transactions: content,
+        pagination: { page, size, total, totalPages },
+      };
+    },
+
+    /**
+     * Creates a manual transaction on an eligible wallet.
+     * Runs assertCanInsertTransaction before insert (T-04-12).
+     * Amount must be positive cents.
+     */
+    async createTransaction(walletId: number, userId: number, input: CreateTransactionInput) {
+      // Ownership-scoped wallet fetch
+      const walletRows = await db
+        .select()
+        .from(wallets)
+        .where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
+      const wallet = walletRows[0];
+      if (!wallet) throw new HTTPException(404, { message: 'not_found' });
+
+      // Load mappings for blocking guard
+      const [incomeMappings, expenseMappings] = await Promise.all([
+        db
+          .select({ catId: walletIncomeCategoryMappings.incomeCategoryId })
+          .from(walletIncomeCategoryMappings)
+          .where(
+            and(
+              eq(walletIncomeCategoryMappings.walletId, walletId),
+              eq(walletIncomeCategoryMappings.userId, userId)
+            )
+          ),
+        db
+          .select({ catId: walletExpenseCategoryMappings.expenseCategoryId })
+          .from(walletExpenseCategoryMappings)
+          .where(
+            and(
+              eq(walletExpenseCategoryMappings.walletId, walletId),
+              eq(walletExpenseCategoryMappings.userId, userId)
+            )
+          ),
+      ]);
+
+      // Run blocking guard (T-04-12, T-04-13)
+      assertCanInsertTransaction(input.type, wallet, {
+        incomeCategories: incomeMappings.map((r) => r.catId),
+        expenseCategories: expenseMappings.map((r) => r.catId),
+      });
+
+      const amountCents = Math.round(input.amount);
+      if (amountCents <= 0) {
+        throw new HTTPException(400, { message: 'amount_must_be_positive' });
+      }
+
+      const [created] = await db
+        .insert(walletTransactions)
+        .values({
+          walletId,
+          userId,
+          type: input.type,
+          amount: amountCents,
+          description: input.description ?? null,
+          transactionDate: input.transactionDate,
+        })
+        .returning();
+
+      return created;
+    },
+
+    /**
+     * Updates mutable fields of a manual transaction (ownership-scoped).
+     * Returns the updated row.
+     */
+    async updateTransaction(
+      walletId: number,
+      txId: number,
+      userId: number,
+      input: UpdateTransactionInput
+    ) {
+      // Ownership-scoped fetch
+      const rows = await db
+        .select()
+        .from(walletTransactions)
+        .where(
+          and(
+            eq(walletTransactions.id, txId),
+            eq(walletTransactions.walletId, walletId),
+            eq(walletTransactions.userId, userId)
+          )
+        );
+      const tx = rows[0];
+      if (!tx) throw new HTTPException(404, { message: 'not_found' });
+
+      const updateData: Partial<typeof tx> = {};
+      if (input.amount !== undefined) updateData.amount = Math.round(input.amount);
+      if (input.description !== undefined) updateData.description = input.description;
+      if (input.transactionDate !== undefined) updateData.transactionDate = input.transactionDate;
+
+      if (Object.keys(updateData).length > 0) {
+        await db
+          .update(walletTransactions)
+          .set(updateData)
+          .where(
+            and(
+              eq(walletTransactions.id, txId),
+              eq(walletTransactions.walletId, walletId),
+              eq(walletTransactions.userId, userId)
+            )
+          );
+      }
+
+      const [updated] = await db
+        .select()
+        .from(walletTransactions)
+        .where(
+          and(
+            eq(walletTransactions.id, txId),
+            eq(walletTransactions.walletId, walletId),
+            eq(walletTransactions.userId, userId)
+          )
+        );
+      return updated ?? tx;
+    },
+
+    /**
+     * Soft-deletes a manual transaction by setting deletedAt (ownership-scoped).
+     */
+    async removeTransaction(walletId: number, txId: number, userId: number) {
+      const rows = await db
+        .select()
+        .from(walletTransactions)
+        .where(
+          and(
+            eq(walletTransactions.id, txId),
+            eq(walletTransactions.walletId, walletId),
+            eq(walletTransactions.userId, userId)
+          )
+        );
+      if (!rows[0]) throw new HTTPException(404, { message: 'not_found' });
+
+      const deletedAt = new Date().toISOString();
+      await db
+        .update(walletTransactions)
+        .set({ deletedAt })
+        .where(
+          and(
+            eq(walletTransactions.id, txId),
+            eq(walletTransactions.walletId, walletId),
+            eq(walletTransactions.userId, userId)
+          )
+        );
+
+      const [updated] = await db
+        .select()
+        .from(walletTransactions)
+        .where(eq(walletTransactions.id, txId));
+      return updated ?? { ...rows[0], deletedAt };
+    },
+
+    /**
+     * Restores a soft-deleted transaction by clearing deletedAt (ownership-scoped).
+     */
+    async restoreTransaction(walletId: number, txId: number, userId: number) {
+      const rows = await db
+        .select()
+        .from(walletTransactions)
+        .where(
+          and(
+            eq(walletTransactions.id, txId),
+            eq(walletTransactions.walletId, walletId),
+            eq(walletTransactions.userId, userId)
+          )
+        );
+      if (!rows[0]) throw new HTTPException(404, { message: 'not_found' });
+
+      await db
+        .update(walletTransactions)
+        .set({ deletedAt: null })
+        .where(
+          and(
+            eq(walletTransactions.id, txId),
+            eq(walletTransactions.walletId, walletId),
+            eq(walletTransactions.userId, userId)
+          )
+        );
+
+      const [updated] = await db
+        .select()
+        .from(walletTransactions)
+        .where(eq(walletTransactions.id, txId));
+      return updated ?? { ...rows[0], deletedAt: null };
+    },
   };
 }

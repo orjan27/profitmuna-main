@@ -4,7 +4,13 @@ import { zValidator } from '@hono/zod-validator';
 import { createDb } from '@app/db';
 import { requireAuth } from '@/middleware/auth';
 import { createWalletService } from '@/services/wallet-service';
-import { createWalletSchema, updateWalletSchema } from '@/schemas/wallets';
+import {
+  createWalletSchema,
+  updateWalletSchema,
+  walletTransactionSchema,
+  updateWalletTransactionSchema,
+  walletTransactionQuerySchema,
+} from '@/schemas/wallets';
 import type { Bindings, Variables } from '@/types';
 
 const walletsRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -61,6 +67,82 @@ walletsRouter.delete('/:walletId', async (c) => {
   const userId = c.get('userId');
   const svc = createWalletService(createDb(c.env.DB));
   const result = await svc.remove(walletId, userId);
+  return c.json({ data: result });
+});
+
+// GET /:walletId — wallet detail with breakdown + paginated history (WAL-05)
+walletsRouter.get(
+  '/:walletId',
+  zValidator('query', walletTransactionQuerySchema, (result, c) => {
+    if (!result.success) {
+      return c.json({ error: { code: 'validation_error', message: 'Invalid query params' } }, 422);
+    }
+  }),
+  async (c) => {
+    const walletId = Number(c.req.param('walletId'));
+    const params = c.req.valid('query');
+    const userId = c.get('userId');
+    const svc = createWalletService(createDb(c.env.DB));
+    const result = await svc.getById(walletId, userId, params);
+    return c.json({ data: result });
+  }
+);
+
+// IMPORTANT: register restore BEFORE the generic /:txId handlers to avoid param shadowing
+// PATCH /:walletId/transactions/:txId/restore — restore soft-deleted transaction
+walletsRouter.patch('/:walletId/transactions/:txId/restore', async (c) => {
+  const walletId = Number(c.req.param('walletId'));
+  const txId = Number(c.req.param('txId'));
+  const userId = c.get('userId');
+  const svc = createWalletService(createDb(c.env.DB));
+  const result = await svc.restoreTransaction(walletId, txId, userId);
+  return c.json({ data: result });
+});
+
+// POST /:walletId/transactions — create manual transaction (WAL-04)
+walletsRouter.post(
+  '/:walletId/transactions',
+  zValidator('json', walletTransactionSchema, (result, c) => {
+    if (!result.success) {
+      return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
+    }
+  }),
+  async (c) => {
+    const walletId = Number(c.req.param('walletId'));
+    const input = c.req.valid('json');
+    const userId = c.get('userId');
+    const svc = createWalletService(createDb(c.env.DB));
+    const result = await svc.createTransaction(walletId, userId, input);
+    return c.json({ data: result }, 201);
+  }
+);
+
+// PUT /:walletId/transactions/:txId — update manual transaction
+walletsRouter.put(
+  '/:walletId/transactions/:txId',
+  zValidator('json', updateWalletTransactionSchema, (result, c) => {
+    if (!result.success) {
+      return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
+    }
+  }),
+  async (c) => {
+    const walletId = Number(c.req.param('walletId'));
+    const txId = Number(c.req.param('txId'));
+    const input = c.req.valid('json');
+    const userId = c.get('userId');
+    const svc = createWalletService(createDb(c.env.DB));
+    const result = await svc.updateTransaction(walletId, txId, userId, input);
+    return c.json({ data: result });
+  }
+);
+
+// DELETE /:walletId/transactions/:txId — soft-delete manual transaction
+walletsRouter.delete('/:walletId/transactions/:txId', async (c) => {
+  const walletId = Number(c.req.param('walletId'));
+  const txId = Number(c.req.param('txId'));
+  const userId = c.get('userId');
+  const svc = createWalletService(createDb(c.env.DB));
+  const result = await svc.removeTransaction(walletId, txId, userId);
   return c.json({ data: result });
 });
 
