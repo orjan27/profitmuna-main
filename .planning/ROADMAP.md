@@ -11,7 +11,7 @@
 
 - [x] **Phase 1: Authentication** - Users can create accounts, log in, and manage credentials securely (completed 2026-06-06)
 - [x] **Phase 2: Income & Expenses** - Users can record, browse, and manage income and expense entries with categories (completed 2026-06-06)
-- [ ] **Phase 3: Profit First Allocation** - Users can configure allocation accounts and view derived balance summaries
+- [x] **Phase 3: Profit First Allocation** - Users can configure allocation accounts and view derived balance summaries (completed 2026-06-06)
 - [ ] **Phase 4: Wallets** - Users can create wallets, map categories, record transactions, and view computed balances
 - [ ] **Phase 5: Dashboard** - Users land on a summary view showing totals, allocation balances, and recent transactions
 - [ ] **Phase 6: Settings & Notifications** - Users can configure currency, set reminder schedules, and use the notification center
@@ -194,8 +194,8 @@ Plans:
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 4/4            | Complete    | 2026-06-06 |
-| 3. Profit First Allocation  | 4/4            | Complete    | 2026-06-06 |
-| 4. Wallets                  | 1/3 | In Progress|  |
+| 3. Profit First Allocation  | 6/6 | Complete    | 2026-06-06 |
+| 4. Wallets                  | 1/3            | In Progress |            |
 | 5. Dashboard                | 0/0            | Not started | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
 
