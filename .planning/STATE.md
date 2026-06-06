@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 03 Plan 06 complete (gap closure — WR-01 closed, category filter wired end-to-end)
-last_updated: '2026-06-06T20:48:00.000Z'
+stopped_at: Phase 04 Plan 01 complete (wallet foundation — schema, migration, BFF proxy, Zod schemas, types, test scaffold)
+last_updated: '2026-06-06T12:56:58.807Z'
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 17
-  completed_plans: 14
-  percent: 35
+  completed_plans: 16
+  percent: 88
 ---
 
 # State: Profitmuna
@@ -32,11 +32,11 @@ progress:
 ## Current Position
 
 Phase: 04 (wallets) — EXECUTING
-Plan: 1 of 3
-**Phase:** 03
-**Plan:** Plan 04 complete — Phase 03 complete
+Plan: 2 of 3
+**Phase:** 04
+**Plan:** Plan 01 complete — wallet foundation (schema, migration, BFF proxy, Zod schemas, types, test scaffold)
 **Status:** Executing Phase 04
-**Phase goal:** Every user has exactly 4 Profit First allocation accounts; CRUD, percentage editing, and allocation summary with derived balances
+**Phase goal:** Users can create wallets with Profit First or standalone source types, configure income/expense mappings, and track money with computed balances
 
 ```
 Progress: [██████████] Phase 1 (4/4 automated) — Auth
@@ -67,6 +67,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 03 P04 | ~4 min active | 2 tasks | 5 files |
 | Phase 03 P05 | ~8 min active | 2 tasks | 2 files |
 | Phase 03 P06 | ~10 min active | 2 tasks | 4 files |
+| Phase 04 P01 | ~6 min active | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -109,8 +110,8 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Phase 03 Plan 06 complete (gap closure — WR-01 closed, category filter wired end-to-end)
-**Next:** Phase 03 all gap-closure plans complete — Phase 03 is now complete; proceed to Phase 04 (Wallets) or Phase 02 (Income & Expenses) per ROADMAP dependencies
+**Stopped at:** Phase 04 Plan 01 complete (wallet foundation — schema, migration, BFF proxy, Zod schemas, types, test scaffold)
+**Next:** Phase 04 Plan 02 — wallet CRUD service, server actions, wallet list UI
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -152,3 +153,7 @@ _State initialized: 2026-06-05_
 - [Phase 03-06]: Category list in getSummary is intentionally unfiltered — must show all options regardless of active date/categoryIds filter so users can see and select any category
 - [Phase 03-06]: Category ids mapped to strings in page.tsx (String(c.id)) to match nuqs parseAsArrayOf(parseAsString) contract — avoids type mismatch in URL param handling
 - [Phase 03-06]: Empty-state uses disabled button + muted text rather than hiding the filter control — visible non-interactive indicator is better UX than invisible dead filter
+- [Phase 04-01]: wallets_user_pf_account_unique index on (userId, profitFirstAccountId) enforces one wallet per PF account at DB level (WAL-01 D-01)
+- [Phase 04-01]: profitFirstAccountId FK has no onDelete cascade — wallet delete-guard in Plan 02 service can block deletes of linked PF accounts (D-16)
+- [Phase 04-01]: (dashboard)/layout.tsx already existed from Phase 3 — left unchanged; wallet pages will nest inside it automatically
+- [Phase 04-01]: walletsRouter uses self-contained requireAuth at router level, matching profitFirstRouter pattern — no outer app.use needed (T-04-01)

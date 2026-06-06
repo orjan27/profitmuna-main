@@ -42,11 +42,11 @@ Requirements for initial release. Each maps to roadmap phases. Finance behavior 
 
 ### Wallets
 
-- [ ] **WAL-01**: User can create a wallet — PROFIT_FIRST type (linked 1:1 to an allocation account) or BLANK
-- [ ] **WAL-02**: User can map income/expense categories to a wallet (each category maps to at most one wallet) and toggle auto-deduct-all-expenses
-- [ ] **WAL-03**: User can view all wallets with computed balance breakdowns (PF allocation + mapped income − mapped expenses + deposits − withdrawals)
-- [ ] **WAL-04**: User can record manual DEPOSIT/WITHDRAWAL transactions, edit them, soft-delete and restore them
-- [ ] **WAL-05**: User can view wallet detail with paginated transaction history
+- [x] **WAL-01**: User can create a wallet — PROFIT_FIRST type (linked 1:1 to an allocation account) or BLANK
+- [x] **WAL-02**: User can map income/expense categories to a wallet (each category maps to at most one wallet) and toggle auto-deduct-all-expenses
+- [x] **WAL-03**: User can view all wallets with computed balance breakdowns (PF allocation + mapped income − mapped expenses + deposits − withdrawals)
+- [x] **WAL-04**: User can record manual DEPOSIT/WITHDRAWAL transactions, edit them, soft-delete and restore them
+- [x] **WAL-05**: User can view wallet detail with paginated transaction history
 
 ### Notifications
 
@@ -105,11 +105,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PF-02       | Phase 3 | Complete |
 | PF-03       | Phase 3 | Complete |
 | PF-04       | Phase 3 | Complete |
-| WAL-01      | Phase 4 | Pending  |
-| WAL-02      | Phase 4 | Pending  |
-| WAL-03      | Phase 4 | Pending  |
-| WAL-04      | Phase 4 | Pending  |
-| WAL-05      | Phase 4 | Pending  |
+| WAL-01      | Phase 4 | Complete |
+| WAL-02      | Phase 4 | Complete |
+| WAL-03      | Phase 4 | Complete |
+| WAL-04      | Phase 4 | Complete |
+| WAL-05      | Phase 4 | Complete |
 | DASH-01     | Phase 5 | Pending  |
 | SET-01      | Phase 6 | Pending  |
 | SET-02      | Phase 6 | Pending  |

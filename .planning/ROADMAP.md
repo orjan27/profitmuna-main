@@ -146,7 +146,7 @@ Plans:
 
 **Wave 0**
 
-- [ ] 04-01-PLAN.md — Foundation: 4 wallet tables + applied migration [BLOCKING], Zod schemas, web type contracts, BFF proxy (5 verbs), stub router behind requireAuth, wallet-labels + formatCurrency utilities, WAL-01..05 test scaffold (WAL-01..05 infra)
+- [x] 04-01-PLAN.md — Foundation: 4 wallet tables + applied migration [BLOCKING], Zod schemas, web type contracts, BFF proxy (5 verbs), stub router behind requireAuth, wallet-labels + formatCurrency utilities, WAL-01..05 test scaffold (WAL-01..05 infra)
 
 **Wave 1** _(blocked on Wave 0 completion)_
 
@@ -195,7 +195,7 @@ Plans:
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 4/4            | Complete    | 2026-06-06 |
 | 3. Profit First Allocation  | 4/4            | Complete    | 2026-06-06 |
-| 4. Wallets                  | 0/3            | Planned     | -          |
+| 4. Wallets                  | 1/3 | In Progress|  |
 | 5. Dashboard                | 0/0            | Not started | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
 
