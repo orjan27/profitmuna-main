@@ -228,7 +228,7 @@ Plans:
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 4/4            | Complete    | 2026-06-06 |
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
-| 4. Wallets                  | 4/4            | Complete    | 2026-06-06 |
+| 4. Wallets                  | 4/4 | Complete    | 2026-06-06 |
 | 5. Dashboard                | 0/3            | Planned     | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
 

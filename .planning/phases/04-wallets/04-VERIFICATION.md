@@ -11,6 +11,7 @@ re_verification:
     - 'User can open a wallet detail view with a paginated transaction history (SC-5 / WAL-05)'
   gaps_remaining: []
   regressions: []
+human_verification_complete: true
 human_verification:
   - test: 'Create a PROFIT_FIRST wallet linked to an existing allocation account'
     expected: 'Wallet appears in the list with a computed balance; creating a second wallet for the same account is rejected with a 409 error message'
@@ -33,7 +34,7 @@ human_verification:
 
 **Phase Goal:** Users can create wallets linked to allocation accounts or standalone, map income and expense categories to wallets, record manual transactions, and see computed balances
 **Verified:** 2026-06-06T22:17:00Z
-**Status:** human_needed
+**Status:** passed (human verification complete — 5/5, see 04-HUMAN-UAT.md)
 **Re-verification:** Yes — after gap closure (SC-5 / WAL-05)
 
 ---
