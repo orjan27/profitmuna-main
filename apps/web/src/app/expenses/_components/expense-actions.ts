@@ -5,6 +5,37 @@ import { revalidatePath } from 'next/cache';
 import { apiFetch, ApiError } from '@/server/api';
 import { toCents } from '@/lib/format-currency';
 
+import type { ExpenseRow } from './edit-expense-dialog';
+
+interface PaginatedExpenses {
+  content: ExpenseRow[];
+  page: number;
+  last: boolean;
+  totalElements: number;
+}
+
+/**
+ * Load a page of expense records for the load-more affordance.
+ * Called from the ExpensesOverview client component — client components must
+ * not import the server-only apiFetch directly.
+ *
+ * @returns The page content plus a `last` flag signalling no more pages.
+ */
+export async function fetchExpensesAction(params: {
+  page: number;
+  limit?: number;
+  from?: string;
+  to?: string;
+}): Promise<PaginatedExpenses> {
+  const qs = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit ?? 20),
+    ...(params.from ? { from: params.from } : {}),
+    ...(params.to ? { to: params.to } : {}),
+  });
+  return apiFetch<PaginatedExpenses>(`/api/expenses?${qs.toString()}`);
+}
+
 /**
  * Update an existing expense by ID.
  * Converts decimal peso amount to integer cents (D-08).

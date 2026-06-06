@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatCurrency } from '@/lib/format-currency';
-import { apiFetch } from '@/server/api';
+import { fetchExpensesAction } from './expense-actions';
 import { ExpenseList } from './expense-list';
 import type { ExpenseRow } from './edit-expense-dialog';
 
@@ -62,10 +62,12 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
     fromVal: string,
     toVal: string
   ): Promise<PaginatedExpenses> {
-    const qs = new URLSearchParams({ page: String(page), limit: String(PAGE_LIMIT) });
-    if (fromVal) qs.set('from', fromVal);
-    if (toVal) qs.set('to', toVal);
-    return apiFetch<PaginatedExpenses>(`/api/expenses?${qs.toString()}`);
+    return fetchExpensesAction({
+      page,
+      limit: PAGE_LIMIT,
+      ...(fromVal ? { from: fromVal } : {}),
+      ...(toVal ? { to: toVal } : {}),
+    });
   }
 
   // Apply filter: reset accumulator to page 0 with new filter values
