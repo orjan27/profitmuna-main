@@ -30,13 +30,13 @@ The finance functionality must work **exactly like** the existing rentals app at
 - ✓ Google OAuth login (arctic PKCE, email-keyed account linking; live consent flow pending UAT credentials) — Validated in Phase 1: Authentication
 - ✓ Password reset via email link (Resend) — Validated in Phase 1: Authentication
 - ✓ Welcome email after registration (Resend) — Validated in Phase 1: Authentication
+- ✓ Profit First accounts with configurable percentages (server-enforced sum-to-100% validation), custom accounts — Validated in Phase 3: Profit First Allocation
+- ✓ Allocation summary with derived balances, date-range and category filters — Validated in Phase 3: Profit First Allocation
 
 ### Active
 
 - [ ] Income CRUD with categories, PENDING/RECEIVED status, receive transition
 - [ ] Expense CRUD with categories, payment method, soft delete
-- [ ] Profit First accounts with configurable percentages (sum-to-100% validation), custom accounts
-- [ ] Allocation summary with derived balances and filters
 - [ ] Wallets with PF-account linking, category mappings, manual transactions, computed balances
 - [ ] In-app notification center (read/unread)
 - [ ] Scheduled income-logging reminder emails based on user preference (Workers cron)
@@ -97,4 +97,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-06-06 — Phase 1 (Authentication) complete: register/verify/login/refresh/logout, password reset, Google OAuth; 6 credential-gated UAT items tracked in 01-HUMAN-UAT.md_
+_Last updated: 2026-06-06 — Phase 3 (Profit First Allocation) complete: account seeding, CRUD, server-enforced percentage editing, allocation summary with date/category filters; 8 browser UAT items tracked in 03-HUMAN-UAT.md_
