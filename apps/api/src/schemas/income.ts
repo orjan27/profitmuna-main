@@ -3,7 +3,7 @@ import { z } from 'zod';
 /** Schema for creating an income record. Amount arrives as integer cents from the web layer. */
 export const createIncomeSchema = z.object({
   categoryId: z.number().int().positive(),
-  amount: z.number().positive(),
+  amount: z.number().int().positive(),
   description: z.string().max(500).optional(),
   incomeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   moneyStatus: z.enum(['RECEIVED', 'PENDING']),
