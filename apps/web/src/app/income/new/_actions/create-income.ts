@@ -12,6 +12,9 @@ import { toCents } from '@/lib/format-currency';
  */
 export async function createIncomeAction(formData: FormData): Promise<{ error: string } | void> {
   const rawAmount = Number(formData.get('amount'));
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+    return { error: 'invalid_amount' };
+  }
   const amount = toCents(rawAmount); // Pitfall 2: convert pesos → cents before API
 
   const body = {

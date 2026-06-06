@@ -107,7 +107,9 @@ export function IncomeForm({
         toast.error(
           result.error === 'invalid_category'
             ? 'Invalid category selected.'
-            : 'Something went wrong. Please try again.'
+            : result.error === 'invalid_amount'
+              ? 'Enter a valid amount greater than zero.'
+              : 'Something went wrong. Please try again.'
         );
       }
       // On success the action calls redirect() — component unmounts

@@ -49,6 +49,9 @@ export async function updateIncomeAction(
   formData: FormData
 ): Promise<{ error: string } | void> {
   const rawAmount = Number(formData.get('amount'));
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+    return { error: 'invalid_amount' };
+  }
   const body: Record<string, unknown> = {
     categoryId: Number(formData.get('categoryId')),
     amount: toCents(rawAmount),

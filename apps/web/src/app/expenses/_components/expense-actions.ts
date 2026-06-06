@@ -48,6 +48,9 @@ export async function updateExpenseAction(
   formData: FormData
 ): Promise<{ error: string } | undefined> {
   const rawAmount = Number(formData.get('amount'));
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+    return { error: 'Enter a valid amount greater than zero.' };
+  }
   const categoryId = Number(formData.get('categoryId'));
   const expenseDate = formData.get('expenseDate') as string;
   const description = (formData.get('description') as string) || undefined;
