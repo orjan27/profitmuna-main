@@ -8,7 +8,13 @@ import app from '../src/index';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash, encodeHex } from '@/lib/token';
 import { signAccessToken, signRefreshToken, verifyAccessToken } from '@/lib/jwt';
-import { login, refreshTokens, logout } from '@/services/auth-service';
+import {
+  login,
+  refreshTokens,
+  logout,
+  forgotPassword,
+  resetPassword,
+} from '@/services/auth-service';
 
 import { createTestDb, seedUser, mockEnv } from './helpers/db';
 
@@ -914,5 +920,178 @@ describe('POST /api/auth/logout', () => {
       .where(eq(schema.refreshTokens.userId, user.id))
       .all();
     expect(rows).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// slice 01-03 tests: forgotPassword / resetPassword service (AUTH-04)
+// ---------------------------------------------------------------------------
+
+describe('auth-service: forgotPassword', () => {
+  it('for an existing user: deletes prior reset_password tokens, inserts new hashed token, returns resetUrl', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'forgot@exists.test',
+      name: 'Forgot Exists',
+      passwordHash: await hashPassword('oldpass'),
+      emailVerified: true,
+    });
+
+    // Pre-seed a stale reset_password token that should be replaced
+    const staleRaw = generateSecureToken();
+    db.insert(schema.authTokens)
+      .values({
+        userId: user.id,
+        tokenHash: await sha256Hash(staleRaw),
+        purpose: 'reset_password',
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      })
+      .run();
+
+    const result = await forgotPassword(d1, 'http://app.test', 'forgot@exists.test');
+
+    expect(result.exists).toBe(true);
+    expect(result.resetUrl).toContain('/reset-password?token=');
+
+    // Old token should be gone; only one new row
+    const tokens = db
+      .select()
+      .from(schema.authTokens)
+      .where(eq(schema.authTokens.userId, user.id))
+      .all();
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0].purpose).toBe('reset_password');
+    // Stored hash must differ from the stale token hash
+    expect(tokens[0].tokenHash).not.toBe(await sha256Hash(staleRaw));
+  });
+
+  it('for an unknown email: returns generic success, creates no auth_tokens row', async () => {
+    const { d1, db } = createTestDb();
+
+    const result = await forgotPassword(d1, 'http://app.test', 'nobody@unknown.test');
+
+    expect(result.exists).toBe(false);
+    // Caller inspects `exists` to decide whether to email — resetUrl may be empty string
+    const tokens = db.select().from(schema.authTokens).all();
+    expect(tokens).toHaveLength(0);
+  });
+});
+
+describe('auth-service: resetPassword', () => {
+  it('updates password_hash, deletes the token row (single-use), and wipes all refresh_tokens', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'reset@valid.test',
+      name: 'Reset Valid',
+      passwordHash: await hashPassword('oldpass123'),
+      emailVerified: true,
+    });
+
+    // Seed an active refresh token to confirm it gets wiped
+    db.insert(schema.refreshTokens)
+      .values({
+        userId: user.id,
+        tokenHash: 'rt-to-wipe',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .run();
+
+    const rawToken = generateSecureToken();
+    db.insert(schema.authTokens)
+      .values({
+        userId: user.id,
+        tokenHash: await sha256Hash(rawToken),
+        purpose: 'reset_password',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1h from now
+      })
+      .run();
+
+    const userId = await resetPassword(d1, rawToken, 'newpass456');
+    expect(userId).toBe(user.id);
+
+    // Password hash should have been updated
+    const updatedUser = db.select().from(schema.users).where(eq(schema.users.id, user.id)).all()[0];
+    expect(await verifyPassword('newpass456', updatedUser.passwordHash!)).toBe(true);
+    expect(await verifyPassword('oldpass123', updatedUser.passwordHash!)).toBe(false);
+
+    // Token row should be gone (single-use)
+    const tokenRows = db
+      .select()
+      .from(schema.authTokens)
+      .where(eq(schema.authTokens.userId, user.id))
+      .all();
+    expect(tokenRows).toHaveLength(0);
+
+    // All refresh tokens for the user should be wiped (T-03-04)
+    const rtRows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    expect(rtRows).toHaveLength(0);
+  });
+
+  it('throws 400 invalid_or_expired_token when the token is reused (single-use enforcement)', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'reuse@reset.test',
+      name: 'Reuse Reset',
+      passwordHash: await hashPassword('pass1'),
+      emailVerified: true,
+    });
+
+    const rawToken = generateSecureToken();
+    db.insert(schema.authTokens)
+      .values({
+        userId: user.id,
+        tokenHash: await sha256Hash(rawToken),
+        purpose: 'reset_password',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      })
+      .run();
+
+    // First use — succeeds
+    await resetPassword(d1, rawToken, 'newpass789');
+
+    // Second use — must be rejected (token deleted on first use)
+    await expect(resetPassword(d1, rawToken, 'anotherpass')).rejects.toMatchObject({
+      status: 400,
+      message: 'invalid_or_expired_token',
+    });
+  });
+
+  it('throws 400 invalid_or_expired_token for an expired token', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'expired@reset.test',
+      name: 'Expired Reset',
+      passwordHash: await hashPassword('pass2'),
+      emailVerified: true,
+    });
+
+    const rawToken = generateSecureToken();
+    db.insert(schema.authTokens)
+      .values({
+        userId: user.id,
+        tokenHash: await sha256Hash(rawToken),
+        purpose: 'reset_password',
+        expiresAt: new Date(Date.now() - 60_000).toISOString(), // expired 1 minute ago
+      })
+      .run();
+
+    await expect(resetPassword(d1, rawToken, 'shouldfail')).rejects.toMatchObject({
+      status: 400,
+      message: 'invalid_or_expired_token',
+    });
+  });
+
+  it('throws 400 for a completely unknown token', async () => {
+    const { d1 } = createTestDb();
+    const randomToken = generateSecureToken();
+
+    await expect(resetPassword(d1, randomToken, 'newpass')).rejects.toMatchObject({
+      status: 400,
+      message: 'invalid_or_expired_token',
+    });
   });
 });
