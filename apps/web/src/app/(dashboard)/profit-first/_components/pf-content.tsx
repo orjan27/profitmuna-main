@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { useAmountVisibility, AmountToggle, MaskedAmount } from '@/components/amount-visibility';
+import { PfAllocationBar } from './pf-allocation-bar';
 import { PfOverview, type PfAccount } from './pf-overview';
 import { PfAccountForm } from './pf-account-form';
 import { PfPercentageEditor } from './pf-percentage-editor';
@@ -14,13 +15,11 @@ interface PfContentProps {
 }
 
 /**
- * Client boundary component that owns:
- * - amount-visibility state (passed to PfOverview / AmountToggle)
- * - "Add Account" dialog trigger
- * - "Edit Percentages" toggle (shows the inline bulk editor)
+ * Client boundary for /profit-first. Owns amount-visibility state and the
+ * mutation entry points (add-account dialog, inline percentage editor).
  *
- * This allows the RSC page.tsx to pass server-fetched data down while
- * the client manages all mutation entry points and modal state.
+ * Composition: hero total (typographic, no container) → stacked allocation
+ * bar (the split is the hero) → account ledger → quiet foot actions.
  */
 export function PfContent({ accounts, totalIncome }: PfContentProps) {
   const { visible, toggle, mounted } = useAmountVisibility();
@@ -28,45 +27,64 @@ export function PfContent({ accounts, totalIncome }: PfContentProps) {
   const [editingPercents, setEditingPercents] = useState(false);
 
   return (
-    <>
-      {/* Headline stat: total received income for the active filter range */}
-      <div className="rounded-lg border bg-card p-4">
-        <p className="text-sm text-muted-foreground">Total Income (Received)</p>
-        <MaskedAmount
-          cents={totalIncome}
-          visible={visible}
-          mounted={mounted}
-          className="text-2xl font-semibold tracking-tight"
-        />
-      </div>
-
-      {/* Action row: Add Account (accent CTA) + Edit Percentages + Eye toggle */}
-      <div className="flex items-center gap-2">
-        <Button onClick={() => setAddOpen(true)}>Add Account</Button>
-        {!editingPercents && (
-          <Button variant="outline" onClick={() => setEditingPercents(true)}>
-            Edit Percentages
-          </Button>
-        )}
-        <div className="ml-auto">
-          <AmountToggle visible={visible} toggle={toggle} />
+    <div className="flex flex-col">
+      {/* Hero: received income as typography on the paper, eye toggle alongside */}
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-sm text-muted-foreground">Received income</p>
+          <MaskedAmount
+            cents={totalIncome}
+            visible={visible}
+            mounted={mounted}
+            className="mt-1.5 block text-4xl font-semibold leading-none tracking-tight tabular-nums md:text-5xl"
+          />
         </div>
+        <AmountToggle visible={visible} toggle={toggle} />
       </div>
 
-      {/* Inline bulk percentage editor — replaces cards area when active */}
-      {editingPercents ? (
-        <PfPercentageEditor accounts={accounts} onCancel={() => setEditingPercents(false)} />
-      ) : (
-        <PfOverview
-          accounts={accounts}
-          totalIncome={totalIncome}
-          visible={visible}
-          mounted={mounted}
-        />
-      )}
+      {/* The split: one stacked 100% bar, segments in account colors */}
+      <div className="mt-7">
+        <PfAllocationBar accounts={accounts} />
+        {totalIncome === 0 && accounts.length > 0 && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Record your first income and watch it split automatically.
+          </p>
+        )}
+      </div>
+
+      {/* Ledger, or the inline bulk percentage editor while editing */}
+      <div className="mt-8">
+        {editingPercents ? (
+          <PfPercentageEditor accounts={accounts} onCancel={() => setEditingPercents(false)} />
+        ) : (
+          <>
+            <PfOverview accounts={accounts} visible={visible} mounted={mounted} />
+
+            {/* Foot actions: rare operations live quietly where they act */}
+            <div className="mt-2 flex items-center justify-between border-t border-border pt-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setAddOpen(true)}
+              >
+                + Add account
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setEditingPercents(true)}
+              >
+                Edit percentages
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Create account dialog */}
       <PfAccountForm open={addOpen} onOpenChange={setAddOpen} />
-    </>
+    </div>
   );
 }
