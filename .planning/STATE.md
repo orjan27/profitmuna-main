@@ -3,12 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-06-06T00:05:00.764Z"
+stopped_at: Completed Phase 01 Plan 02 (login + session lifecycle)
+last_updated: "2026-06-06T00:51:37.615Z"
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -16,7 +17,7 @@ progress:
 
 **Project:** Profitmuna
 **Milestone:** v1
-**Last updated:** 2026-06-05
+**Last updated:** 2026-06-06
 
 ---
 
@@ -31,15 +32,15 @@ progress:
 ## Current Position
 
 Phase: 01 (authentication) — EXECUTING
-Plan: 1 of 4
+Plan: 2 of 4 (COMPLETED) — next: 01-03 password reset
 **Phase:** 1 — Authentication
-**Plan:** None started
+**Plan:** 01-02 complete — login/session lifecycle
 **Status:** Executing Phase 01
 **Phase goal:** Users can securely create accounts and log in via email/password or Google, with email verification and password recovery
 
 ```
-Progress: [ ] Phase 1  [ ] Phase 2  [ ] Phase 3  [ ] Phase 4  [ ] Phase 5  [ ] Phase 6
-           Auth         Inc+Exp      PF Alloc     Wallets      Dashboard    Settings
+Progress: [█████░░░░░] Phase 1 (2/4) — Auth
+           50% of Phase 1 plans complete
 ```
 
 ---
@@ -51,11 +52,13 @@ Progress: [ ] Phase 1  [ ] Phase 2  [ ] Phase 3  [ ] Phase 4  [ ] Phase 5  [ ] P
 | Phases total          | 6     |
 | Phases complete       | 0     |
 | Requirements total    | 30    |
-| Requirements complete | 0     |
-| Plans complete        | 0     |
+| Requirements complete | 2     |
+| Plans complete        | 2     |
 
 ---
+
 | Phase 01 P01 | 30 min active (7h57m wall) | 5 tasks | 35 files |
+| Phase 01 P02 | 35 min active | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -67,6 +70,10 @@ Progress: [ ] Phase 1  [ ] Phase 2  [ ] Phase 3  [ ] Phase 4  [ ] Phase 5  [ ] P
 | Percentages stored as basis points (e.g. 500 = 5.00%)                     | Matches reference; integer math for allocation                                                              |
 | Allocation and wallet balances are derived, not stored                    | Percentage changes retroactively recompute; simpler schema                                                  |
 | JWT 30-min access / 7-day refresh in httpOnly cookies                     | User-specified security standard                                                                            |
+| Opaque refresh token in DB (sha256 hash); not a long-lived JWT            | Enables rotation + reuse-detection (D-11); revoked tokens detectable                                        |
+| requireAuth reuses verifyAccessToken from lib/jwt                         | Enforces HS256 + iss + aud + exp on every request without re-implementing (T-02-03)                         |
+| Global logout deletes all refresh_tokens rows for user                    | Log-out-everywhere semantics per D-12                                                                       |
+| login_attempts lockout: 5 failures → 15-min lockedUntil (non-atomic v1)   | Brute-force mitigation T-02-02; non-atomic race documented and accepted for v1                              |
 | Resend for all email (verification, reset, welcome, reminders)            | User-specified provider; net-new (reference has no email)                                                   |
 | Scheduled reminder emails via Workers cron                                | Matches edge runtime constraint; no Node.js cron                                                            |
 | Income/expense categories have system defaults (protected) + user customs | Matches reference mechanics                                                                                 |
@@ -94,16 +101,19 @@ None currently.
 
 ## Session Continuity
 
-**To resume work:** Read ROADMAP.md for phase goals and success criteria, then run `/gsd:plan-phase 1` to begin Phase 1 planning.
+**Stopped at:** Completed Phase 01 Plan 02 (login + session lifecycle)
+**Next:** Execute Phase 01 Plan 03 — password reset (forgot-password + reset-password flow)
 
-**Phase 1 key files to create:**
+**Phase 1 completed files (Plans 01-02):**
 
-- `packages/db/src/schema.ts` — users, sessions, email_verifications, password_resets tables
-- `apps/api/src/routes/auth.ts` — register, login, logout, refresh, verify-email, reset-password, google-oauth
-- `apps/api/src/services/authService.ts` — JWT signing/verification, password hashing, email dispatch
-- `apps/api/src/middleware/auth.ts` — JWT validation middleware
-- `apps/web/src/app/(auth)/` — register, login, verify-email, reset-password pages
-- `apps/web/src/server/` — server actions or fetch wrappers for auth API calls
+- `apps/api/src/services/auth-service.ts` — register, verifyEmail, resendVerification, assertLoginAllowed, login, refreshTokens, logout
+- `apps/api/src/routes/auth.ts` — POST register/verify-email/resend-verification/login/refresh/logout
+- `apps/api/src/middleware/auth.ts` — requireAuth (iss/aud/exp validated via verifyAccessToken)
+- `apps/web/src/app/api/auth/[...path]/route.ts` — BFF proxy with transparent refresh
+- `apps/web/src/server/auth.ts` — getSession() for server components
+- `apps/web/src/middleware.ts` — redirect guard to /login
+- `apps/web/src/components/auth/RegisterForm.tsx`, `LoginForm.tsx`
+- `apps/web/src/app/(auth)/register/`, `login/`, `verify-email/` pages
 
 ---
 

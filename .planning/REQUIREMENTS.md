@@ -10,10 +10,10 @@ Requirements for initial release. Each maps to roadmap phases. Finance behavior 
 ### Authentication
 
 - [x] **AUTH-01**: User can create an account with email/password and must verify their email via a Resend-sent link before logging in
-- [ ] **AUTH-02**: User can log in with email/password and stay logged in via JWT — 30-min access token, 7-day refresh token, httpOnly cookies, automatic refresh
+- [x] **AUTH-02**: User can log in with email/password and stay logged in via JWT — 30-min access token, 7-day refresh token, httpOnly cookies, automatic refresh
 - [ ] **AUTH-03**: User can log in with Google (account auto-created on first OAuth login)
 - [ ] **AUTH-04**: User can reset their password via an emailed reset link
-- [ ] **AUTH-05**: User can log out from any page (tokens cleared)
+- [x] **AUTH-05**: User can log out from any page (tokens cleared)
 - [x] **AUTH-06**: User receives a welcome email after registration
 
 ### Income
@@ -82,39 +82,39 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase   | Status  |
-| ----------- | ------- | ------- |
+| Requirement | Phase   | Status   |
+| ----------- | ------- | -------- |
 | AUTH-01     | Phase 1 | Complete |
-| AUTH-02     | Phase 1 | Pending |
-| AUTH-03     | Phase 1 | Pending |
-| AUTH-04     | Phase 1 | Pending |
-| AUTH-05     | Phase 1 | Pending |
+| AUTH-02     | Phase 1 | Complete |
+| AUTH-03     | Phase 1 | Pending  |
+| AUTH-04     | Phase 1 | Pending  |
+| AUTH-05     | Phase 1 | Complete |
 | AUTH-06     | Phase 1 | Complete |
-| INC-01      | Phase 2 | Pending |
-| INC-02      | Phase 2 | Pending |
-| INC-03      | Phase 2 | Pending |
-| INC-04      | Phase 2 | Pending |
-| INC-05      | Phase 2 | Pending |
-| INC-06      | Phase 2 | Pending |
-| EXP-01      | Phase 2 | Pending |
-| EXP-02      | Phase 2 | Pending |
-| EXP-03      | Phase 2 | Pending |
-| EXP-04      | Phase 2 | Pending |
-| EXP-05      | Phase 2 | Pending |
-| PF-01       | Phase 3 | Pending |
-| PF-02       | Phase 3 | Pending |
-| PF-03       | Phase 3 | Pending |
-| PF-04       | Phase 3 | Pending |
-| WAL-01      | Phase 4 | Pending |
-| WAL-02      | Phase 4 | Pending |
-| WAL-03      | Phase 4 | Pending |
-| WAL-04      | Phase 4 | Pending |
-| WAL-05      | Phase 4 | Pending |
-| DASH-01     | Phase 5 | Pending |
-| SET-01      | Phase 6 | Pending |
-| SET-02      | Phase 6 | Pending |
-| NOTIF-01    | Phase 6 | Pending |
-| NOTIF-02    | Phase 6 | Pending |
+| INC-01      | Phase 2 | Pending  |
+| INC-02      | Phase 2 | Pending  |
+| INC-03      | Phase 2 | Pending  |
+| INC-04      | Phase 2 | Pending  |
+| INC-05      | Phase 2 | Pending  |
+| INC-06      | Phase 2 | Pending  |
+| EXP-01      | Phase 2 | Pending  |
+| EXP-02      | Phase 2 | Pending  |
+| EXP-03      | Phase 2 | Pending  |
+| EXP-04      | Phase 2 | Pending  |
+| EXP-05      | Phase 2 | Pending  |
+| PF-01       | Phase 3 | Pending  |
+| PF-02       | Phase 3 | Pending  |
+| PF-03       | Phase 3 | Pending  |
+| PF-04       | Phase 3 | Pending  |
+| WAL-01      | Phase 4 | Pending  |
+| WAL-02      | Phase 4 | Pending  |
+| WAL-03      | Phase 4 | Pending  |
+| WAL-04      | Phase 4 | Pending  |
+| WAL-05      | Phase 4 | Pending  |
+| DASH-01     | Phase 5 | Pending  |
+| SET-01      | Phase 6 | Pending  |
+| SET-02      | Phase 6 | Pending  |
+| NOTIF-01    | Phase 6 | Pending  |
+| NOTIF-02    | Phase 6 | Pending  |
 
 **Coverage:**
 
