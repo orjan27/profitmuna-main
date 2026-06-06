@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 03 Plan 04 complete
-last_updated: "2026-06-06T06:00:13.304Z"
+stopped_at: Phase 03 Plan 05 complete (gap closure — CR-01 closed)
+last_updated: '2026-06-06T12:41:34.517Z'
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 17
-  completed_plans: 12
+  completed_plans: 13
   percent: 33
 ---
 
@@ -25,17 +25,17 @@ progress:
 
 **Core value:** When income is recorded as received, it is automatically split across the user's Profit First allocation percentages — the user always knows exactly how much belongs to each bucket.
 
-**Current focus:** Phase 03 — profit-first-allocation
+**Current focus:** Phase 04 — wallets
 
 ---
 
 ## Current Position
 
-Phase: 03 (profit-first-allocation) — EXECUTING
-Plan: 4 of 4
+Phase: 04 (wallets) — EXECUTING
+Plan: 1 of 3
 **Phase:** 03
 **Plan:** Plan 04 complete — Phase 03 complete
-**Status:** Ready to execute
+**Status:** Executing Phase 04
 **Phase goal:** Every user has exactly 4 Profit First allocation accounts; CRUD, percentage editing, and allocation summary with derived balances
 
 ```
@@ -65,6 +65,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 03 P02 | ~20 min active | 2 tasks | 6 files |
 | Phase 03 P03 | ~30 min active | 2 tasks | 18 files |
 | Phase 03 P04 | ~4 min active | 2 tasks | 5 files |
+| Phase 03 P05 | ~8 min active | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,7 +108,7 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Phase 03 Plan 04 complete
+**Stopped at:** Phase 03 Plan 05 complete (gap closure — CR-01 closed)
 **Next:** Phase 03 complete — proceed to Phase 04 (Wallets) or Phase 02 (Income & Expenses) per ROADMAP dependencies
 
 **Phase 1 completed files (Plans 01-02):**
@@ -145,3 +146,5 @@ _State initialized: 2026-06-05_
 - [Phase 03-04]: percent→bp conversion (Math.round(pct \* 100)) done exclusively in server actions, never in UI components — Pitfall 3 containment
 - [Phase 03-04]: Delete confirmation dialog mounted inside AccountCard (co-located with state) rather than lifted to PfContent — keeps delete state local to the card
 - [Phase 03-04]: PfPercentageEditor mounted inline in PfContent replacing cards area — matches reference inline behavior; no Sheet/Drawer needed
+- [Phase 03-05]: updatePercentages coverage check runs before sum validation and before any DB writes — rejection is atomic; no partial updates on invalid payload
+- [Phase 03-05]: Error message 'Submit all accounts exactly once.' is generic — reveals no owned-ID data or internal state (T-03-05-03 accept disposition)
