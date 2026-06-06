@@ -36,9 +36,9 @@ Requirements for initial release. Each maps to roadmap phases. Finance behavior 
 ### Profit First Allocation
 
 - [x] **PF-01**: New users get default allocation accounts seeded — Profit 5%, Owner Pay 50%, Tax 15%, Operating Expenses 30%
-- [ ] **PF-02**: User can update allocation percentages, validated to sum to exactly 100% (stored as basis points)
-- [ ] **PF-03**: User can create, edit, and delete custom allocation accounts (defaults not deletable; accounts linked to wallets not deletable)
-- [ ] **PF-04**: User can view an allocation summary with balances derived from received allocated income, filterable by date range and category
+- [x] **PF-02**: User can update allocation percentages, validated to sum to exactly 100% (stored as basis points)
+- [x] **PF-03**: User can create, edit, and delete custom allocation accounts (defaults not deletable; accounts linked to wallets not deletable)
+- [x] **PF-04**: User can view an allocation summary with balances derived from received allocated income, filterable by date range and category
 
 ### Wallets
 
@@ -102,9 +102,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXP-04      | Phase 2 | Pending  |
 | EXP-05      | Phase 2 | Pending  |
 | PF-01       | Phase 3 | Complete |
-| PF-02       | Phase 3 | Pending  |
-| PF-03       | Phase 3 | Pending  |
-| PF-04       | Phase 3 | Pending  |
+| PF-02       | Phase 3 | Complete |
+| PF-03       | Phase 3 | Complete |
+| PF-04       | Phase 3 | Complete |
 | WAL-01      | Phase 4 | Pending  |
 | WAL-02      | Phase 4 | Pending  |
 | WAL-03      | Phase 4 | Pending  |

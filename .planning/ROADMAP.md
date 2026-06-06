@@ -110,7 +110,7 @@ Plans:
 
 **Wave 2** _(blocked on Wave 1 completion)_
 
-- [ ] 03-02-PLAN.md — API layer: createProfitFirstService (summary/CRUD/percentages), Zod schemas, thin Hono router behind requireAuth, index registration + CORS methods, BFF proxy (PF-02, PF-03, PF-04)
+- [x] 03-02-PLAN.md — API layer: createProfitFirstService (summary/CRUD/percentages), Zod schemas, thin Hono router behind requireAuth, index registration + CORS methods, BFF proxy (PF-02, PF-03, PF-04)
 
 **Wave 3** _(blocked on Wave 2 completion)_
 
@@ -188,8 +188,8 @@ Plans:
 | Phase                       | Plans Complete | Status      | Completed  |
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
-| 2. Income & Expenses        | 1/4 | In Progress|  |
-| 3. Profit First Allocation  | 0/4            | Planned     | -          |
+| 2. Income & Expenses        | 1/4            | In Progress |            |
+| 3. Profit First Allocation  | 2/4 | In Progress|  |
 | 4. Wallets                  | 0/3            | Planned     | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |

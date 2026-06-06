@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 03 Plan 01 complete
-last_updated: '2026-06-06T11:05:00.000Z'
+stopped_at: Phase 03 Plan 02 complete
+last_updated: "2026-06-06T11:25:00.000Z"
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 15
-  completed_plans: 7
-  percent: 20
+  completed_plans: 8
+  percent: 47
 ---
 
 # State: Profitmuna
@@ -34,7 +34,7 @@ progress:
 Phase: 03 (profit-first-allocation) — EXECUTING
 Plan: 2 of 4
 **Phase:** 03
-**Plan:** Plan 01 complete — Plan 02 next
+**Plan:** Plan 02 complete — Plan 03 next
 **Status:** Executing Phase 03
 **Phase goal:** Every user has exactly 4 Profit First allocation accounts; CRUD, percentage editing, and allocation summary with derived balances
 
@@ -53,7 +53,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phases complete       | 0     |
 | Requirements total    | 30    |
 | Requirements complete | 2     |
-| Plans complete        | 2     |
+| Plans complete        | 8     |
 
 ---
 
@@ -62,6 +62,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 01 P03 | 30 min | 2 tasks | 8 files |
 | Phase 01 P04 | 20 min active | 4 commits | 4 files |
 | Phase 03 P01 | ~15 min active | 3 tasks | 7 files |
+| Phase 03 P02 | ~20 min active | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -104,8 +105,8 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Phase 03 Plan 01 complete
-**Next:** Execute Phase 03 Plan 02 (profit-first CRUD, percentage editing, allocation summary)
+**Stopped at:** Phase 03 Plan 02 complete
+**Next:** Execute Phase 03 Plan 03 (profit-first UI — page, components, server actions)
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -132,3 +133,6 @@ _State initialized: 2026-06-05_
 - [Phase 03-01]: profitFirstAccounts uniqueIndex(userId, name) prevents duplicate seeding — constraint error on branch 1/2 calls is the intended guard
 - [Phase 03-01]: incomes table was already present from Phase 2 work — minimal stub was not needed; Phase 3 queries use the full table
 - [Phase 03-01]: PF_DEFAULT_COLORS canonical 8-value tuple in apps/web/src/lib/constants.ts; Plan 02 must duplicate in apps/api/src/schemas/profit-first.ts for Zod enum validation
+- [Phase 03-02]: getSummary returns targetPercentage as percent (bp/100) not basis points — UI editor uses total===100 check (Pitfall 3)
+- [Phase 03-02]: Phase 4 wallet-link guard in deleteAccount stubbed as comment block — wallets table does not exist in Phase 3
+- [Phase 03-02]: BFF proxy has no transparent-refresh or Set-Cookie relay — middleware.ts handles auth redirect for unauthenticated users
