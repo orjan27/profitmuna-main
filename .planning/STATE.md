@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed Phase 01 Plan 02 (login + session lifecycle)
-last_updated: '2026-06-06T00:58:16.231Z'
+stopped_at: 'Completed Phase 01 Plan 04 automated tasks; Task 3 at checkpoint:human-verify (Google credentials)'
+last_updated: '2026-06-06T09:06:00.000Z'
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 17
 ---
 
 # State: Profitmuna
@@ -31,16 +31,16 @@ progress:
 
 ## Current Position
 
-Phase: 01 (authentication) — EXECUTING
-Plan: 2 of 4 (COMPLETED) — next: 01-03 password reset
+Phase: 01 (authentication) — EXECUTING (Task 3 checkpoint:human-verify)
+Plan: 4 of 4 (automated tasks complete)
 **Phase:** 1 — Authentication
-**Plan:** 01-02 complete — login/session lifecycle
-**Status:** Executing Phase 01
+**Plan:** 01-04 automated tasks complete — Google OAuth routes + upsertGoogleUser
+**Status:** Awaiting human verification (Google Cloud credentials + live OAuth test)
 **Phase goal:** Users can securely create accounts and log in via email/password or Google, with email verification and password recovery
 
 ```
-Progress: [█████░░░░░] Phase 1 (2/4) — Auth
-           50% of Phase 1 plans complete
+Progress: [██████████] Phase 1 (4/4 automated) — Auth
+           100% of Phase 1 automated plans complete; Task 3 live verification pending
 ```
 
 ---
@@ -60,6 +60,7 @@ Progress: [█████░░░░░] Phase 1 (2/4) — Auth
 | Phase 01 P01 | 30 min active (7h57m wall) | 5 tasks | 35 files |
 | Phase 01 P02 | 35 min active | 3 tasks | 9 files |
 | Phase 01 P03 | 30 min | 2 tasks | 8 files |
+| Phase 01 P04 | 20 min active | 4 commits | 4 files |
 
 ## Accumulated Context
 
@@ -102,8 +103,8 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Completed Phase 01 Plan 03 (password reset)
-**Next:** Execute Phase 01 Plan 04 — Google OAuth
+**Stopped at:** Phase 01 Plan 04 automated tasks complete; awaiting human verification (Task 3 — Google OAuth live test)
+**Next:** After human approves Task 3 — Phase 01 complete; proceed to Phase 02
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -122,6 +123,8 @@ _State initialized: 2026-06-05_
 
 ## Decisions
 
-- [Phase ?]: Per-email reset cooldown reuses login_attempts table (keyed **reset**<email>) — satisfies security.md rate-limit on email-sending without a new table
-- [Phase ?]: forgotPassword returns {exists,resetUrl}; route handles waitUntil email dispatch — services stay framework-agnostic (pattern from slice 01)
-- [Phase ?]: resetPassword deletes all refresh_tokens for user on password change — force re-login everywhere (T-03-04)
+- [Phase 01-03]: Per-email reset cooldown reuses login_attempts table (keyed **reset**<email>) — satisfies security.md rate-limit on email-sending without a new table
+- [Phase 01-03]: forgotPassword returns {exists,resetUrl}; route handles waitUntil email dispatch — services stay framework-agnostic (pattern from slice 01)
+- [Phase 01-03]: resetPassword deletes all refresh_tokens for user on password change — force re-login everywhere (T-03-04)
+- [Phase 01-04]: upsertGoogleUser resolution order: googleId match → email match (link) → create new — no duplicates; Google email is provider-verified
+- [Phase 01-04]: OAuth google + callback added to BFF UNAUTHED_PATHS — no session cookie during OAuth flow; transparent refresh must be skipped

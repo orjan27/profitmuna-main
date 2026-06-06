@@ -11,7 +11,7 @@ Requirements for initial release. Each maps to roadmap phases. Finance behavior 
 
 - [x] **AUTH-01**: User can create an account with email/password and must verify their email via a Resend-sent link before logging in
 - [x] **AUTH-02**: User can log in with email/password and stay logged in via JWT — 30-min access token, 7-day refresh token, httpOnly cookies, automatic refresh
-- [ ] **AUTH-03**: User can log in with Google (account auto-created on first OAuth login)
+- [x] **AUTH-03**: User can log in with Google (account auto-created on first OAuth login)
 - [x] **AUTH-04**: User can reset their password via an emailed reset link
 - [x] **AUTH-05**: User can log out from any page (tokens cleared)
 - [x] **AUTH-06**: User receives a welcome email after registration
@@ -86,7 +86,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ----------- | ------- | -------- |
 | AUTH-01     | Phase 1 | Complete |
 | AUTH-02     | Phase 1 | Complete |
-| AUTH-03     | Phase 1 | Pending  |
+| AUTH-03     | Phase 1 | Complete |
 | AUTH-04     | Phase 1 | Complete |
 | AUTH-05     | Phase 1 | Complete |
 | AUTH-06     | Phase 1 | Complete |

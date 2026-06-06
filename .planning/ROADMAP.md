@@ -9,7 +9,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Authentication** - Users can create accounts, log in, and manage credentials securely
+- [x] **Phase 1: Authentication** - Users can create accounts, log in, and manage credentials securely (completed 2026-06-06)
 - [ ] **Phase 2: Income & Expenses** - Users can record, browse, and manage income and expense entries with categories
 - [ ] **Phase 3: Profit First Allocation** - Users can configure allocation accounts and view derived balance summaries
 - [ ] **Phase 4: Wallets** - Users can create wallets, map categories, record transactions, and view computed balances
@@ -52,7 +52,7 @@ Plans:
 
 **Wave 4** _(blocked on Wave 3 completion)_
 
-- [ ] 01-04-PLAN.md — Google OAuth sign-in + account linking (AUTH-03)
+- [x] 01-04-PLAN.md — Google OAuth sign-in + account linking (AUTH-03)
 
 **UI hint**: yes
 
@@ -135,14 +135,14 @@ Plans:
 
 ## Progress Table
 
-| Phase                       | Plans Complete | Status      | Completed |
-| --------------------------- | -------------- | ----------- | --------- |
-| 1. Authentication           | 3/4 | In Progress|  |
-| 2. Income & Expenses        | 0/0            | Not started | -         |
-| 3. Profit First Allocation  | 0/0            | Not started | -         |
-| 4. Wallets                  | 0/0            | Not started | -         |
-| 5. Dashboard                | 0/0            | Not started | -         |
-| 6. Settings & Notifications | 0/0            | Not started | -         |
+| Phase                       | Plans Complete | Status      | Completed  |
+| --------------------------- | -------------- | ----------- | ---------- |
+| 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
+| 2. Income & Expenses        | 0/0            | Not started | -          |
+| 3. Profit First Allocation  | 0/0            | Not started | -          |
+| 4. Wallets                  | 0/0            | Not started | -          |
+| 5. Dashboard                | 0/0            | Not started | -          |
+| 6. Settings & Notifications | 0/0            | Not started | -          |
 
 ---
 
