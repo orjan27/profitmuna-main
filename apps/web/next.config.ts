@@ -36,6 +36,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Strip the default X-Powered-By: Next.js header in all envs (WR-07)
+  poweredByHeader: false,
   async headers() {
     return [
       {

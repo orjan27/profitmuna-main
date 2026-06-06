@@ -207,6 +207,12 @@ describe('security headers middleware', () => {
     expect(res.headers.get('Strict-Transport-Security')).toBeNull();
   });
 
+  it('does not expose Server or X-Powered-By fingerprint headers (WR-07)', async () => {
+    const res = await app.request('/health', {}, env, executionCtx);
+    expect(res.headers.get('Server')).toBeNull();
+    expect(res.headers.get('X-Powered-By')).toBeNull();
+  });
+
   it('adds Strict-Transport-Security in production', async () => {
     const prodEnv = mockEnv({ NODE_ENV: 'production' });
     const res = await app.request('/health', {}, prodEnv, executionCtx);

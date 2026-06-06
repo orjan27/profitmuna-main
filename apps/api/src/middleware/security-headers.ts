@@ -17,6 +17,9 @@ export const securityHeaders = createMiddleware<{ Bindings: Bindings }>(async (c
   c.res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   c.res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   c.res.headers.set('Content-Security-Policy', CSP);
+  // Strip platform fingerprinting headers (WR-07 / security.md)
+  c.res.headers.delete('Server');
+  c.res.headers.delete('X-Powered-By');
   // Optional chain: tests may invoke app.request() without bindings
   if (c.env?.NODE_ENV === 'production') {
     c.res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
