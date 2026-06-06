@@ -4,7 +4,8 @@ import { eq } from 'drizzle-orm';
 import { schema } from '@app/db';
 
 import { register, upsertGoogleUser } from '@/services/auth-service';
-import { createTestDb, mockEnv } from './helpers/db';
+import { createProfitFirstService } from '@/services/profit-first-service';
+import { createTestDb, mockEnv, seedUser } from './helpers/db';
 
 // Minimal Resend mock so auth-service email calls don't throw
 import { vi } from 'vitest';
@@ -125,24 +126,371 @@ describe('PF-01: seedProfitFirstAccounts', () => {
   });
 });
 
-// ─── PF-02/03/04 placeholders (filled by Plan 02) ───────────────────────────
+// ─── PF-02: Profit First CRUD ────────────────────────────────────────────────
 
 describe('PF-02: profit first account CRUD', () => {
-  it.todo('lists accounts for authenticated user');
-  it.todo('creates a custom account');
-  it.todo('updates account name and color');
-  it.todo('deletes a custom account');
-  it.todo('cannot delete a default account');
-  it.todo('cannot delete an account linked to a wallet');
+  it('rejects account creation that exceeds 100%', async () => {
+    // Default accounts total 500+5000+1500+3000 = 10000 bp — adding any new one fails
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, { email: 'crud@pf.test', name: 'CRUD User', emailVerified: true });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    // Seed the 4 defaults (500+5000+1500+3000 = 10000 bp)
+    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
+    await seedProfitFirstAccounts(drizzleDb, user.id);
+
+    // Any addition now exceeds 10000
+    await expect(
+      svc.createAccount(user.id, {
+        name: 'My Custom',
+        targetPercentage: 100,
+        color: '#3b82f6',
+      })
+    ).rejects.toThrow('Adding this account would exceed 100%');
+  });
+
+  it('cannot delete default account', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, { email: 'del@pf.test', name: 'Del User', emailVerified: true });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
+    await seedProfitFirstAccounts(drizzleDb, user.id);
+
+    const accounts = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .all();
+
+    const profitAccount = accounts.find((a) => a.accountType === 'PROFIT');
+    expect(profitAccount).toBeDefined();
+
+    await expect(svc.deleteAccount(profitAccount!.id, user.id)).rejects.toThrow(
+      'Default accounts cannot be deleted.'
+    );
+  });
+
+  it('deletes a custom account successfully', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'delcustom@pf.test',
+      name: 'Del Custom User',
+      emailVerified: true,
+    });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    // Insert a CUSTOM account directly (defaults total 10000, so reduce one first)
+    db.insert(schema.profitFirstAccounts)
+      .values({
+        name: 'Savings',
+        targetPercentage: 0,
+        color: '#3b82f6',
+        sortOrder: 0,
+        accountType: 'CUSTOM',
+        userId: user.id,
+      })
+      .run();
+
+    const accounts = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .all();
+
+    const customAccount = accounts.find((a) => a.accountType === 'CUSTOM');
+    expect(customAccount).toBeDefined();
+
+    await svc.deleteAccount(customAccount!.id, user.id);
+
+    const remaining = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .all();
+
+    expect(remaining.find((a) => a.id === customAccount!.id)).toBeUndefined();
+  });
+
+  it('returns 404 for account not owned by caller', async () => {
+    const { d1, db } = createTestDb();
+    const user1 = seedUser(db, { email: 'u1@pf.test', name: 'User 1', emailVerified: true });
+    const user2 = seedUser(db, { email: 'u2@pf.test', name: 'User 2', emailVerified: true });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    // Create a CUSTOM account for user1
+    db.insert(schema.profitFirstAccounts)
+      .values({
+        name: 'User1 Account',
+        targetPercentage: 0,
+        color: '#3b82f6',
+        sortOrder: 0,
+        accountType: 'CUSTOM',
+        userId: user1.id,
+      })
+      .run();
+
+    const accounts = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user1.id))
+      .all();
+
+    // user2 trying to delete user1's account — should get 404
+    await expect(svc.deleteAccount(accounts[0].id, user2.id)).rejects.toThrow();
+  });
 });
+
+// ─── PF-03: Percentage update (sum-to-100% validation) ───────────────────────
 
 describe('PF-03: percentage update (sum-to-100% validation)', () => {
-  it.todo('updates percentages when they sum to exactly 10000 bp');
-  it.todo('rejects update when percentages do not sum to 10000 bp');
+  it('rejects percentages not summing to 10000', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, { email: 'pct@pf.test', name: 'Pct User', emailVerified: true });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
+    await seedProfitFirstAccounts(drizzleDb, user.id);
+
+    const accounts = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .all();
+
+    // Submit percentages totaling 9700 bp (not 10000): Profit 200 + OwnerPay 5000 + Tax 1500 + OPEX 3000 = 9700
+    await expect(
+      svc.updatePercentages(user.id, {
+        accounts: accounts.map((a) => ({
+          id: a.id,
+          targetPercentage: a.accountType === 'PROFIT' ? 200 : a.targetPercentage,
+        })),
+      })
+    ).rejects.toThrow('Percentages must total 100%. Current total: 97%.');
+  });
+
+  it('accepts valid percentage distribution', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, { email: 'pctok@pf.test', name: 'Pct OK User', emailVerified: true });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
+    await seedProfitFirstAccounts(drizzleDb, user.id);
+
+    const accounts = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .all();
+
+    // Redistribute: 1000+4500+1500+3000 = 10000 bp
+    const result = await svc.updatePercentages(user.id, {
+      accounts: accounts.map((a) => {
+        if (a.accountType === 'PROFIT') return { id: a.id, targetPercentage: 1000 };
+        if (a.accountType === 'OWNERS_PAY') return { id: a.id, targetPercentage: 4500 };
+        return { id: a.id, targetPercentage: a.targetPercentage };
+      }),
+    });
+
+    expect(result).toBeDefined();
+    const profitAccount = result.find((a) => a.accountType === 'PROFIT');
+    expect(profitAccount?.targetPercentage).toBe(1000);
+  });
 });
 
+// ─── PF-04: Allocation summary ───────────────────────────────────────────────
+
 describe('PF-04: allocation summary', () => {
-  it.todo('returns derived balances for all accounts');
-  it.todo('filters by date range');
-  it.todo('filters by category ids');
+  it('computes balance with integer math', async () => {
+    // 100000 cents income * 500 bp / 10000 = Math.round(5000) = 5000 cents
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'summary@pf.test',
+      name: 'Summary User',
+      emailVerified: true,
+    });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    // Seed profit account at 500 bp (5%)
+    db.insert(schema.profitFirstAccounts)
+      .values({
+        name: 'Profit',
+        targetPercentage: 500,
+        color: '#10b981',
+        sortOrder: 0,
+        accountType: 'PROFIT',
+        userId: user.id,
+      })
+      .run();
+
+    // Seed an income category
+    const [cat] = db
+      .insert(schema.incomeCategories)
+      .values({ name: 'Sales', userId: user.id, system: false })
+      .returning()
+      .all();
+
+    // Insert RECEIVED + profitFirstAllocated income: 100000 cents
+    db.insert(schema.incomes)
+      .values({
+        categoryId: cat.id,
+        categoryName: 'Sales',
+        amount: 100000,
+        incomeDate: '2026-01-15',
+        moneyStatus: 'RECEIVED',
+        profitFirstAllocated: true,
+        userId: user.id,
+      })
+      .run();
+
+    const summary = await svc.getSummary(user.id);
+
+    expect(summary.totalIncome).toBe(100000);
+    const profitAcc = summary.accounts.find((a) => a.name === 'Profit');
+    expect(profitAcc?.computedBalance).toBe(5000);
+    // targetPercentage is returned as percent (5), not basis points (500) — Pitfall 3
+    expect(profitAcc?.targetPercentage).toBe(5);
+  });
+
+  it('excludes PENDING income from balance', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'pending@pf.test',
+      name: 'Pending User',
+      emailVerified: true,
+    });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    db.insert(schema.profitFirstAccounts)
+      .values({
+        name: 'Profit',
+        targetPercentage: 500,
+        color: '#10b981',
+        sortOrder: 0,
+        accountType: 'PROFIT',
+        userId: user.id,
+      })
+      .run();
+
+    const [cat] = db
+      .insert(schema.incomeCategories)
+      .values({ name: 'Sales', userId: user.id, system: false })
+      .returning()
+      .all();
+
+    // PENDING income — should NOT count toward the summary
+    db.insert(schema.incomes)
+      .values({
+        categoryId: cat.id,
+        categoryName: 'Sales',
+        amount: 200000,
+        incomeDate: '2026-01-15',
+        moneyStatus: 'PENDING',
+        profitFirstAllocated: true,
+        userId: user.id,
+      })
+      .run();
+
+    // RECEIVED but profitFirstAllocated=false — should NOT count
+    db.insert(schema.incomes)
+      .values({
+        categoryId: cat.id,
+        categoryName: 'Sales',
+        amount: 50000,
+        incomeDate: '2026-01-15',
+        moneyStatus: 'RECEIVED',
+        profitFirstAllocated: false,
+        userId: user.id,
+      })
+      .run();
+
+    const summary = await svc.getSummary(user.id);
+
+    expect(summary.totalIncome).toBe(0);
+    const profitAcc = summary.accounts.find((a) => a.name === 'Profit');
+    expect(profitAcc?.computedBalance).toBe(0);
+  });
+
+  it('applies date range filter', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'daterange@pf.test',
+      name: 'Date Range User',
+      emailVerified: true,
+    });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    db.insert(schema.profitFirstAccounts)
+      .values({
+        name: 'Profit',
+        targetPercentage: 500,
+        color: '#10b981',
+        sortOrder: 0,
+        accountType: 'PROFIT',
+        userId: user.id,
+      })
+      .run();
+
+    const [cat] = db
+      .insert(schema.incomeCategories)
+      .values({ name: 'Sales', userId: user.id, system: false })
+      .returning()
+      .all();
+
+    // January income: 100000 cents
+    db.insert(schema.incomes)
+      .values({
+        categoryId: cat.id,
+        categoryName: 'Sales',
+        amount: 100000,
+        incomeDate: '2026-01-15',
+        moneyStatus: 'RECEIVED',
+        profitFirstAllocated: true,
+        userId: user.id,
+      })
+      .run();
+
+    // February income: 200000 cents
+    db.insert(schema.incomes)
+      .values({
+        categoryId: cat.id,
+        categoryName: 'Sales',
+        amount: 200000,
+        incomeDate: '2026-02-15',
+        moneyStatus: 'RECEIVED',
+        profitFirstAllocated: true,
+        userId: user.id,
+      })
+      .run();
+
+    // Filter to January only
+    const summary = await svc.getSummary(user.id, {
+      from: '2026-01-01',
+      to: '2026-01-31',
+    });
+
+    // Only the January income (100000) should be included
+    expect(summary.totalIncome).toBe(100000);
+    const profitAcc = summary.accounts.find((a) => a.name === 'Profit');
+    // Math.round((100000 * 500) / 10000) = 5000
+    expect(profitAcc?.computedBalance).toBe(5000);
+  });
 });
