@@ -538,6 +538,42 @@ describe('auth-service: login', () => {
       .all();
     expect(attempts.length === 0 || attempts[0].count === 0).toBe(true);
   });
+
+  it('does not immediately re-lock after a lockout window expires (CR-04)', async () => {
+    const { d1, db } = createTestDb();
+    seedUser(db, {
+      email: 'relock@login.test',
+      name: 'Relock',
+      passwordHash: await hashPassword('correctpass'),
+      emailVerified: true,
+    });
+
+    // Simulate a prior lockout whose 15-minute window has already elapsed:
+    // count is at MAX and lockedUntil is in the past.
+    db.insert(schema.loginAttempts)
+      .values({
+        email: 'relock@login.test',
+        count: 5, // MAX_LOGIN_ATTEMPTS
+        lastAttemptAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+        lockedUntil: new Date(Date.now() - 60 * 1000).toISOString(),
+      })
+      .run();
+
+    // A single post-expiry mistake must yield 401 (not an immediate 429 re-lock)
+    await expect(
+      login(d1, env.JWT_ACCESS_SECRET, 'relock@login.test', 'wrong')
+    ).rejects.toMatchObject({ status: 401, message: 'invalid_credentials' });
+
+    // Counter restarts at 1 and the stale lockout is cleared
+    const after = db
+      .select()
+      .from(schema.loginAttempts)
+      .where(eq(schema.loginAttempts.email, 'relock@login.test'))
+      .all();
+    expect(after).toHaveLength(1);
+    expect(after[0].count).toBe(1);
+    expect(after[0].lockedUntil).toBeNull();
+  });
 });
 
 describe('auth-service: refreshTokens', () => {

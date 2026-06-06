@@ -226,11 +226,18 @@ export async function login(
   if (!user || !passwordValid) {
     // Increment or upsert login_attempts (D-10: non-atomic race accepted for v1)
     if (attempt) {
-      const newCount = attempt.count + 1;
+      // If a prior lockout window has already elapsed, start the counter fresh
+      // so a single post-expiry mistake does not immediately re-lock the
+      // account (CR-04: previously count stayed at MAX and re-locked on the
+      // very next failure, enabling a low-cost account-DoS).
+      const lockoutExpired =
+        attempt.lockedUntil != null && new Date(attempt.lockedUntil) <= new Date();
+      const baseCount = lockoutExpired ? 0 : attempt.count;
+      const newCount = baseCount + 1;
       const lockedUntil =
         newCount >= MAX_LOGIN_ATTEMPTS
           ? new Date(Date.now() + LOCKOUT_MS).toISOString()
-          : attempt.lockedUntil;
+          : null;
       await db
         .update(loginAttempts)
         .set({ count: newCount, lastAttemptAt: new Date().toISOString(), lockedUntil })
