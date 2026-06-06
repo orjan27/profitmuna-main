@@ -158,7 +158,7 @@ Plans:
 
 **Wave 3** _(gap closure — blocked on Wave 2 completion)_
 
-- [ ] 04-04-PLAN.md — Gap closure (SC-5): order + COUNT-back paginated history in getById, single inArray expense-history query (CR-01/CR-03/WR-02); co-fix CR-02 Zod param 422 validation + WR-04 NewWalletForm redirect-aware error toast; regression tests for >1-page failure mode (WAL-05)
+- [x] 04-04-PLAN.md — Gap closure (SC-5): order + COUNT-back paginated history in getById, single inArray expense-history query (CR-01/CR-03/WR-02); co-fix CR-02 Zod param 422 validation + WR-04 NewWalletForm redirect-aware error toast; regression tests for >1-page failure mode (WAL-05)
 
 **UI hint**: yes
 
@@ -217,7 +217,7 @@ Plans:
 
 - [ ] 06-04-PLAN.md — Cron slice: dependency-free Manila-time helper + runCron (due-user reminders mirrored as INCOME_REMINDER, one-time PENDING_INCOME_DUE dedup), sendIncomeReminderEmail, Module Worker scheduled export + hourly cron trigger (NOTIF-02)
 
-   **UI hint**: yes
+  **UI hint**: yes
 
 ---
 
@@ -228,7 +228,7 @@ Plans:
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 4/4            | Complete    | 2026-06-06 |
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
-| 4. Wallets                  | 3/3            | Complete    | 2026-06-06 |
+| 4. Wallets                  | 4/4            | Complete    | 2026-06-06 |
 | 5. Dashboard                | 0/3            | Planned     | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
 
