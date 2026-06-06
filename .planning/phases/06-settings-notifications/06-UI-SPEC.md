@@ -63,7 +63,7 @@ Declared values (all multiples of 4 — same scale as Phases 2–4):
 Exceptions:
 
 - Bell icon touch target: 32px (h-8 w-8) — matches existing `<Button variant="ghost" size="icon">` usage in WalletCard
-- Notification item row: 12px vertical padding (`py-3`) — narrower than form fields to show more items in the dropdown
+- `notification-row`: 12px vertical padding (`py-3`) — intentional exception; narrower than standard form-field spacing (16px) to show more notification items in the dropdown panel without scrolling
 
 **Source:** Inferred from existing usage (`pl-5 pr-4 py-4` in WalletCard, `gap-6` in expense-form, `gap-4` in pf-percentage-editor, `py-2` nav links)
 
@@ -71,19 +71,21 @@ Exceptions:
 
 ## Typography
 
-| Role    | Size                 | Weight         | Line Height            | Usage                                                              |
-| ------- | -------------------- | -------------- | ---------------------- | ------------------------------------------------------------------ |
-| Body    | 14px (`text-sm`)     | 400 (regular)  | 1.5                    | Form help text, notification message body, muted labels            |
-| Label   | 14px (`text-sm`)     | 500 (medium)   | 1.4                    | Form field labels (`<Label>`), settings section subheadings        |
-| Heading | 20px (`text-[20px]`) | 600 (semibold) | 1.25 (`leading-tight`) | Settings page section heading, notification dropdown panel heading |
-| Display | 24px (`text-2xl`)    | 600 (semibold) | auto                   | Not used in this phase                                             |
+Two weights only: 400 (regular) and 600 (semibold). Weight 500 (medium) is not used.
+
+| Role    | Size                 | Weight         | Line Height            | Usage                                                                                         |
+| ------- | -------------------- | -------------- | ---------------------- | --------------------------------------------------------------------------------------------- |
+| Body    | 14px (`text-sm`)     | 400 (regular)  | 1.5                    | Form help text, notification message body, muted labels, read notification titles, timestamps |
+| Label   | 14px (`text-sm`)     | 600 (semibold) | 1.4                    | Form field labels (`<Label>`), settings section subheadings, unread notification titles       |
+| Heading | 20px (`text-[20px]`) | 600 (semibold) | 1.25 (`leading-tight`) | Settings page section heading, notification dropdown panel heading                            |
+| Display | 24px (`text-2xl`)    | 600 (semibold) | auto                   | Not used in this phase                                                                        |
 
 **Notes:**
 
-- 14px / 16px two-size body scale matches the rest of the app — no new sizes introduced
+- 12px (`text-xs`) appears for notification timestamps and the notification panel footer link — below the four declared sizes but matches existing badge usage across phases. Not a new size.
 - `text-[20px] font-semibold leading-tight` is the exact heading size used in `pf-percentage-editor.tsx` — reuse verbatim
-- Notification title inside list items: `text-sm font-medium` (14px / 500 weight)
-- Notification timestamp: `text-xs text-muted-foreground` (12px / regular) — below the two declared body sizes but matches existing badge usage
+- Notification title inside list items: `text-sm font-semibold` (14px / 600 weight) for unread; `text-sm text-muted-foreground` (14px / 400 weight) for read
+- Notification timestamp: `text-xs text-muted-foreground` (12px / regular)
 
 **Source:** `pf-percentage-editor.tsx` heading, `DashboardNav` nav link sizes, `expense-form.tsx` label pattern
 
@@ -137,7 +139,7 @@ The app uses a warm dark-gray monochrome surface. Color exclusively signals mone
   [Separator]
   Help text: "Choose how monetary amounts are displayed across the app. This is display-only — no conversion is applied."
              (text-sm text-muted-foreground)
-  [Label] Currency
+  [Label] Currency   (text-sm font-semibold)
   [Select — currency selector]
     Options (in order):
     - PHP — Philippine Peso (₱) [default, selected on first load]
@@ -160,23 +162,26 @@ The app uses a warm dark-gray monochrome surface. Color exclusively signals mone
   Help text: "Receive a reminder email on your chosen schedule. Reminders are sent in Manila time (UTC+8)."
              (text-sm text-muted-foreground)
 
-  Row: [Switch] [Label "Enable reminders"]
+  Row: [Switch] [Label "Enable reminders"]   (label: text-sm font-semibold)
        Switch uses existing shadcn Switch component (already in income-form.tsx)
        Default state: off (unchecked) for new users
 
   --- Conditional section shown only when switch is ON ---
 
-  [Label] Frequency
+  [Label] Frequency   (text-sm font-semibold)
   [Select — frequency]
     Options: Daily | Weekly | Monthly
     Default: Daily
 
   Conditional sub-fields (shown based on frequency):
-    WEEKLY only:  [Label "Day of week"]  [Select: Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday]
-    MONTHLY only: [Label "Day of month"] [Select: 1st through 28th] (capped at 28 to avoid short-month issues)
+    WEEKLY only:  [Label "Day of week"]   (text-sm font-semibold)
+                  [Select: Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday]
+    MONTHLY only: [Label "Day of month"]  (text-sm font-semibold)
+                  [Select: 1st through 28th] (capped at 28 to avoid short-month issues)
                   Help text below: "Reminders are sent on this day each month."
+                                   (text-sm text-muted-foreground)
 
-  [Label] Hour (Manila time)
+  [Label] Hour (Manila time)   (text-sm font-semibold)
   [Select — hour]
     Options: 12:00 AM (midnight) through 11:00 PM in 1-hour steps (24 items)
     Format: "9:00 AM", "12:00 PM", "6:00 PM" — 12-hour format with AM/PM suffix
@@ -207,7 +212,7 @@ Position in nav: rightmost element in the nav bar, after the existing 5 route li
       {unreadCount > 0 && (
         <Badge
           variant="destructive"
-          className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] font-medium tabular-nums"
+          className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] font-semibold tabular-nums"
         >
           {unreadCount > 9 ? '9+' : unreadCount}
         </Badge>
@@ -253,7 +258,7 @@ Contents:
   Title row: [dot indicator] [title text]
     Unread dot: "h-1.5 w-1.5 rounded-full bg-primary shrink-0 mt-1.5" (small filled circle)
     Read dot: hidden (no dot)
-    Title: text-sm font-medium (unread) | text-sm text-muted-foreground (read)
+    Title: text-sm font-semibold (unread) | text-sm text-muted-foreground (read, weight 400)
   Message:  text-xs text-muted-foreground, 2-line truncate (line-clamp-2)
   Timestamp: text-xs text-muted-foreground tabular-nums (e.g. "Jun 6, 9:00 AM")
 ```
@@ -447,3 +452,4 @@ No `npx shadcn add` calls needed. All components are present. No registry vettin
 
 _Phase: 6-settings-notifications_
 _UI-SPEC generated: 2026-06-06_
+_UI-SPEC revised: 2026-06-06 — typography fix (weight 500 removed; checker revision pass)_
