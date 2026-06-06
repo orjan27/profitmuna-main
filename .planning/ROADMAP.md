@@ -79,8 +79,8 @@ Plans:
 
 **Wave 1** _(blocked on Wave 0 completion; 02-02 and 02-03 run in parallel — no file overlap)_
 
-- [ ] 02-02-PLAN.md — Income slice: record/browse(search+status+date+load-more)/edit/delete/receive (INC-01, INC-02, INC-03, INC-04, INC-05)
-- [ ] 02-03-PLAN.md — Expense slice: record(payment method)/browse(date+load-more)/edit/soft-delete+restore (EXP-01, EXP-02, EXP-03, EXP-04)
+- [x] 02-02-PLAN.md — Income slice: record/browse(search+status+date+load-more)/edit/delete/receive (INC-01, INC-02, INC-03, INC-04, INC-05)
+- [x] 02-03-PLAN.md — Expense slice: record(payment method)/browse(date+load-more)/edit/soft-delete+restore (EXP-01, EXP-02, EXP-03, EXP-04)
 
 **Wave 2** _(blocked on Wave 1 completion)_
 
@@ -188,7 +188,7 @@ Plans:
 | Phase                       | Plans Complete | Status      | Completed  |
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
-| 2. Income & Expenses        | 1/4            | In Progress |            |
+| 2. Income & Expenses        | 3/4 | In Progress|  |
 | 3. Profit First Allocation  | 4/4            | Complete    | 2026-06-06 |
 | 4. Wallets                  | 0/3            | Planned     | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
