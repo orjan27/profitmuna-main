@@ -18,6 +18,10 @@ export interface WalletListItem {
   transactionCount: number;
   /** Count of income + expense category mappings (for delete impact dialog) */
   mappingCount: number;
+  /** Income category ids mapped to this wallet (D-06: disable in pickers elsewhere) */
+  incomeCategoryIds: number[];
+  /** Expense category ids mapped to this wallet (D-06: disable in pickers elsewhere) */
+  expenseCategoryIds: number[];
 }
 
 export interface WalletTransaction {

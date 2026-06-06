@@ -53,6 +53,9 @@ interface NewWalletFormProps {
   incomeCategories: IncomeCategory[];
   expenseCategories: ExpenseCategory[];
   prefilledPfAccountId?: number;
+  /** D-06: categories already mapped to another wallet appear disabled in the pickers */
+  mappedIncomeCategoryIds: Set<number>;
+  mappedExpenseCategoryIds: Set<number>;
 }
 
 export function NewWalletForm({
@@ -61,6 +64,8 @@ export function NewWalletForm({
   incomeCategories,
   expenseCategories,
   prefilledPfAccountId,
+  mappedIncomeCategoryIds,
+  mappedExpenseCategoryIds,
 }: NewWalletFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -299,26 +304,39 @@ export function NewWalletForm({
                 <CommandList>
                   <CommandEmpty>No categories found.</CommandEmpty>
                   <CommandGroup>
-                    {incomeCategories.map((cat) => (
-                      <CommandItem
-                        key={cat.id}
-                        value={cat.name}
-                        onSelect={() => toggleIncomeCategory(cat.id)}
-                      >
-                        <Checkbox
-                          checked={selectedIncomeCategoryIds.includes(cat.id)}
-                          className="mr-2"
-                          onCheckedChange={() => toggleIncomeCategory(cat.id)}
-                        />
-                        {cat.name}
-                        <Check
-                          className={cn(
-                            'ml-auto h-4 w-4',
-                            selectedIncomeCategoryIds.includes(cat.id) ? 'opacity-100' : 'opacity-0'
+                    {incomeCategories.map((cat) => {
+                      // D-06: already mapped to another wallet — disabled, server enforces 409
+                      const isMapped = mappedIncomeCategoryIds.has(cat.id);
+                      return (
+                        <CommandItem
+                          key={cat.id}
+                          value={cat.name}
+                          disabled={isMapped}
+                          onSelect={() => toggleIncomeCategory(cat.id)}
+                        >
+                          <Checkbox
+                            checked={selectedIncomeCategoryIds.includes(cat.id)}
+                            disabled={isMapped}
+                            className="mr-2"
+                            onCheckedChange={() => toggleIncomeCategory(cat.id)}
+                          />
+                          {cat.name}
+                          {isMapped && (
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              (already mapped)
+                            </span>
                           )}
-                        />
-                      </CommandItem>
-                    ))}
+                          <Check
+                            className={cn(
+                              'ml-auto h-4 w-4',
+                              selectedIncomeCategoryIds.includes(cat.id)
+                                ? 'opacity-100'
+                                : 'opacity-0'
+                            )}
+                          />
+                        </CommandItem>
+                      );
+                    })}
                   </CommandGroup>
                 </CommandList>
               </Command>
@@ -377,28 +395,39 @@ export function NewWalletForm({
                   <CommandList>
                     <CommandEmpty>No categories found.</CommandEmpty>
                     <CommandGroup>
-                      {expenseCategories.map((cat) => (
-                        <CommandItem
-                          key={cat.id}
-                          value={cat.name}
-                          onSelect={() => toggleExpenseCategory(cat.id)}
-                        >
-                          <Checkbox
-                            checked={selectedExpenseCategoryIds.includes(cat.id)}
-                            className="mr-2"
-                            onCheckedChange={() => toggleExpenseCategory(cat.id)}
-                          />
-                          {cat.name}
-                          <Check
-                            className={cn(
-                              'ml-auto h-4 w-4',
-                              selectedExpenseCategoryIds.includes(cat.id)
-                                ? 'opacity-100'
-                                : 'opacity-0'
+                      {expenseCategories.map((cat) => {
+                        // D-06: already mapped to another wallet — disabled, server enforces 409
+                        const isMapped = mappedExpenseCategoryIds.has(cat.id);
+                        return (
+                          <CommandItem
+                            key={cat.id}
+                            value={cat.name}
+                            disabled={isMapped}
+                            onSelect={() => toggleExpenseCategory(cat.id)}
+                          >
+                            <Checkbox
+                              checked={selectedExpenseCategoryIds.includes(cat.id)}
+                              disabled={isMapped}
+                              className="mr-2"
+                              onCheckedChange={() => toggleExpenseCategory(cat.id)}
+                            />
+                            {cat.name}
+                            {isMapped && (
+                              <span className="text-muted-foreground ml-2 text-xs">
+                                (already mapped)
+                              </span>
                             )}
-                          />
-                        </CommandItem>
-                      ))}
+                            <Check
+                              className={cn(
+                                'ml-auto h-4 w-4',
+                                selectedExpenseCategoryIds.includes(cat.id)
+                                  ? 'opacity-100'
+                                  : 'opacity-0'
+                              )}
+                            />
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   </CommandList>
                 </Command>

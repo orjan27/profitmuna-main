@@ -55,6 +55,10 @@ export default async function NewWalletPage({
       .map((w) => w.profitFirstAccountId as number)
   );
 
+  // D-06: categories already mapped to another wallet appear disabled in the pickers
+  const mappedIncomeCategoryIds = new Set(wallets.flatMap((w) => w.incomeCategoryIds ?? []));
+  const mappedExpenseCategoryIds = new Set(wallets.flatMap((w) => w.expenseCategoryIds ?? []));
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold">Create Wallet</h1>
@@ -64,6 +68,8 @@ export default async function NewWalletPage({
         incomeCategories={incomeCategoriesRes.data ?? []}
         expenseCategories={expenseCategoriesRes.data ?? []}
         prefilledPfAccountId={prefilledPfAccountId}
+        mappedIncomeCategoryIds={mappedIncomeCategoryIds}
+        mappedExpenseCategoryIds={mappedExpenseCategoryIds}
       />
     </div>
   );

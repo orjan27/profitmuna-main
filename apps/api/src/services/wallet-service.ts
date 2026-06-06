@@ -500,6 +500,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           balanceCents,
           transactionCount: txImpact.activeCount,
           mappingCount,
+          // D-06: pickers disable categories already mapped to another wallet
+          incomeCategoryIds: mappings.incomeCategoryIds,
+          expenseCategoryIds: mappings.expenseCategoryIds,
         };
       });
     },
