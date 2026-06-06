@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 03 Plan 05 complete (gap closure — CR-01 closed)
-last_updated: '2026-06-06T12:41:34.517Z'
+stopped_at: Phase 03 Plan 06 complete (gap closure — WR-01 closed, category filter wired end-to-end)
+last_updated: '2026-06-06T20:48:00.000Z'
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 17
-  completed_plans: 13
-  percent: 33
+  completed_plans: 14
+  percent: 35
 ---
 
 # State: Profitmuna
@@ -66,6 +66,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 03 P03 | ~30 min active | 2 tasks | 18 files |
 | Phase 03 P04 | ~4 min active | 2 tasks | 5 files |
 | Phase 03 P05 | ~8 min active | 2 tasks | 2 files |
+| Phase 03 P06 | ~10 min active | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -108,8 +109,8 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Phase 03 Plan 05 complete (gap closure — CR-01 closed)
-**Next:** Phase 03 complete — proceed to Phase 04 (Wallets) or Phase 02 (Income & Expenses) per ROADMAP dependencies
+**Stopped at:** Phase 03 Plan 06 complete (gap closure — WR-01 closed, category filter wired end-to-end)
+**Next:** Phase 03 all gap-closure plans complete — Phase 03 is now complete; proceed to Phase 04 (Wallets) or Phase 02 (Income & Expenses) per ROADMAP dependencies
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -148,3 +149,6 @@ _State initialized: 2026-06-05_
 - [Phase 03-04]: PfPercentageEditor mounted inline in PfContent replacing cards area — matches reference inline behavior; no Sheet/Drawer needed
 - [Phase 03-05]: updatePercentages coverage check runs before sum validation and before any DB writes — rejection is atomic; no partial updates on invalid payload
 - [Phase 03-05]: Error message 'Submit all accounts exactly once.' is generic — reveals no owned-ID data or internal state (T-03-05-03 accept disposition)
+- [Phase 03-06]: Category list in getSummary is intentionally unfiltered — must show all options regardless of active date/categoryIds filter so users can see and select any category
+- [Phase 03-06]: Category ids mapped to strings in page.tsx (String(c.id)) to match nuqs parseAsArrayOf(parseAsString) contract — avoids type mismatch in URL param handling
+- [Phase 03-06]: Empty-state uses disabled button + muted text rather than hiding the filter control — visible non-interactive indicator is better UX than invisible dead filter

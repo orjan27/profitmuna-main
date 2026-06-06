@@ -122,8 +122,8 @@ Plans:
 
 **Gap closure** _(VERIFICATION 2026-06-06: SC2 partial, SC4 partial)_
 
-- [ ] 03-05-PLAN.md — Gap 2 (CR-01): updatePercentages enforces exact user-owned account coverage before sum-to-100% validation; partial-set 400 regression test (PF-02)
-- [ ] 03-06-PLAN.md — Gap 1 (WR-01): getSummary returns distinct user income categories; page.tsx derives categoryOptions and passes to PfFilters; empty-state when no categories (PF-04)
+- [x] 03-05-PLAN.md — Gap 2 (CR-01): updatePercentages enforces exact user-owned account coverage before sum-to-100% validation; partial-set 400 regression test (PF-02)
+- [x] 03-06-PLAN.md — Gap 1 (WR-01): getSummary returns distinct user income categories; page.tsx derives categoryOptions and passes to PfFilters; empty-state when no categories (PF-04)
 
 **UI hint**: yes
 
@@ -193,7 +193,7 @@ Plans:
 | Phase                       | Plans Complete | Status      | Completed  |
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
-| 2. Income & Expenses        | 4/4 | Complete   | 2026-06-06 |
+| 2. Income & Expenses        | 4/4            | Complete    | 2026-06-06 |
 | 3. Profit First Allocation  | 4/4            | Complete    | 2026-06-06 |
 | 4. Wallets                  | 0/3            | Planned     | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
