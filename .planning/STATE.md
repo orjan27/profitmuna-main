@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 5 context gathered
-last_updated: "2026-06-06T03:55:49.264Z"
+last_updated: '2026-06-06T03:55:49.264Z'
 progress:
   total_phases: 6
   completed_phases: 2
@@ -32,9 +32,9 @@ progress:
 ## Current Position
 
 Phase: 03 (profit-first-allocation) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 **Phase:** 03
-**Plan:** Plan 03 complete — Plan 04 next
+**Plan:** Plan 04 complete — Phase 03 complete
 **Status:** Executing Phase 03
 **Phase goal:** Every user has exactly 4 Profit First allocation accounts; CRUD, percentage editing, and allocation summary with derived balances
 
@@ -64,6 +64,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 03 P01 | ~15 min active | 3 tasks | 7 files |
 | Phase 03 P02 | ~20 min active | 2 tasks | 6 files |
 | Phase 03 P03 | ~30 min active | 2 tasks | 18 files |
+| Phase 03 P04 | ~4 min active | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -106,8 +107,8 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Phase 5 context gathered
-**Next:** Execute Phase 03 Plan 04 (profit-first CRUD mutations — server actions, create/edit/delete dialogs, percentage editor)
+**Stopped at:** Phase 03 Plan 04 complete
+**Next:** Phase 03 complete — proceed to Phase 04 (Wallets) or Phase 02 (Income & Expenses) per ROADMAP dependencies
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -140,3 +141,7 @@ _State initialized: 2026-06-05_
 - [Phase 03-03]: RSC page.tsx fetches direct to API_BASE_URL (not BFF proxy) — server-to-server avoids unnecessary hop; BFF reserved for client-side fetches and Plan 04 server actions
 - [Phase 03-03]: PfContent is a thin client wrapper owning useAmountVisibility state; passes visible/mounted to PfOverview and AmountToggle — canonical RSC/client boundary composition pattern
 - [Phase 03-03]: eslint.config.mjs updated with apps/\*\*/.next/ ignore — ESLint 9 flat config resolves ignores relative to config root, so workspace .next/ dirs require explicit glob prefixes
+- [Phase 03-04]: Server actions in apps/web/src/server/ (not route-group \_actions/) per CLAUDE.md STRICT structure — mirrors auth.ts server-only module pattern
+- [Phase 03-04]: percent→bp conversion (Math.round(pct \* 100)) done exclusively in server actions, never in UI components — Pitfall 3 containment
+- [Phase 03-04]: Delete confirmation dialog mounted inside AccountCard (co-located with state) rather than lifted to PfContent — keeps delete state local to the card
+- [Phase 03-04]: PfPercentageEditor mounted inline in PfContent replacing cards area — matches reference inline behavior; no Sheet/Drawer needed

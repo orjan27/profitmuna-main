@@ -51,10 +51,10 @@ Profit First service factory with reference-exact validation semantics and integ
 
 ## Tasks Completed
 
-| Task | Name                                                             | Commit  | Files                                                                                                   |
-| ---- | ---------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------- |
+| Task | Name                                                               | Commit  | Files                                                                                                                    |
+| ---- | ------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------ |
 | 1    | createProfitFirstService factory + Zod schemas + PF-02/03/04 tests | 297338d | apps/api/src/services/profit-first-service.ts, apps/api/src/schemas/profit-first.ts, apps/api/tests/profit-first.test.ts |
-| 2    | Thin Hono router + index registration + CORS + BFF proxy         | 6fa4549 | apps/api/src/routes/profit-first.ts, apps/api/src/index.ts, apps/web/src/app/api/profit-first/[...path]/route.ts |
+| 2    | Thin Hono router + index registration + CORS + BFF proxy           | 6fa4549 | apps/api/src/routes/profit-first.ts, apps/api/src/index.ts, apps/web/src/app/api/profit-first/[...path]/route.ts         |
 
 ## What Was Built
 
@@ -63,31 +63,37 @@ Profit First service factory with reference-exact validation semantics and integ
 `apps/api/src/services/profit-first-service.ts` now exports both `seedProfitFirstAccounts` (unchanged from Plan 01) and `createProfitFirstService(db)`:
 
 **`getSummary(userId, dateRange?, filters?)`**
+
 - Parallel `Promise.all`: total received income query + accounts SELECT by sortOrder
 - `getTotalReceivedIncome`: SUM(amount) WHERE moneyStatus='RECEIVED' AND profitFirstAllocated=1, optional incomeDate range and categoryId IN-list, all scoped to userId
 - `computeBalance`: `Math.round((totalIncomeCents * targetPercentage) / 10000)` — integer math only, no float (D-08)
 - Returns `targetPercentage` as percent (bp/100) so the UI's `total === 100` check works (Pitfall 3)
 
 **`createAccount(userId, input)`**
+
 - Parallel fetch: current SUM of basis points + MAX sortOrder for user
 - Rejects 400 "Adding this account would exceed 100%..." if currentSum + input.targetPercentage > 10000
 - Surfaces unique(userId,name) constraint as 400 "An account with this name already exists."
 
 **`updateAccount(accountId, userId, input)`**
+
 - 404 when row missing or userId mismatch (IDOR guard, T-03-04)
 - If targetPercentage changes: fetches SUM of OTHER accounts via `ne(id, accountId)`; rejects 400 if new total > 10000
 
 **`deleteAccount(accountId, userId)`**
+
 - 404 when missing/not owned; 400 "Default accounts cannot be deleted." for non-CUSTOM
 - Phase 4 wallet-link guard present as commented stub block
 
 **`updatePercentages(userId, input)`**
+
 - Validates `sum === 10000` exactly; 400 "Percentages must total 100%. Current total: {sum/100}%."
 - Parallel updates, each scoped to (id, userId); returns updated accounts by sortOrder
 
 ### Zod Schemas (Task 1)
 
 `apps/api/src/schemas/profit-first.ts` exports:
+
 - `createAccountSchema`: name 1-100 trim, targetPercentage int 0-10000, color z.enum(8 values), sortOrder int >=0 optional
 - `updateAccountSchema`: all optional
 - `updatePercentagesSchema`: accounts array min 1, each { id positive int, targetPercentage 0-10000 }
@@ -97,6 +103,7 @@ Profit First service factory with reference-exact validation semantics and integ
 ### Router (Task 2)
 
 `apps/api/src/routes/profit-first.ts` — thin Hono router:
+
 - `profitFirstRouter.use('/*', requireAuth)` — every route authenticated (T-03-09)
 - `GET /summary` — zValidator query, parses comma-separated categoryIds to number[]
 - `POST /accounts` — zValidator json, returns 201
@@ -113,6 +120,7 @@ Profit First service factory with reference-exact validation semantics and integ
 ### BFF Proxy (Task 2)
 
 `apps/web/src/app/api/profit-first/[...path]/route.ts`:
+
 - Reads `access_token` cookie, sets `Authorization: Bearer` header
 - Forwards to `${API_BASE_URL}/api/profit-first/${path}${search}`
 - No transparent-refresh (middleware.ts handles auth redirect)
@@ -122,6 +130,7 @@ Profit First service factory with reference-exact validation semantics and integ
 ### Tests (Task 1)
 
 12 tests pass (3 PF-01 + 9 new):
+
 - PF-02: rejects exceeding 100% on create, cannot delete default, deletes custom, 404 for other user's account
 - PF-03: rejects non-10000 sum with exact error message "97%", accepts valid redistribution
 - PF-04: integer balance math (100000 cents × 500 bp / 10000 = 5000), excludes PENDING + profitFirstAllocated=false income, applies date range filter
@@ -156,10 +165,10 @@ Profit First service factory with reference-exact validation semantics and integ
 
 ## Threat Surface Scan
 
-| Flag | File | Description |
-|------|------|-------------|
-| threat_flag: authenticated-endpoints | apps/api/src/routes/profit-first.ts | 5 new API endpoints behind requireAuth (T-03-09 mitigated via profitFirstRouter.use('/*', requireAuth)) |
-| threat_flag: IDOR-guard | apps/api/src/services/profit-first-service.ts | All queries scoped to userId; deleteAccount/updateAccount return 404 on ownership mismatch (T-03-04 mitigated) |
+| Flag                                 | File                                          | Description                                                                                                    |
+| ------------------------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| threat_flag: authenticated-endpoints | apps/api/src/routes/profit-first.ts           | 5 new API endpoints behind requireAuth (T-03-09 mitigated via profitFirstRouter.use('/\*', requireAuth))       |
+| threat_flag: IDOR-guard              | apps/api/src/services/profit-first-service.ts | All queries scoped to userId; deleteAccount/updateAccount return 404 on ownership mismatch (T-03-04 mitigated) |
 
 All flagged surfaces are covered by the plan's threat model (T-03-04, T-03-05, T-03-06, T-03-07, T-03-08, T-03-09).
 

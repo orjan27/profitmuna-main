@@ -118,7 +118,7 @@ Plans:
 
 **Wave 4** _(blocked on Wave 3 completion)_
 
-- [ ] 03-04-PLAN.md — Mutation UI: percent→bp server actions, bulk percentage editor (100% gate), create/edit/delete account dialogs with preset swatches, wired per-account dropdown (PF-02, PF-03)
+- [x] 03-04-PLAN.md — Mutation UI: percent→bp server actions, bulk percentage editor (100% gate), create/edit/delete account dialogs with preset swatches, wired per-account dropdown (PF-02, PF-03)
 
 **UI hint**: yes
 
@@ -189,7 +189,7 @@ Plans:
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 1/4            | In Progress |            |
-| 3. Profit First Allocation  | 3/4            | In Progress |            |
+| 3. Profit First Allocation  | 4/4            | Complete    | 2026-06-06 |
 | 4. Wallets                  | 0/3            | Planned     | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
