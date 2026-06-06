@@ -460,17 +460,22 @@ export async function forgotPassword(
     return { exists: true, resetUrl: '' };
   }
 
-  // Record this reset attempt (upsert by keyed email)
+  // Record this reset attempt (upsert by keyed email). Only lastAttemptAt is
+  // read for the cooldown, so we no longer increment an unbounded counter
+  // that nothing consumes (WR-08). NOTE: a dedicated purpose/kind column (or
+  // a separate table) to remove the __reset__ key-prefix coupling with the
+  // login-lockout namespace is deferred — it requires a schema migration
+  // beyond this phase's scope.
   const now = new Date().toISOString();
   if (lastAttempt) {
     await db
       .update(loginAttempts)
-      .set({ count: lastAttempt.count + 1, lastAttemptAt: now })
+      .set({ lastAttemptAt: now })
       .where(eq(loginAttempts.email, `__reset__${email}`));
   } else {
     await db.insert(loginAttempts).values({
       email: `__reset__${email}`,
-      count: 1,
+      count: 0,
       lastAttemptAt: now,
     });
   }
