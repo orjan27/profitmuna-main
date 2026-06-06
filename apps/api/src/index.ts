@@ -8,7 +8,16 @@ import type { Bindings, Variables } from '@/types';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-app.use('/*', cors());
+// Allowlist the configured app origin and only the methods this API uses.
+// origin is a function because the binding is request-scoped on Workers
+// (security.md: never reflect a wildcard origin from an auth API).
+app.use('/*', (c, next) =>
+  cors({
+    origin: c.env.APP_BASE_URL,
+    allowMethods: ['GET', 'POST'],
+    credentials: false,
+  })(c, next)
+);
 app.use('/*', securityHeaders);
 
 // Structured error shape { error: { code, message } } for expected errors;
