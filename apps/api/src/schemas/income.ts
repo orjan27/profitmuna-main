@@ -26,6 +26,14 @@ export const receiveIncomeSchema = z.object({
     .optional(),
 });
 
+/** Schema for creating an income category. Does NOT expose system — seeder controls that field. */
+export const createIncomeCategorySchema = z.object({
+  name: z.string().min(1).max(100),
+});
+
+/** Schema for renaming an income category. */
+export const updateIncomeCategorySchema = createIncomeCategorySchema;
+
 /** Schema for list/filter query params. */
 export const incomeQuerySchema = z.object({
   page: z.coerce.number().int().min(0).default(0),

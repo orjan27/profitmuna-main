@@ -13,6 +13,7 @@ import { IncomeList } from './income-list';
 import { EditIncomeDialog } from './edit-income-dialog';
 import { ReceiveIncomeDialog } from './receive-income-dialog';
 import { fetchIncomesAction } from './income-actions';
+import { ManageCategoriesDialog } from './manage-categories-dialog';
 
 interface IncomeOverviewProps {
   /** Initial page of income records rendered server-side. */
@@ -95,9 +96,12 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
             </p>
           ) : null}
         </div>
-        <Button asChild>
-          <Link href="/income/new">Add Income</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <ManageCategoriesDialog categories={categories} />
+          <Button asChild>
+            <Link href="/income/new">Add Income</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Filters (URL-persisted, debounced search) */}

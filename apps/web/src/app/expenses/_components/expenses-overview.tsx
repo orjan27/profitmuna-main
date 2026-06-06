@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/format-currency';
 import { fetchExpensesAction } from './expense-actions';
 import { ExpenseList } from './expense-list';
 import type { ExpenseRow } from './edit-expense-dialog';
+import { ManageCategoriesDialog } from './manage-categories-dialog';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -122,12 +123,15 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Total (active)</p>
           <p className="mt-1 text-2xl font-semibold">{formatCurrency(activeTotal)}</p>
         </div>
-        <Button asChild size="sm">
-          <Link href="/expenses/new">
-            <Plus className="h-4 w-4 mr-1" aria-hidden="true" />
-            Record Expense
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <ManageCategoriesDialog categories={categories} />
+          <Button asChild size="sm">
+            <Link href="/expenses/new">
+              <Plus className="h-4 w-4 mr-1" aria-hidden="true" />
+              Record Expense
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Date-range filter (D-07 — no free-text search for expenses) */}
