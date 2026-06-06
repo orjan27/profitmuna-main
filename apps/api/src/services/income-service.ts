@@ -191,19 +191,8 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
       }
 
       let categoryName = existing.categoryName;
-      if (input.categoryId !== undefined && input.categoryId !== existing.categoryId) {
-        const category = await db.query.incomeCategories.findFirst({
-          where: and(
-            eq(incomeCategories.id, input.categoryId),
-            eq(incomeCategories.userId, userId)
-          ),
-        });
-        if (!category) {
-          throw new HTTPException(400, { message: 'invalid_category' });
-        }
-        categoryName = category.name;
-      } else if (input.categoryId !== undefined) {
-        // categoryId unchanged — re-resolve name from same category (validate still owned)
+      if (input.categoryId !== undefined) {
+        // Validate the category is still owned and re-resolve its name (WR-07).
         const category = await db.query.incomeCategories.findFirst({
           where: and(
             eq(incomeCategories.id, input.categoryId),
