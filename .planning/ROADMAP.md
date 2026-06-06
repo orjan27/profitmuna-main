@@ -106,7 +106,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Data foundation: profit_first_accounts + minimal incomes table, seedProfitFirstAccounts wired into register + Google first-login, additive migration + idempotent backfill, Wave 0 test scaffold + web leaf utilities (PF-01)
+- [x] 03-01-PLAN.md — Data foundation: profit_first_accounts + minimal incomes table, seedProfitFirstAccounts wired into register + Google first-login, additive migration + idempotent backfill, Wave 0 test scaffold + web leaf utilities (PF-01)
 
 **Wave 2** _(blocked on Wave 1 completion)_
 

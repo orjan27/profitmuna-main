@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-06-06T02:47:50.910Z"
+stopped_at: Phase 03 Plan 01 complete
+last_updated: '2026-06-06T11:05:00.000Z'
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 15
-  completed_plans: 4
-  percent: 17
+  completed_plans: 7
+  percent: 20
 ---
 
 # State: Profitmuna
@@ -25,18 +25,18 @@ progress:
 
 **Core value:** When income is recorded as received, it is automatically split across the user's Profit First allocation percentages — the user always knows exactly how much belongs to each bucket.
 
-**Current focus:** Phase 02 — income-expenses
+**Current focus:** Phase 03 — profit-first-allocation
 
 ---
 
 ## Current Position
 
-Phase: 02 (income-expenses) — EXECUTING
-Plan: 1 of 4
-**Phase:** 02
-**Plan:** Not started
-**Status:** Ready to execute
-**Phase goal:** Users can securely create accounts and log in via email/password or Google, with email verification and password recovery
+Phase: 03 (profit-first-allocation) — EXECUTING
+Plan: 2 of 4
+**Phase:** 03
+**Plan:** Plan 01 complete — Plan 02 next
+**Status:** Executing Phase 03
+**Phase goal:** Every user has exactly 4 Profit First allocation accounts; CRUD, percentage editing, and allocation summary with derived balances
 
 ```
 Progress: [██████████] Phase 1 (4/4 automated) — Auth
@@ -61,6 +61,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 01 P02 | 35 min active | 3 tasks | 9 files |
 | Phase 01 P03 | 30 min | 2 tasks | 8 files |
 | Phase 01 P04 | 20 min active | 4 commits | 4 files |
+| Phase 03 P01 | ~15 min active | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -103,8 +104,8 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Phase 4 UI-SPEC approved
-**Next:** After human approves Task 3 — Phase 01 complete; proceed to Phase 02
+**Stopped at:** Phase 03 Plan 01 complete
+**Next:** Execute Phase 03 Plan 02 (profit-first CRUD, percentage editing, allocation summary)
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -128,3 +129,6 @@ _State initialized: 2026-06-05_
 - [Phase 01-03]: resetPassword deletes all refresh_tokens for user on password change — force re-login everywhere (T-03-04)
 - [Phase 01-04]: upsertGoogleUser resolution order: googleId match → email match (link) → create new — no duplicates; Google email is provider-verified
 - [Phase 01-04]: OAuth google + callback added to BFF UNAUTHED_PATHS — no session cookie during OAuth flow; transparent refresh must be skipped
+- [Phase 03-01]: profitFirstAccounts uniqueIndex(userId, name) prevents duplicate seeding — constraint error on branch 1/2 calls is the intended guard
+- [Phase 03-01]: incomes table was already present from Phase 2 work — minimal stub was not needed; Phase 3 queries use the full table
+- [Phase 03-01]: PF_DEFAULT_COLORS canonical 8-value tuple in apps/web/src/lib/constants.ts; Plan 02 must duplicate in apps/api/src/schemas/profit-first.ts for Zod enum validation
