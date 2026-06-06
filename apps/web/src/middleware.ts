@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Public auth routes — always allow through without a session
-const AUTH_ROUTES = new Set([
+// Public routes — always allow through without a session.
+// '/' is the marketing landing page; the rest are auth flows.
+const PUBLIC_ROUTES = new Set([
+  '/',
   '/login',
   '/register',
   '/verify-email',
@@ -21,8 +23,8 @@ const AUTH_ROUTES = new Set([
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
-  // Allow auth routes through unconditionally
-  if (AUTH_ROUTES.has(pathname)) {
+  // Allow public routes through unconditionally
+  if (PUBLIC_ROUTES.has(pathname)) {
     return NextResponse.next();
   }
 
