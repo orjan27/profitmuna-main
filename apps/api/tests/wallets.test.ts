@@ -229,19 +229,296 @@ describe('wallets service', () => {
   // ─── WAL-02: income and expense category mappings ─────────────────────────
 
   describe('WAL-02: income and expense category mappings', () => {
-    it.todo('maps income categories to a wallet on create');
-    it.todo('returns 409 when an income category is already mapped to another wallet');
-    it.todo('maps expense categories via expenseMode CATEGORIES to a wallet');
-    it.todo('returns 409 when an expense category is already mapped to another wallet');
-    it.todo('expenseMode ALL sets autoDeductAllExpenses=true and clears category mappings');
-    it.todo('expenseMode NONE sets autoDeductAllExpenses=false and clears category mappings');
-    it.todo('replaces existing income category mappings atomically on update');
-    it.todo(
-      'setting expenseMode ALL when another wallet already has it returns 409 auto_deduct_all_already_set'
-    );
-    it.todo('rejects income category not belonging to the authenticated user (T-04-07)');
-    it.todo('rejects expense category not belonging to the authenticated user (T-04-07)');
-    it.todo('PROFIT_FIRST wallet does not apply income mappings (D-08)');
+    it('maps income categories to a wallet on create', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02a@test.com', name: 'User A', emailVerified: true });
+      const incCat = seedIncomeCategory(db, user.id, 'Consulting');
+
+      const svc = createWalletService(dbD1);
+      await svc.create(user.id, {
+        name: 'Mapped Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+        incomeCategoryIds: [incCat.id],
+      });
+
+      const rows = db
+        .select()
+        .from(schema.walletIncomeCategoryMappings)
+        .where(eq(schema.walletIncomeCategoryMappings.userId, user.id))
+        .all();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].incomeCategoryId).toBe(incCat.id);
+    });
+
+    it('returns 409 when an income category is already mapped to another wallet', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02b@test.com', name: 'User B', emailVerified: true });
+      const incCat = seedIncomeCategory(db, user.id, 'Freelance');
+
+      const svc = createWalletService(dbD1);
+      await svc.create(user.id, {
+        name: 'First Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+        incomeCategoryIds: [incCat.id],
+      });
+
+      await expect(
+        svc.create(user.id, {
+          name: 'Second Wallet',
+          sourceType: 'BLANK',
+          color: '#8b5cf6',
+          incomeCategoryIds: [incCat.id],
+        })
+      ).rejects.toMatchObject({ status: 409, message: 'income_category_already_mapped' });
+    });
+
+    it('maps expense categories via expenseMode CATEGORIES to a wallet', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02c@test.com', name: 'User C', emailVerified: true });
+      const expCat = seedExpenseCategory(db, user.id, 'Rent');
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Expense Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+        expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
+      });
+
+      const rows = db
+        .select()
+        .from(schema.walletExpenseCategoryMappings)
+        .where(eq(schema.walletExpenseCategoryMappings.walletId, wallet.id))
+        .all();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].expenseCategoryId).toBe(expCat.id);
+
+      // autoDeductAllExpenses should be false for CATEGORIES mode
+      const walletRow = db
+        .select()
+        .from(schema.wallets)
+        .where(eq(schema.wallets.id, wallet.id))
+        .all()[0];
+      expect(walletRow.autoDeductAllExpenses).toBe(false);
+    });
+
+    it('returns 409 when an expense category is already mapped to another wallet', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02d@test.com', name: 'User D', emailVerified: true });
+      const expCat = seedExpenseCategory(db, user.id, 'Utilities');
+
+      const svc = createWalletService(dbD1);
+      await svc.create(user.id, {
+        name: 'First Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+        expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
+      });
+
+      await expect(
+        svc.create(user.id, {
+          name: 'Second Wallet',
+          sourceType: 'BLANK',
+          color: '#8b5cf6',
+          expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
+        })
+      ).rejects.toMatchObject({ status: 409, message: 'expense_category_already_mapped' });
+    });
+
+    it('expenseMode ALL sets autoDeductAllExpenses=true and clears category mappings', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02e@test.com', name: 'User E', emailVerified: true });
+      const expCat = seedExpenseCategory(db, user.id, 'Food');
+
+      const svc = createWalletService(dbD1);
+      // Create with CATEGORIES first
+      const wallet = await svc.create(user.id, {
+        name: 'All Expenses Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+        expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
+      });
+
+      // Update to ALL — should clear specific mappings and set flag
+      await svc.update(wallet.id, user.id, {
+        expenseMode: { kind: 'ALL' },
+      });
+
+      const walletRow = db
+        .select()
+        .from(schema.wallets)
+        .where(eq(schema.wallets.id, wallet.id))
+        .all()[0];
+      expect(walletRow.autoDeductAllExpenses).toBe(true);
+
+      const expMappings = db
+        .select()
+        .from(schema.walletExpenseCategoryMappings)
+        .where(eq(schema.walletExpenseCategoryMappings.walletId, wallet.id))
+        .all();
+      expect(expMappings).toHaveLength(0);
+    });
+
+    it('expenseMode NONE sets autoDeductAllExpenses=false and clears category mappings', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02f@test.com', name: 'User F', emailVerified: true });
+      const expCat = seedExpenseCategory(db, user.id, 'Transport');
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Clear Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+        expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
+      });
+
+      await svc.update(wallet.id, user.id, {
+        expenseMode: { kind: 'NONE' },
+      });
+
+      const walletRow = db
+        .select()
+        .from(schema.wallets)
+        .where(eq(schema.wallets.id, wallet.id))
+        .all()[0];
+      expect(walletRow.autoDeductAllExpenses).toBe(false);
+
+      const expMappings = db
+        .select()
+        .from(schema.walletExpenseCategoryMappings)
+        .where(eq(schema.walletExpenseCategoryMappings.walletId, wallet.id))
+        .all();
+      expect(expMappings).toHaveLength(0);
+    });
+
+    it('replaces existing income category mappings atomically on update', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02g@test.com', name: 'User G', emailVerified: true });
+      const cat1 = seedIncomeCategory(db, user.id, 'Cat1');
+      const cat2 = seedIncomeCategory(db, user.id, 'Cat2');
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Replace Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+        incomeCategoryIds: [cat1.id],
+      });
+
+      // Replace with cat2 only
+      await svc.update(wallet.id, user.id, {
+        incomeCategoryIds: [cat2.id],
+      });
+
+      const rows = db
+        .select()
+        .from(schema.walletIncomeCategoryMappings)
+        .where(eq(schema.walletIncomeCategoryMappings.walletId, wallet.id))
+        .all();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].incomeCategoryId).toBe(cat2.id);
+    });
+
+    it('setting expenseMode ALL when another wallet already has it returns 409 auto_deduct_all_already_set', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02h@test.com', name: 'User H', emailVerified: true });
+
+      const svc = createWalletService(dbD1);
+      // First wallet gets ALL
+      await svc.create(user.id, {
+        name: 'Auto Deduct All',
+        sourceType: 'BLANK',
+        color: '#10b981',
+        expenseMode: { kind: 'ALL' },
+      });
+
+      // Second wallet tries to get ALL too — should be rejected
+      await expect(
+        svc.create(user.id, {
+          name: 'Second Wallet',
+          sourceType: 'BLANK',
+          color: '#8b5cf6',
+          expenseMode: { kind: 'ALL' },
+        })
+      ).rejects.toMatchObject({ status: 409, message: 'auto_deduct_all_already_set' });
+    });
+
+    it('rejects income category not belonging to the authenticated user (T-04-07)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user1 = seedUser(db, {
+        email: 'wal02i-u1@test.com',
+        name: 'User 1',
+        emailVerified: true,
+      });
+      const user2 = seedUser(db, {
+        email: 'wal02i-u2@test.com',
+        name: 'User 2',
+        emailVerified: true,
+      });
+      // Cat belongs to user2, not user1
+      const cat = seedIncomeCategory(db, user2.id, 'Other User Cat');
+
+      const svc = createWalletService(dbD1);
+      await expect(
+        svc.create(user1.id, {
+          name: 'Bad Wallet',
+          sourceType: 'BLANK',
+          color: '#10b981',
+          incomeCategoryIds: [cat.id],
+        })
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('rejects expense category not belonging to the authenticated user (T-04-07)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user1 = seedUser(db, {
+        email: 'wal02j-u1@test.com',
+        name: 'User 1',
+        emailVerified: true,
+      });
+      const user2 = seedUser(db, {
+        email: 'wal02j-u2@test.com',
+        name: 'User 2',
+        emailVerified: true,
+      });
+      const cat = seedExpenseCategory(db, user2.id, 'Other Expense');
+
+      const svc = createWalletService(dbD1);
+      await expect(
+        svc.create(user1.id, {
+          name: 'Bad Wallet',
+          sourceType: 'BLANK',
+          color: '#10b981',
+          expenseMode: { kind: 'CATEGORIES', ids: [cat.id] },
+        })
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('PROFIT_FIRST wallet does not apply income mappings (D-08)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal02k@test.com', name: 'User K', emailVerified: true });
+      const pfAccount = seedPfAccount(db, user.id);
+      const incCat = seedIncomeCategory(db, user.id, 'Salary');
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'PF Wallet',
+        sourceType: 'PROFIT_FIRST',
+        profitFirstAccountId: pfAccount.id,
+        color: '#10b981',
+        incomeCategoryIds: [incCat.id], // should be ignored for PF wallets
+      });
+
+      const rows = db
+        .select()
+        .from(schema.walletIncomeCategoryMappings)
+        .where(eq(schema.walletIncomeCategoryMappings.walletId, wallet.id))
+        .all();
+      // PF wallets skip income mapping (D-08)
+      expect(rows).toHaveLength(0);
+    });
   });
 
   // ─── WAL-03: derived balance computation ─────────────────────────────────
