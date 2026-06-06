@@ -75,7 +75,7 @@ Plans:
 
 **Wave 0**
 
-- [ ] 02-01-PLAN.md — Foundation: 4 DB tables + applied migration, CORS expansion + stub routers mounted behind requireAuth, server-only apiFetch client, currency/date/constants helpers, NuqsAdapter, in-memory D1 test helper (INC-01…06, EXP-01…05 infra)
+- [x] 02-01-PLAN.md — Foundation: 4 DB tables + applied migration, CORS expansion + stub routers mounted behind requireAuth, server-only apiFetch client, currency/date/constants helpers, NuqsAdapter, in-memory D1 test helper (INC-01…06, EXP-01…05 infra)
 
 **Wave 1** _(blocked on Wave 0 completion; 02-02 and 02-03 run in parallel — no file overlap)_
 
@@ -188,7 +188,7 @@ Plans:
 | Phase                       | Plans Complete | Status      | Completed  |
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
-| 2. Income & Expenses        | 0/4            | Planned     | -          |
+| 2. Income & Expenses        | 1/4 | In Progress|  |
 | 3. Profit First Allocation  | 0/4            | Planned     | -          |
 | 4. Wallets                  | 0/3            | Planned     | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
