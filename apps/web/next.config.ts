@@ -1,5 +1,15 @@
 import type { NextConfig } from 'next';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Next.js needs 'unsafe-eval' (and inline scripts) for its dev/HMR runtime.
+// In production we drop them to keep XSS defense strong (WR-06). Moving to a
+// nonce-based script CSP via middleware is a future hardening pass (deferred —
+// out of this phase's scope).
+const scriptSrc = isProduction
+  ? "script-src 'self'"
+  : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+
 // Security response headers required by security.md, applied to every route.
 // HSTS is also enforced at the Cloudflare edge in production — kept here as
 // defense-in-depth per plan 01-01 decisions_resolved.
@@ -12,8 +22,8 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // Next.js requires inline/eval scripts in dev; inline styles for Tailwind
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      scriptSrc,
+      // 'unsafe-inline' for styles is required by Tailwind's injected styles
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
