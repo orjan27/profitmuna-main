@@ -1,10 +1,11 @@
 ---
 phase: 5
 slug: dashboard
-status: draft
+status: approved
 shadcn_initialized: true
 preset: none
 created: 2026-06-06
+reviewed_at: 2026-06-06
 ---
 
 # Phase 5 — UI Design Contract
@@ -49,7 +50,7 @@ Exceptions:
 - Feed row touch target: natural flow with `py-3` (12px) gives approximately 44px touch target at body font size — satisfies mobile accessibility minimum without a fixed height rule.
 - Nav sidebar link items: minimum 44px height via `py-3 px-4` padding on mobile.
 - Stat card icon container: 48px × 48px (`h-12 w-12`) icon wrapper — intentionally 48px (12×4) for visual weight; not a grid spacing token.
-- Date filter preset button gap: 6px (`gap-1.5`) — inherited directly from `pf-filters.tsx` `gap-1.5` pattern; treated as an approved exception.
+- Date filter preset button gap: 8px (`gap-2`) in the new `DashboardFilters.tsx` — the `gap-1.5` (6px) in `pf-filters.tsx` is a grandfathered value in that existing file and is NOT carried forward to the new component.
 
 **Source:** Phase 4 UI-SPEC spacing contract (inherited unchanged). Exceptions derived from existing `pf-filters.tsx` + `amount-visibility.tsx` + `income-list.tsx` patterns.
 
