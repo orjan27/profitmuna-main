@@ -135,8 +135,23 @@ Plans:
 3. User can view all wallets with computed balance breakdowns (PF allocation + mapped income − mapped expenses + deposits − withdrawals)
 4. User can record manual DEPOSIT or WITHDRAWAL transactions, edit them, soft-delete them, and restore soft-deleted transactions
 5. User can open a wallet detail view with a paginated transaction history
-   **Plans**: TBD
-   **UI hint**: yes
+   **Plans**: 3 plans
+
+Plans:
+
+**Wave 0**
+
+- [ ] 04-01-PLAN.md — Foundation: 4 wallet tables + applied migration [BLOCKING], Zod schemas, web type contracts, BFF proxy (5 verbs), stub router behind requireAuth, wallet-labels + formatCurrency utilities, WAL-01..05 test scaffold (WAL-01..05 infra)
+
+**Wave 1** _(blocked on Wave 0 completion)_
+
+- [ ] 04-02-PLAN.md — Wallet CRUD + mapping + balance slice: createWalletService (list/create/update/remove, mapping conflict 409, auto-deduct-all uniqueness, balance computation), create-wallet form (type/color/category/3-mode expense, PF income hidden), card-grid list with computed balances + PF-suggesting empty state + impact delete dialog (WAL-01, WAL-02, WAL-03)
+
+**Wave 2** _(blocked on Wave 1 completion)_
+
+- [ ] 04-03-PLAN.md — Transactions + detail slice: getById (breakdown + merged paginated history), createTransaction/update/remove/restore with assertCanInsertTransaction double-count guard, transaction routes (incl. PATCH restore), detail page with collapsible breakdown + inline soft-delete/restore + add/edit/delete dialogs + nuqs pagination (WAL-04, WAL-05)
+
+**UI hint**: yes
 
 ### Phase 5: Dashboard
 
@@ -175,7 +190,7 @@ Plans:
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 0/4            | Planned     | -          |
 | 3. Profit First Allocation  | 0/4            | Planned     | -          |
-| 4. Wallets                  | 0/0            | Not started | -          |
+| 4. Wallets                  | 0/3            | Planned     | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
 
