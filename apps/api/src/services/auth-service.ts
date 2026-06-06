@@ -208,30 +208,6 @@ export async function resendVerification(
   return { verifyUrl, email: user.email };
 }
 
-/**
- * Enforces the login gate (D-07): valid credentials are required first, then
- * an unverified email hard-blocks with 403 — no session may ever be issued
- * for an unverified user.
- * @throws HTTPException 401 invalid_credentials | 403 email_not_verified
- */
-export async function assertLoginAllowed(
-  d1: D1Database,
-  email: string,
-  password: string
-): Promise<{ userId: number }> {
-  const db = createDb(d1);
-  const rows = await db.select().from(users).where(eq(users.email, email));
-  const user = rows[0];
-
-  if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
-    throw new HTTPException(401, { message: 'invalid_credentials' });
-  }
-  if (!user.emailVerified) {
-    throw new HTTPException(403, { message: 'email_not_verified' });
-  }
-  return { userId: user.id };
-}
-
 export type LoginResult = {
   userId: number;
   accessToken: string;
