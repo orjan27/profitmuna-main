@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { toast } from 'sonner';
 import { Check, ChevronsUpDown } from 'lucide-react';
 
@@ -134,8 +135,7 @@ export function NewWalletForm({
         sourceType,
         profitFirstAccountId: sourceType === 'PROFIT_FIRST' ? Number(pfAccountId) : null,
         color,
-        incomeCategoryIds:
-          sourceType !== 'PROFIT_FIRST' ? selectedIncomeCategoryIds : undefined,
+        incomeCategoryIds: sourceType !== 'PROFIT_FIRST' ? selectedIncomeCategoryIds : undefined,
         expenseMode: expenseModeInput,
       });
 
@@ -153,9 +153,11 @@ export function NewWalletForm({
           setFormError('Something went wrong. Please try again.');
         }
       }
-    } catch {
-      // redirect() throws — this is expected on success
-      toast.success('Wallet created.');
+    } catch (err) {
+      // redirect() throws a special error — re-throw so Next.js can handle the navigation
+      if (isRedirectError(err)) throw err;
+      // Real failures surface an error toast instead of a false success
+      toast.error('Could not create wallet. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -309,9 +311,7 @@ export function NewWalletForm({
                         <Check
                           className={cn(
                             'ml-auto h-4 w-4',
-                            selectedIncomeCategoryIds.includes(cat.id)
-                              ? 'opacity-100'
-                              : 'opacity-0'
+                            selectedIncomeCategoryIds.includes(cat.id) ? 'opacity-100' : 'opacity-0'
                           )}
                         />
                       </CommandItem>

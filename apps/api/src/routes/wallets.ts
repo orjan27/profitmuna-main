@@ -10,6 +10,8 @@ import {
   walletTransactionSchema,
   updateWalletTransactionSchema,
   walletTransactionQuerySchema,
+  walletIdParamSchema,
+  txIdParamSchema,
 } from '@/schemas/wallets';
 import type { Bindings, Variables } from '@/types';
 
@@ -46,13 +48,21 @@ walletsRouter.post(
 // PUT /:walletId — update wallet
 walletsRouter.put(
   '/:walletId',
+  zValidator('param', walletIdParamSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        { error: { code: 'validation_error', message: 'Invalid path parameter' } },
+        422
+      );
+    }
+  }),
   zValidator('json', updateWalletSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
     }
   }),
   async (c) => {
-    const walletId = Number(c.req.param('walletId'));
+    const { walletId } = c.req.valid('param');
     const input = c.req.valid('json');
     const userId = c.get('userId');
     const svc = createWalletService(createDb(c.env.DB));
@@ -62,24 +72,43 @@ walletsRouter.put(
 );
 
 // DELETE /:walletId — remove wallet (returns impact counts for D-16)
-walletsRouter.delete('/:walletId', async (c) => {
-  const walletId = Number(c.req.param('walletId'));
-  const userId = c.get('userId');
-  const svc = createWalletService(createDb(c.env.DB));
-  const result = await svc.remove(walletId, userId);
-  return c.json({ data: result });
-});
+walletsRouter.delete(
+  '/:walletId',
+  zValidator('param', walletIdParamSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        { error: { code: 'validation_error', message: 'Invalid path parameter' } },
+        422
+      );
+    }
+  }),
+  async (c) => {
+    const { walletId } = c.req.valid('param');
+    const userId = c.get('userId');
+    const svc = createWalletService(createDb(c.env.DB));
+    const result = await svc.remove(walletId, userId);
+    return c.json({ data: result });
+  }
+);
 
 // GET /:walletId — wallet detail with breakdown + paginated history (WAL-05)
 walletsRouter.get(
   '/:walletId',
+  zValidator('param', walletIdParamSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        { error: { code: 'validation_error', message: 'Invalid path parameter' } },
+        422
+      );
+    }
+  }),
   zValidator('query', walletTransactionQuerySchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { code: 'validation_error', message: 'Invalid query params' } }, 422);
     }
   }),
   async (c) => {
-    const walletId = Number(c.req.param('walletId'));
+    const { walletId } = c.req.valid('param');
     const params = c.req.valid('query');
     const userId = c.get('userId');
     const svc = createWalletService(createDb(c.env.DB));
@@ -90,25 +119,43 @@ walletsRouter.get(
 
 // IMPORTANT: register restore BEFORE the generic /:txId handlers to avoid param shadowing
 // PATCH /:walletId/transactions/:txId/restore — restore soft-deleted transaction
-walletsRouter.patch('/:walletId/transactions/:txId/restore', async (c) => {
-  const walletId = Number(c.req.param('walletId'));
-  const txId = Number(c.req.param('txId'));
-  const userId = c.get('userId');
-  const svc = createWalletService(createDb(c.env.DB));
-  const result = await svc.restoreTransaction(walletId, txId, userId);
-  return c.json({ data: result });
-});
+walletsRouter.patch(
+  '/:walletId/transactions/:txId/restore',
+  zValidator('param', txIdParamSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        { error: { code: 'validation_error', message: 'Invalid path parameter' } },
+        422
+      );
+    }
+  }),
+  async (c) => {
+    const { walletId, txId } = c.req.valid('param');
+    const userId = c.get('userId');
+    const svc = createWalletService(createDb(c.env.DB));
+    const result = await svc.restoreTransaction(walletId, txId, userId);
+    return c.json({ data: result });
+  }
+);
 
 // POST /:walletId/transactions — create manual transaction (WAL-04)
 walletsRouter.post(
   '/:walletId/transactions',
+  zValidator('param', walletIdParamSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        { error: { code: 'validation_error', message: 'Invalid path parameter' } },
+        422
+      );
+    }
+  }),
   zValidator('json', walletTransactionSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
     }
   }),
   async (c) => {
-    const walletId = Number(c.req.param('walletId'));
+    const { walletId } = c.req.valid('param');
     const input = c.req.valid('json');
     const userId = c.get('userId');
     const svc = createWalletService(createDb(c.env.DB));
@@ -120,14 +167,21 @@ walletsRouter.post(
 // PUT /:walletId/transactions/:txId — update manual transaction
 walletsRouter.put(
   '/:walletId/transactions/:txId',
+  zValidator('param', txIdParamSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        { error: { code: 'validation_error', message: 'Invalid path parameter' } },
+        422
+      );
+    }
+  }),
   zValidator('json', updateWalletTransactionSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
     }
   }),
   async (c) => {
-    const walletId = Number(c.req.param('walletId'));
-    const txId = Number(c.req.param('txId'));
+    const { walletId, txId } = c.req.valid('param');
     const input = c.req.valid('json');
     const userId = c.get('userId');
     const svc = createWalletService(createDb(c.env.DB));
@@ -137,13 +191,23 @@ walletsRouter.put(
 );
 
 // DELETE /:walletId/transactions/:txId — soft-delete manual transaction
-walletsRouter.delete('/:walletId/transactions/:txId', async (c) => {
-  const walletId = Number(c.req.param('walletId'));
-  const txId = Number(c.req.param('txId'));
-  const userId = c.get('userId');
-  const svc = createWalletService(createDb(c.env.DB));
-  const result = await svc.removeTransaction(walletId, txId, userId);
-  return c.json({ data: result });
-});
+walletsRouter.delete(
+  '/:walletId/transactions/:txId',
+  zValidator('param', txIdParamSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(
+        { error: { code: 'validation_error', message: 'Invalid path parameter' } },
+        422
+      );
+    }
+  }),
+  async (c) => {
+    const { walletId, txId } = c.req.valid('param');
+    const userId = c.get('userId');
+    const svc = createWalletService(createDb(c.env.DB));
+    const result = await svc.removeTransaction(walletId, txId, userId);
+    return c.json({ data: result });
+  }
+);
 
 export { walletsRouter };

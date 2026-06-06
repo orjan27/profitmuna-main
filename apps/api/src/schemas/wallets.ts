@@ -48,3 +48,12 @@ export const walletTransactionQuerySchema = z.object({
   page: z.coerce.number().int().min(0).default(0),
   size: z.coerce.number().int().min(1).max(100).default(20),
 });
+
+export const walletIdParamSchema = z.object({
+  walletId: z.coerce.number().int().positive(),
+});
+
+export const txIdParamSchema = z.object({
+  walletId: z.coerce.number().int().positive(),
+  txId: z.coerce.number().int().positive(),
+});
