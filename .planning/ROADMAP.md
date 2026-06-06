@@ -48,7 +48,7 @@ Plans:
 
 **Wave 3** _(blocked on Wave 2 completion)_
 
-- [ ] 01-03-PLAN.md — Password reset via emailed single-use link (AUTH-04)
+- [x] 01-03-PLAN.md — Password reset via emailed single-use link (AUTH-04)
 
 **Wave 4** _(blocked on Wave 3 completion)_
 
@@ -137,7 +137,7 @@ Plans:
 
 | Phase                       | Plans Complete | Status      | Completed |
 | --------------------------- | -------------- | ----------- | --------- |
-| 1. Authentication           | 2/4 | In Progress|  |
+| 1. Authentication           | 3/4 | In Progress|  |
 | 2. Income & Expenses        | 0/0            | Not started | -         |
 | 3. Profit First Allocation  | 0/0            | Not started | -         |
 | 4. Wallets                  | 0/0            | Not started | -         |

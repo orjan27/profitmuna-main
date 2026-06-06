@@ -4,12 +4,12 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed Phase 01 Plan 02 (login + session lifecycle)
-last_updated: "2026-06-06T00:51:37.615Z"
+last_updated: '2026-06-06T00:58:16.231Z'
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -59,6 +59,7 @@ Progress: [█████░░░░░] Phase 1 (2/4) — Auth
 
 | Phase 01 P01 | 30 min active (7h57m wall) | 5 tasks | 35 files |
 | Phase 01 P02 | 35 min active | 3 tasks | 9 files |
+| Phase 01 P03 | 30 min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -101,8 +102,8 @@ None currently.
 
 ## Session Continuity
 
-**Stopped at:** Completed Phase 01 Plan 02 (login + session lifecycle)
-**Next:** Execute Phase 01 Plan 03 — password reset (forgot-password + reset-password flow)
+**Stopped at:** Completed Phase 01 Plan 03 (password reset)
+**Next:** Execute Phase 01 Plan 04 — Google OAuth
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -118,3 +119,9 @@ None currently.
 ---
 
 _State initialized: 2026-06-05_
+
+## Decisions
+
+- [Phase ?]: Per-email reset cooldown reuses login_attempts table (keyed **reset**<email>) — satisfies security.md rate-limit on email-sending without a new table
+- [Phase ?]: forgotPassword returns {exists,resetUrl}; route handles waitUntil email dispatch — services stay framework-agnostic (pattern from slice 01)
+- [Phase ?]: resetPassword deletes all refresh_tokens for user on password change — force re-login everywhere (T-03-04)
