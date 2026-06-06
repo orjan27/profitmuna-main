@@ -145,8 +145,8 @@ export function PfFilters({ categoryOptions = [] }: PfFiltersProps) {
         ))}
       </div>
 
-      {/* Category multi-select sheet (only shown when categories available) */}
-      {categoryOptions.length > 0 && (
+      {/* Category multi-select sheet or empty-state */}
+      {categoryOptions.length > 0 ? (
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1.5">
@@ -185,6 +185,16 @@ export function PfFilters({ categoryOptions = [] }: PfFiltersProps) {
             </div>
           </SheetContent>
         </Sheet>
+      ) : (
+        /* categoryOptions.length === 0 — explicit empty-state so the filter is
+           visible but non-interactive rather than silently absent */
+        <div className="flex items-center gap-1.5">
+          <Button variant="outline" size="sm" className="gap-1.5" disabled>
+            <Filter className="h-3.5 w-3.5" />
+            Income categories
+          </Button>
+          <span className="text-xs text-muted-foreground">No income categories yet</span>
+        </div>
       )}
     </div>
   );

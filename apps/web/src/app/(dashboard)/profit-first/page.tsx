@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 
 import { PfContent } from './_components/pf-content';
-import { PfFilters } from './_components/pf-filters';
+import { PfFilters, type CategoryOption } from './_components/pf-filters';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,6 +20,7 @@ interface SummaryResponse {
   data: {
     totalIncome: number;
     accounts: SummaryAccount[];
+    categories: Array<{ id: number; name: string }>;
   };
 }
 
@@ -63,6 +64,7 @@ export default async function ProfitFirstPage({
 
   let totalIncome = 0;
   let accounts: SummaryAccount[] = [];
+  let categoryOptions: CategoryOption[] = [];
 
   try {
     const res = await fetch(summaryUrl, {
@@ -77,6 +79,8 @@ export default async function ProfitFirstPage({
       const json = (await res.json()) as SummaryResponse;
       totalIncome = json.data.totalIncome;
       accounts = json.data.accounts;
+      // Map API categories to CategoryOption (id must be string — nuqs parseAsArrayOf(parseAsString))
+      categoryOptions = json.data.categories.map((c) => ({ id: String(c.id), label: c.name }));
     }
   } catch {
     // Network error — page renders empty state; user can refresh
@@ -93,7 +97,7 @@ export default async function ProfitFirstPage({
       </div>
 
       {/* Filter bar — client component (nuqs hooks — Pitfall 5) */}
-      <PfFilters />
+      <PfFilters categoryOptions={categoryOptions} />
 
       {/*
        * PfContent: client component that owns amount-visibility state
