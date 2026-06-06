@@ -34,19 +34,19 @@ created: 2026-06-06
 
 Declared values (must be multiples of 4):
 
-| Token | Value | Usage                                                                         |
-| ----- | ----- | ----------------------------------------------------------------------------- |
-| xs    | 4px   | Icon gaps, color swatch gaps, inline badge padding, wallet type indicator dot |
-| sm    | 8px   | Compact field labels, balance breakdown row padding, card action spacing      |
-| md    | 16px  | Default element spacing, form field gap, card padding supplement              |
-| lg    | 24px  | Card internal padding (shadcn Card default), section gap, dialog body padding |
-| xl    | 32px  | Layout column gap, page section vertical gap                                  |
-| 2xl   | 48px  | Page top padding, major section breaks                                        |
-| 3xl   | 64px  | Full-page layout spacing                                                      |
+| Token | Value | Usage                                                                                              |
+| ----- | ----- | -------------------------------------------------------------------------------------------------- |
+| xs    | 4px   | Icon gaps, inline badge padding, wallet type indicator dot                                         |
+| sm    | 8px   | Compact field labels, balance breakdown row padding, card action spacing, color swatch palette gap |
+| md    | 16px  | Default element spacing, form field gap, card padding supplement                                   |
+| lg    | 24px  | Card internal padding (shadcn Card default), section gap, dialog body padding                      |
+| xl    | 32px  | Layout column gap, page section vertical gap                                                       |
+| 2xl   | 48px  | Page top padding, major section breaks                                                             |
+| 3xl   | 64px  | Full-page layout spacing                                                                           |
 
 Exceptions:
 
-- Color swatch palette grid: 6px gap between swatches (same exception as Phase 3; acceptable between xs and sm).
+- Color swatch palette grid: 8px gap between swatches (`gap-2`). Satisfies the multiple-of-4 requirement.
 - Touch targets for icon-only action buttons (delete, restore, edit on transaction rows): minimum 44px height via padding on mobile.
 - Transaction row height: no fixed height; natural flow with `py-3` (12px) gives approximately 44px touch target at body font size.
 
@@ -56,21 +56,22 @@ Exceptions:
 
 ## Typography
 
-| Role    | Size | Weight         | Line Height | Usage                                                                        |
-| ------- | ---- | -------------- | ----------- | ---------------------------------------------------------------------------- |
-| Body    | 14px | 400 (regular)  | 1.5         | Transaction descriptions, category names, mapping section body text          |
-| Label   | 14px | 500 (medium)   | 1.4         | Form field labels, balance breakdown row labels, section subheadings         |
-| Heading | 20px | 600 (semibold) | 1.2         | Page heading ("Wallets"), wallet detail heading (wallet name), dialog titles |
-| Display | 28px | 600 (semibold) | 1.1         | Total wallet balance on the wallet card and detail page header               |
+| Role    | Size | Weight         | Line Height | Usage                                                                                                                             |
+| ------- | ---- | -------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Body    | 14px | 400 (regular)  | 1.5         | Transaction descriptions, category names, mapping section body text                                                               |
+| Label   | 14px | 400 (regular)  | 1.4         | Form field labels, balance breakdown row labels, section subheadings — differentiated from Body via `text-muted-foreground` color |
+| Heading | 20px | 600 (semibold) | 1.2         | Page heading ("Wallets"), wallet detail heading (wallet name), dialog titles                                                      |
+| Display | 28px | 600 (semibold) | 1.1         | Total wallet balance on the wallet card and detail page header                                                                    |
 
 Notes:
 
+- Label role uses the same weight (400) as Body. Visual separation is achieved through `text-muted-foreground` on labels, not font weight.
 - Negative balance amounts use the Display role typographically; only the color changes (destructive red).
 - Amount inputs in transaction dialogs: 16px / weight 400 / line-height 1.5 (Body-class rendered inside `<Input>`).
 - Soft-deleted transaction rows: same typography; `line-through` decoration and `opacity-50` applied via Tailwind class.
 - Shadcn `CardTitle` renders `font-semibold leading-none` — aligns with Heading at 20px.
 
-**Source:** Phase 3 UI-SPEC typography contract (inherited); consistent with existing shadcn new-york defaults and auth form patterns.
+**Source:** Phase 3 UI-SPEC typography contract (inherited); consistent with existing shadcn new-york defaults and auth form patterns. Weight 500 (medium) removed per checker requirement; Label differentiation moved to color.
 
 ---
 
@@ -87,7 +88,7 @@ Accent reserved for:
 
 - "Create Wallet" primary action button (wallet list page)
 - "Add Deposit" and "Add Withdrawal" action buttons (wallet detail page)
-- "Save" button in transaction dialog (create/edit)
+- Confirm button in transaction dialog (create: "Add Deposit" / "Add Withdrawal"; edit: "Save Deposit" / "Save Withdrawal")
 - Active/current page button in pagination controls
 - Focused input ring (Tailwind focus-visible, via shadcn Input default)
 
@@ -224,7 +225,7 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 │  [Select allocation account ▼]                            │
 │                                                           │
 │  Color                                                    │
-│  [●][●][●][●][●][●][●][●]  (8 preset swatches)            │
+│  [●][●][●][●][●][●][●][●]  (8 preset swatches, gap-2)    │
 │                                                           │
 │  ── Income Categories ─────────────────────────────────── │
 │  (Section hidden when type = PROFIT_FIRST — D-08)         │
@@ -236,7 +237,7 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 │  (○) Specific expense categories                          │
 │      [Search and select categories…]  (shown when ○ above) │
 │                                                           │
-│                           [Cancel]  [Create Wallet]       │
+│                [Discard Changes]  [Create Wallet]         │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -245,7 +246,7 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 - Linked Account selector appears only when type = PROFIT_FIRST; populates from PF accounts without an existing wallet link.
 - Income Categories section is conditionally hidden when type = PROFIT_FIRST (D-08).
 - Expense mode uses RadioGroup with 3 options (D-07); "Specific categories" picker conditionally revealed.
-- Cancel navigates back to `/wallets`.
+- "Discard Changes" navigates back to `/wallets` without saving (rendered as `variant="ghost"` or `variant="outline"`).
 
 ### Wallet Detail Page: `/wallets/[walletId]`
 
@@ -282,9 +283,9 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 
 - Balance breakdown collapsible is closed by default.
 - Zero-value breakdown rows are hidden (D-02).
-- Soft-deleted transaction rows: `opacity-50 line-through` on text; single "Restore" button (`variant="outline"` size="sm") replaces edit/delete actions (D-09).
+- Soft-deleted transaction rows: `opacity-50 line-through` on all text; single "Restore" button (`variant="outline"` size="sm") replaces edit/delete actions (D-09).
 - Auto-sourced transactions (income, expenses) are read-only — no edit/delete actions shown.
-- Manual transactions show edit (pencil icon) and delete (trash icon) action buttons.
+- Manual transactions show edit (pencil icon, `aria-label="Edit transaction"`) and delete (trash icon, `aria-label="Delete transaction"`) action buttons.
 - Transaction type column shows abbreviated badge: "DEP" / "WD" for manual; "INC" / "EXP" for auto-sourced.
 - Pagination: page-based controls at bottom using nuqs for URL `page` param (D-10).
 - "Add Deposit" and "Add Withdrawal" buttons are disabled and show a tooltip with the blocking message when `assertCanInsertTransaction` would reject them (D-11).
@@ -304,14 +305,16 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 │  Description (optional)      │
 │  [___________________]       │
 │                              │
-│           [Cancel]  [Save]   │
+│     [✕ close]  [Add Deposit] │
 └──────────────────────────────┘
 ```
 
 - Dialog title: "Add Deposit" / "Add Withdrawal" / "Edit Deposit" / "Edit Withdrawal".
+- Confirm button label mirrors the dialog title exactly: "Add Deposit" / "Add Withdrawal" (create mode); "Save Deposit" / "Save Withdrawal" (edit mode).
+- Secondary action: close via the X icon in the dialog header only — no explicit secondary button required. If a text close action is needed for accessibility, use `variant="ghost"` with label "Close".
 - Amount field: number input, minimum 0.01, accepts decimal (converts to cents on submit).
 - Date field: date input (YYYY-MM-DD), defaults to today.
-- Save button uses `variant="default"` (accent).
+- Confirm button uses `variant="default"` (accent).
 
 ### Delete Transaction Confirmation Dialog
 
@@ -322,11 +325,12 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 │  Delete this ₱X,XXX.XX deposit?      │
 │  You can restore it from the list.   │
 │                                      │
-│           [Cancel]  [Delete]         │
+│                [Close]  [Delete]     │
 └──────────────────────────────────────┘
 ```
 
 - "Delete" button uses `variant="destructive"`.
+- Secondary action "Close" uses `variant="outline"` — neutral label for a confirmation dismissal.
 - A success toast fires after deletion: "Transaction deleted." with an undo hint not required (restore is inline per D-09).
 
 ### Delete Wallet Confirmation Dialog (D-16)
@@ -341,11 +345,12 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 │  • Income and expense category mappings    │
 │  This cannot be undone.                    │
 │                                            │
-│              [Cancel]  [Delete Wallet]     │
+│         [Close]  [Delete Wallet]           │
 └────────────────────────────────────────────┘
 ```
 
 - "Delete Wallet" button uses `variant="destructive"`.
+- Secondary action "Close" uses `variant="outline"` — neutral label for a destructive confirmation dismissal.
 - Impact counts are fetched from the API before showing the dialog (or passed as props from the list response).
 - Dialog copy is populated with the actual wallet name and transaction count.
 
@@ -372,7 +377,7 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 | Expense mode — SPECIFIC        | Selected                     | Category picker revealed below radio group                                               |
 | Expense mode — SPECIFIC        | Zero categories selected     | Validation error "Select at least one expense category"                                  |
 | Create Wallet button           | Submitting                   | `disabled` + spinner, text "Creating…"                                                   |
-| Save transaction button        | Submitting                   | `disabled` + spinner, text "Saving…"                                                     |
+| Transaction confirm button     | Submitting                   | `disabled` + spinner, text "Adding…" (create) / "Saving…" (edit)                         |
 | Pagination — current page      | Active                       | `variant="default"` button (accent fill)                                                 |
 | Pagination — other pages       | Default                      | `variant="outline"` button                                                               |
 | Color swatch                   | Selected                     | Ring indicator (`ring-2 ring-offset-2 ring-primary`)                                     |
@@ -392,6 +397,7 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 | Empty state quick-create prefix              | "Quick-create for your allocation accounts:"                                                                         |
 | Form heading — create                        | "Create Wallet"                                                                                                      |
 | Form heading — edit                          | "Edit Wallet"                                                                                                        |
+| Form secondary action — create form          | "Discard Changes" (navigates back without saving; `variant="ghost"` or `variant="outline"`)                          |
 | Wallet type option — PROFIT_FIRST            | "Profit First"                                                                                                       |
 | Wallet type option — BLANK                   | "Standalone"                                                                                                         |
 | Wallet type description — PROFIT_FIRST       | "Funded by your Profit First allocation percentage."                                                                 |
@@ -417,8 +423,14 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 | Dialog title — add withdrawal                | "Add Withdrawal"                                                                                                     |
 | Dialog title — edit deposit                  | "Edit Deposit"                                                                                                       |
 | Dialog title — edit withdrawal               | "Edit Withdrawal"                                                                                                    |
+| Dialog confirm — add deposit                 | "Add Deposit"                                                                                                        |
+| Dialog confirm — add withdrawal              | "Add Withdrawal"                                                                                                     |
+| Dialog confirm — edit deposit                | "Save Deposit"                                                                                                       |
+| Dialog confirm — edit withdrawal             | "Save Withdrawal"                                                                                                    |
+| Dialog secondary action — transaction dialog | "Close" (`variant="ghost"`, shown only if accessible text fallback is needed beyond the X icon)                      |
 | Dialog title — delete transaction            | "Delete Transaction"                                                                                                 |
 | Dialog body — delete transaction             | "Delete this {amount} {type}? You can restore it from the list."                                                     |
+| Dialog secondary action — delete dialogs     | "Close" (`variant="outline"`)                                                                                        |
 | Dialog title — delete wallet                 | "Delete Wallet"                                                                                                      |
 | Dialog body — delete wallet                  | "Delete \"{name}\"? This will permanently remove {N} transactions and all category mappings. This cannot be undone." |
 | Transaction field — amount label             | "Amount"                                                                                                             |
@@ -426,6 +438,8 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 | Transaction field — description label        | "Description"                                                                                                        |
 | Transaction field — description placeholder  | "Optional note"                                                                                                      |
 | Restore button label                         | "Restore"                                                                                                            |
+| Edit transaction icon button — aria-label    | `aria-label="Edit transaction"`                                                                                      |
+| Delete transaction icon button — aria-label  | `aria-label="Delete transaction"`                                                                                    |
 | Transaction type badge — DEPOSIT             | "Deposit"                                                                                                            |
 | Transaction type badge — WITHDRAWAL          | "Withdrawal"                                                                                                         |
 | Transaction type badge — auto income         | "Income"                                                                                                             |
@@ -453,8 +467,8 @@ Phase 4 net-new additions: `collapsible`, `command`, `popover`, `radio-group`.
 
 Destructive actions in this phase:
 
-- **Delete manual transaction** (D-12): confirmation via Dialog; soft-delete (restorable inline); "Delete" button `variant="destructive"`.
-- **Delete wallet** (D-16): confirmation via Dialog with impact detail (N transactions + mappings); hard-delete cascades; "Delete Wallet" button `variant="destructive"`; cannot be undone.
+- **Delete manual transaction** (D-12): confirmation via Dialog; soft-delete (restorable inline); "Delete" button `variant="destructive"`; secondary action "Close" `variant="outline"`.
+- **Delete wallet** (D-16): confirmation via Dialog with impact detail (N transactions + mappings); hard-delete cascades; "Delete Wallet" button `variant="destructive"`; secondary action "Close" `variant="outline"`; cannot be undone.
 
 ---
 
