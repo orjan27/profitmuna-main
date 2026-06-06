@@ -31,11 +31,11 @@ progress:
 
 ## Current Position
 
-Phase: 04 (wallets) — EXECUTING
-Plan: 2 of 3
+Phase: 04 (wallets) — COMPLETE
+Plan: 3 of 3
 **Phase:** 04
-**Plan:** Plan 02 complete — wallet CRUD service, balance computation, create form, list page
-**Status:** Executing Phase 04 — Plan 03 next (wallet detail, manual transactions, WAL-04/05)
+**Plan:** Plan 03 complete — wallet detail page, manual transactions, soft-delete/restore, WAL-04/05
+**Status:** Phase 04 complete — all WAL-01..05 satisfied
 **Phase goal:** Users can create wallets with Profit First or standalone source types, configure income/expense mappings, and track money with computed balances
 
 ```

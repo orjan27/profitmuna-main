@@ -12,7 +12,7 @@
 - [x] **Phase 1: Authentication** - Users can create accounts, log in, and manage credentials securely (completed 2026-06-06)
 - [x] **Phase 2: Income & Expenses** - Users can record, browse, and manage income and expense entries with categories (completed 2026-06-06)
 - [x] **Phase 3: Profit First Allocation** - Users can configure allocation accounts and view derived balance summaries (completed 2026-06-06)
-- [ ] **Phase 4: Wallets** - Users can create wallets, map categories, record transactions, and view computed balances
+- [x] **Phase 4: Wallets** - Users can create wallets, map categories, record transactions, and view computed balances (completed 2026-06-06)
 - [ ] **Phase 5: Dashboard** - Users land on a summary view showing totals, allocation balances, and recent transactions
 - [ ] **Phase 6: Settings & Notifications** - Users can configure currency, set reminder schedules, and use the notification center
 
@@ -154,7 +154,7 @@ Plans:
 
 **Wave 2** _(blocked on Wave 1 completion)_
 
-- [ ] 04-03-PLAN.md — Transactions + detail slice: getById (breakdown + merged paginated history), createTransaction/update/remove/restore with assertCanInsertTransaction double-count guard, transaction routes (incl. PATCH restore), detail page with collapsible breakdown + inline soft-delete/restore + add/edit/delete dialogs + nuqs pagination (WAL-04, WAL-05)
+- [x] 04-03-PLAN.md — Transactions + detail slice: getById (breakdown + merged paginated history), createTransaction/update/remove/restore with assertCanInsertTransaction double-count guard, transaction routes (incl. PATCH restore), detail page with collapsible breakdown + inline soft-delete/restore + add/edit/delete dialogs + nuqs pagination (WAL-04, WAL-05)
 
 **UI hint**: yes
 
@@ -196,7 +196,7 @@ Plans:
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 4/4            | Complete    | 2026-06-06 |
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
-| 4. Wallets                  | 2/3            | In Progress |            |
+| 4. Wallets                  | 3/3            | Complete    | 2026-06-06 |
 | 5. Dashboard                | 0/0            | Not started | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
 
