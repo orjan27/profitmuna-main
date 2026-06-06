@@ -42,7 +42,14 @@ findings:
   warning: 9
   info: 5
   total: 18
-status: issues_found
+status: fixed
+fixed_at: 2026-06-06
+fix_summary:
+  critical_fixed: 4
+  warning_fixed: 8
+  warning_partial: 1
+  info_deferred: 5
+  in_scope_addressed: 13
 ---
 
 # Phase 01: Code Review Report
@@ -64,6 +71,7 @@ The documented Phase deviations (PBKDF2 vs bcrypt, 30-min access JWT, duplicated
 
 ### CR-01: Google OAuth callback ignores `email_verified` and userinfo HTTP status — forged/unverified account takeover
 
+**Status:** FIXED (commit `a534096`) — checks `userRes.ok`, parses userinfo via `googleUserinfoSchema`, rejects `email_verified: false` with 400.
 **File:** `apps/api/src/routes/auth.ts:248-263`
 **Issue:** The callback fetches Google userinfo, casts the JSON to a typed shape with no validation, and passes `email` directly to `upsertGoogleUser` — which links by email and unconditionally sets `emailVerified: true` (`apps/api/src/services/auth-service.ts:454-468`). Two problems:
 
@@ -93,6 +101,7 @@ Then only call `upsertGoogleUser` after the verified check passes.
 
 ### CR-02: No rate limiting on `register` / `resend-verification` — email-bomb and cost-abuse vector
 
+**Status:** FIXED (commit `57def9f`) — per-email cooldown (`enforceEmailCooldown`) on both endpoints, 429 + `Retry-After` before any email; `onError` propagates the header.
 **File:** `apps/api/src/routes/auth.ts:38-56` (register), `apps/api/src/routes/auth.ts:72-89` (resend-verification)
 **Issue:** `security.md` mandates: "Apply rate limiting to authentication endpoints, password reset, and any endpoint that sends email or SMS. Return `429` with `Retry-After`." `forgot-password` got a per-email cooldown (`RESET_COOLDOWN_MS`), but `register` and `resend-verification` both call `sendVerificationEmail` (register sends two emails) with no throttle whatsoever. An attacker can:
 
@@ -103,6 +112,7 @@ Then only call `upsertGoogleUser` after the verified check passes.
 
 ### CR-03: Login user-enumeration via password-hash timing side channel
 
+**Status:** FIXED (commit `d9e0618`) — always derive PBKDF2 against `DUMMY_PASSWORD_HASH` when the user/passwordHash is absent.
 **File:** `apps/api/src/services/auth-service.ts:209-210`
 **Issue:**
 
@@ -123,6 +133,7 @@ const passwordValid = (await verifyPassword(password, hashToCheck)) && user?.pas
 
 ### CR-04: Lockout logic permanently re-locks on a single failed attempt after the first lockout window
 
+**Status:** FIXED (commit `50e4f7a`) — reset the counter to 0 once a prior `lockedUntil` has elapsed before counting the new attempt.
 **File:** `apps/api/src/services/auth-service.ts:214-226`
 **Issue:** On a failed attempt the counter is only ever incremented; it is reset to 0 _only on successful login_ (lines 243-248). After the first lockout the row holds `count = 5` (or more) with `lockedUntil` now in the past. Once the window expires, the very next failed attempt computes `newCount = 6 >= MAX_LOGIN_ATTEMPTS` and immediately re-locks for another 15 minutes. Net effect: after one lockout, a legitimate user who fat-fingers their password even once is instantly locked again, and an attacker can keep a victim permanently locked out with a single wrong-password request every 15 minutes — a low-cost account-DoS.
 
@@ -140,59 +151,70 @@ const lockedUntil =
 
 ### WR-01: Default `cors()` sends `Access-Control-Allow-Origin: *` and allows all methods
 
+**Status:** FIXED (commit `21fecb0`) — explicit `cors({ origin: c.env.APP_BASE_URL, allowMethods: ['GET','POST'], credentials: false })` via the request-scoped function form.
 **File:** `apps/api/src/index.ts:11`
 **Issue:** `app.use('/*', cors())` uses Hono's defaults, which reflect `Access-Control-Allow-Origin: *` and a broad method/header set. `security.md` requires allowlisting specific origins and limiting `Access-Control-Allow-Methods` to those actually used. Although the browser only talks to the same-origin BFF today (so credentialed CORS is not currently the exposure), a wildcard CORS policy on an authentication API is a latent misconfiguration that invites direct cross-origin probing.
 **Fix:** Configure explicitly: `cors({ origin: c.env.APP_BASE_URL, allowMethods: ['GET', 'POST'], credentials: false })`. Since the secret/origin is request-scoped on Workers, use the function form of `origin`.
 
 ### WR-02: `assertLoginAllowed` is dead, unreachable code
 
+**Status:** FIXED (commit `7518018`) — deleted; `login` remains the single credential gate.
 **File:** `apps/api/src/services/auth-service.ts:153-169`
 **Issue:** `assertLoginAllowed` is exported but never imported anywhere (the route uses `login`, which independently reimplements credential + verification checks). Dead code in a security module is a maintenance hazard — a future caller may use this variant, which has **no lockout enforcement**, silently bypassing the brute-force protection in `login`.
 **Fix:** Delete `assertLoginAllowed`, or have `login` delegate to it so there is a single source of truth for the credential gate.
 
 ### WR-03: `JWT_REFRESH_SECRET` binding declared and required but never used
 
+**Status:** FIXED (commit `d38abaa`) — removed the binding, `signRefreshToken`, its test, and the wrangler secret reference.
 **File:** `apps/api/src/types/index.ts:4`, `apps/api/src/lib/jwt.ts:32-40`, `apps/api/tests/helpers/db.ts:173`
 **Issue:** Refresh tokens are opaque random strings stored as SHA-256 hashes (`auth-service.ts:252-257`), not JWTs. `JWT_REFRESH_SECRET` is in `Bindings` (and `signRefreshToken` exists in `lib/jwt.ts`) but neither is used by any runtime path — `signRefreshToken` is only exercised by a test. This is a misleading config surface: an operator will provision a secret that does nothing, and a reader may assume refresh tokens are signed JWTs.
 **Fix:** Remove `JWT_REFRESH_SECRET` from `Bindings`/`wrangler.toml` and delete the unused `signRefreshToken`, or document why they exist. Keep the implementation honest about the refresh-token scheme.
 
 ### WR-04: `/logout` requires a valid (unexpired) access token — logout fails for expired sessions
 
+**Status:** FIXED (commit `edf3e69`) — logout now runs off the `refresh_token` cookie via `logoutByRefreshToken`, no longer gated by `requireAuth`; always clears cookies and revokes tokens.
 **File:** `apps/api/src/routes/auth.ts:145-152`
 **Issue:** `requireAuth` rejects expired access tokens with 401. Logout is exactly the moment an access token is most likely stale. The BFF's transparent refresh mitigates this for browser flows, but `logout` is not in the BFF `UNAUTHED_PATHS` set and the refresh itself can fail (revoked/expired refresh token), in which case the user cannot log out and the server-side refresh-token rows are never deleted (their session remains revocable only by expiry). Logout should be resilient to an expired/absent access token.
 **Fix:** Allow logout to proceed using the `refresh_token` cookie (look up the row, delete the user's tokens) even when the access token is invalid, rather than gating it behind `requireAuth`.
 
 ### WR-05: Google userinfo response consumed via unchecked `as` cast (no boundary narrowing)
 
+**Status:** FIXED (commit `a534096`, with CR-01) — `googleUserinfoSchema.parse()` narrows the payload at the boundary.
 **File:** `apps/api/src/routes/auth.ts:251-256`
 **Issue:** `(await userRes.json()) as { sub; email; name; email_verified }` violates the project rule "Narrow unknowns at the boundary. Do not leak `unknown` into business logic" and CLAUDE.md's "Use Zod to parse untyped data." An external provider response is trusted wholesale; any field could be missing. (Closely tied to CR-01.)
 **Fix:** Define a Zod schema for the Google userinfo payload in `schemas/auth.ts` and `.parse()` the response.
 
 ### WR-06: `next.config.ts` ships `'unsafe-eval'` + `'unsafe-inline'` in the production CSP
 
+**Status:** FIXED (commit `9d3faff`) — relaxed `script-src` gated on non-production; production uses `script-src 'self'`. Nonce-based CSP via middleware deferred (out of phase scope).
 **File:** `apps/web/next.config.ts:15-16`
 **Issue:** `script-src 'self' 'unsafe-inline' 'unsafe-eval'` is applied unconditionally, including production builds. The comment says these are needed "in dev," but the config does not gate on environment, so production inherits a CSP that permits inline script and `eval`, substantially weakening XSS defense for an app handling financial data.
 **Fix:** Gate the relaxed directives on `process.env.NODE_ENV !== 'production'`; in production use nonces/hashes (Next.js supports a nonce-based CSP via middleware) and drop `'unsafe-eval'`.
 
 ### WR-07: `Server` / `X-Powered-By` headers not stripped
 
+**Status:** FIXED (commit `349bac1`) — `poweredByHeader: false` in next.config.ts; API middleware deletes `Server` / `X-Powered-By`.
 **File:** `apps/web/next.config.ts:28-37`, `apps/api/src/middleware/security-headers.ts:13-24`
 **Issue:** `security.md`: "Remove `Server` and `X-Powered-By` headers in production." Next.js emits `X-Powered-By: Next.js` by default and neither config disables it (`poweredByHeader: false` is absent), nor does the API middleware strip platform headers. Minor info disclosure / fingerprinting.
 **Fix:** Add `poweredByHeader: false` to `next.config.ts`; explicitly `c.res.headers.delete('Server')`/`'X-Powered-By'` in the API security-headers middleware.
 
 ### WR-08: `forgotPassword` rate-limit row reuses `login_attempts` with a colliding key space and an unbounded counter
 
+**Status:** PARTIAL (commit `4b99b91`) — stopped incrementing the unread counter. DEFERRED: dedicated `purpose`/`kind` column or separate table to drop the `__reset__` key-prefix coupling requires a schema migration beyond this phase's scope.
 **File:** `apps/api/src/services/auth-service.ts:373-401`
 **Issue:** Reset cooldown rows are keyed `__reset__<email>` in the same `login_attempts` table used for login lockout. The `count` for these rows is incremented on every reset request and never reset, so it grows unbounded (harmless today but dead state). More importantly, keying by a string-prefixed email in a shared table is fragile: a user whose literal email begins with `__reset__` would collide with the lockout namespace. The coupling also means a `login`-side counter reset (keyed by plain email) and the reset-side row drift independently with no cleanup.
 **Fix:** Either add a dedicated `purpose`/`kind` column (or a separate table) for reset throttling instead of namespacing via string prefix, and stop incrementing a counter you never read.
 
 ### WR-09: `verifyPassword` silently mis-parses odd-length salt hex
 
+**Status:** FIXED (commit `4467517`) — validates even-length hex salt before parsing; malformed hashes rejected explicitly.
 **File:** `apps/api/src/lib/password.ts:73`
 **Issue:** `saltHex.match(/.{2}/g)` drops a trailing nibble if `saltHex` has odd length, and `parseInt` of a non-hex pair yields `NaN` → a salt byte of `NaN`. A corrupted/tampered stored hash therefore derives against a malformed salt instead of being cleanly rejected. It will return `false` (no auth bypass), but it fails ambiguously rather than explicitly.
 **Fix:** Validate the salt hex shape before parsing: `if (!/^[0-9a-f]+$/i.test(saltHex) || saltHex.length % 2 !== 0) return false;` and reject `NaN` bytes.
 
 ## Info
+
+_All Info findings (IN-01..IN-05) are DEFERRED — out of the fix scope for this pass (Critical + Warning only). Tracked for the backlog._
 
 ### IN-01: `login_attempts` lockout is per-email only — distributed/IP dimension absent
 
