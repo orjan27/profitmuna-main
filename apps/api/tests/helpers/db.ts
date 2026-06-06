@@ -115,6 +115,61 @@ CREATE TABLE profit_first_accounts (
   updated_at TEXT
 );
 CREATE UNIQUE INDEX pfa_user_name_unique ON profit_first_accounts (user_id, name);
+
+-- Phase 4: Wallet tables
+CREATE TABLE wallets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  profit_first_account_id INTEGER REFERENCES profit_first_accounts(id),
+  auto_deduct_all_expenses INTEGER NOT NULL DEFAULT 0,
+  color TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX wallets_user_idx ON wallets (user_id);
+CREATE UNIQUE INDEX wallets_user_pf_account_unique ON wallets (user_id, profit_first_account_id);
+
+CREATE TABLE wallet_income_category_mappings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  income_category_id INTEGER NOT NULL REFERENCES income_categories(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE UNIQUE INDEX wicm_income_category_unique ON wallet_income_category_mappings (income_category_id);
+CREATE INDEX wicm_user_idx ON wallet_income_category_mappings (user_id);
+CREATE INDEX wicm_wallet_idx ON wallet_income_category_mappings (wallet_id);
+
+CREATE TABLE wallet_expense_category_mappings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  expense_category_id INTEGER NOT NULL REFERENCES expense_categories(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE UNIQUE INDEX wecm_expense_category_unique ON wallet_expense_category_mappings (expense_category_id);
+CREATE INDEX wecm_user_idx ON wallet_expense_category_mappings (user_id);
+CREATE INDEX wecm_wallet_idx ON wallet_expense_category_mappings (wallet_id);
+
+CREATE TABLE wallet_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  type TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  description TEXT,
+  transaction_date TEXT NOT NULL,
+  deleted_at TEXT,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX wt_user_wallet_idx ON wallet_transactions (user_id, wallet_id);
+CREATE INDEX wt_wallet_date_idx ON wallet_transactions (wallet_id, transaction_date);
 `;
 
 function makeStatement(sqlite: SqliteDb, query: string, params: unknown[]) {
