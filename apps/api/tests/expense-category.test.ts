@@ -14,10 +14,10 @@ function today(): string {
 
 describe('expense category service — seeding', () => {
   it('seeds default categories on first list() for a user with no categories', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const cats = await svc.list(userA.id);
 
     expect(cats.length).toBeGreaterThan(0);
@@ -33,10 +33,10 @@ describe('expense category service — seeding', () => {
   });
 
   it('does not duplicate defaults on a second list() call', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const firstCall = await svc.list(userA.id);
     const secondCall = await svc.list(userA.id);
 
@@ -44,11 +44,11 @@ describe('expense category service — seeding', () => {
   });
 
   it('seeds independently per user', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
     const userB = seedUser(db, { email: USER_B_EMAIL, name: 'User B' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     await svc.list(userA.id);
     const catsB = await svc.list(userB.id);
 
@@ -61,10 +61,10 @@ describe('expense category service — seeding', () => {
 
 describe('expense category service — create', () => {
   it('creates a custom category (system = false) for the user', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     await svc.list(userA.id); // seed first
     const cat = await svc.create(userA.id, 'Subscriptions');
 
@@ -78,10 +78,10 @@ describe('expense category service — create', () => {
 
 describe('expense category service — cascade rename (D-13)', () => {
   it('renaming a custom category cascades categoryName to existing expense rows', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const cat = await svc.create(userA.id, 'Groceries');
 
     await db.insert(expenses).values({
@@ -112,10 +112,10 @@ describe('expense category service — cascade rename (D-13)', () => {
 
 describe('expense category service — block delete in-use (D-12)', () => {
   it('throws 400 category_in_use when deleting a category with expense records', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const cat = await svc.create(userA.id, 'Groceries');
 
     await db.insert(expenses).values({
@@ -133,10 +133,10 @@ describe('expense category service — block delete in-use (D-12)', () => {
   });
 
   it('allows deleting a category whose only expenses are soft-deleted (CR-04)', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const cat = await svc.create(userA.id, 'Groceries');
 
     await db.insert(expenses).values({
@@ -155,10 +155,10 @@ describe('expense category service — block delete in-use (D-12)', () => {
   });
 
   it('deletes an unused custom category successfully', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const cat = await svc.create(userA.id, 'UnusedCategory');
 
     await svc.delete(cat.id, userA.id);
@@ -172,10 +172,10 @@ describe('expense category service — block delete in-use (D-12)', () => {
 
 describe('expense category service — system protection (T-02-18)', () => {
   it('throws 400 cannot_edit_system_category when renaming a system default', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const cats = await svc.list(userA.id);
     const systemCat = cats.find((c) => c.system)!;
 
@@ -186,10 +186,10 @@ describe('expense category service — system protection (T-02-18)', () => {
   });
 
   it('throws 400 cannot_delete_system_category when deleting a system default', async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const cats = await svc.list(userA.id);
     const systemCat = cats.find((c) => c.system)!;
 
@@ -204,11 +204,11 @@ describe('expense category service — system protection (T-02-18)', () => {
 
 describe('expense category service — IDOR (T-02-16)', () => {
   it("returns 404 when accessing another user's category for update", async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
     const userB = seedUser(db, { email: USER_B_EMAIL, name: 'User B' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const catA = await svc.create(userA.id, 'Groceries');
 
     await expect(svc.update(catA.id, userB.id, 'Hijacked')).rejects.toMatchObject({
@@ -217,11 +217,11 @@ describe('expense category service — IDOR (T-02-16)', () => {
   });
 
   it("returns 404 when accessing another user's category for delete", async () => {
-    const { db } = createTestDb();
+    const { db, dbD1 } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
     const userB = seedUser(db, { email: USER_B_EMAIL, name: 'User B' })!;
 
-    const svc = createExpenseCategoryService(db);
+    const svc = createExpenseCategoryService(dbD1);
     const catA = await svc.create(userA.id, 'Groceries');
 
     await expect(svc.delete(catA.id, userB.id)).rejects.toMatchObject({

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzle as drizzleD1 } from 'drizzle-orm/d1';
 
 import { schema } from '@app/db';
 
@@ -204,7 +205,11 @@ export function createTestDb() {
   sqlite.exec(DDL);
   const d1 = createD1Shim(sqlite);
   const db = drizzle(sqlite, { schema });
-  return { d1, db, sqlite };
+  // dbD1 is the same drizzle API but backed by the D1 driver (over the shim),
+  // so it exposes D1-only primitives like db.batch() that services rely on in
+  // production. Use this when constructing a service that calls db.batch().
+  const dbD1 = drizzleD1(d1, { schema });
+  return { d1, db, dbD1, sqlite };
 }
 
 /**

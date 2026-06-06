@@ -123,6 +123,16 @@ describe('expense service (EXP-01..04 + IDOR)', () => {
     expect(updated.categoryName).toBe('Transport');
   });
 
+  it('EXP-03: update rejects editing a soft-deleted expense (CR-05)', async () => {
+    const created = await svc.create(userId, { categoryId, amount: 1000, expenseDate: makeDate() });
+    await svc.delete(created.id, userId);
+
+    await expect(svc.update(created.id, userId, { amount: 9999 })).rejects.toMatchObject({
+      status: 409,
+      message: 'expense_deleted',
+    });
+  });
+
   it('EXP-03: update throws not_found for cross-user IDOR', async () => {
     const created = await svc.create(userId, { categoryId, amount: 1000, expenseDate: makeDate() });
 

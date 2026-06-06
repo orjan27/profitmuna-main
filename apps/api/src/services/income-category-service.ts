@@ -80,19 +80,24 @@ export function createIncomeCategoryService(db: ReturnType<typeof createDb>) {
         throw new HTTPException(400, { message: 'cannot_edit_system_category' });
       }
 
-      // Cascade rename (RESEARCH Pattern 3) — atomic update on both tables
-      const [updated] = await Promise.all([
+      // Cascade rename (RESEARCH Pattern 3) — atomic via db.batch so the
+      // category row and denormalized income.categoryName never drift if one
+      // statement fails (D-13). Promise.all issues independent, non-atomic
+      // statements on D1, which is the bug this batch prevents.
+      await db.batch([
         db
           .update(incomeCategories)
           .set({ name })
-          .where(and(eq(incomeCategories.id, id), eq(incomeCategories.userId, userId)))
-          .returning()
-          .then((rows) => rows[0]),
+          .where(and(eq(incomeCategories.id, id), eq(incomeCategories.userId, userId))),
         db
           .update(incomes)
           .set({ categoryName: name })
           .where(and(eq(incomes.categoryId, id), eq(incomes.userId, userId))),
       ]);
+
+      const updated = await db.query.incomeCategories.findFirst({
+        where: and(eq(incomeCategories.id, id), eq(incomeCategories.userId, userId)),
+      });
 
       return updated!;
     },

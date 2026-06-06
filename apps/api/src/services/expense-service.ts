@@ -179,6 +179,12 @@ export function createExpenseService(db: Db) {
         throw new HTTPException(404, { message: 'not_found' });
       }
 
+      // A soft-deleted expense must be restored before it can be edited —
+      // editing it directly would bypass the soft-delete state machine (CR-05).
+      if (existing.deletedAt) {
+        throw new HTTPException(409, { message: 'expense_deleted' });
+      }
+
       let categoryName = existing.categoryName;
       if (input.categoryId !== undefined) {
         categoryName = await resolveCategoryName(db, input.categoryId, userId);

@@ -82,19 +82,24 @@ export function createExpenseCategoryService(db: ReturnType<typeof createDb>) {
         throw new HTTPException(400, { message: 'cannot_edit_system_category' });
       }
 
-      // Cascade rename (RESEARCH Pattern 3) — atomic update on both tables
-      const [updated] = await Promise.all([
+      // Cascade rename (RESEARCH Pattern 3) — atomic via db.batch so the
+      // category row and denormalized expense.categoryName never drift if one
+      // statement fails (D-13). Promise.all issues independent, non-atomic
+      // statements on D1, which is the bug this batch prevents.
+      await db.batch([
         db
           .update(expenseCategories)
           .set({ name })
-          .where(and(eq(expenseCategories.id, id), eq(expenseCategories.userId, userId)))
-          .returning()
-          .then((rows) => rows[0]),
+          .where(and(eq(expenseCategories.id, id), eq(expenseCategories.userId, userId))),
         db
           .update(expenses)
           .set({ categoryName: name })
           .where(and(eq(expenses.categoryId, id), eq(expenses.userId, userId))),
       ]);
+
+      const updated = await db.query.expenseCategories.findFirst({
+        where: and(eq(expenseCategories.id, id), eq(expenseCategories.userId, userId)),
+      });
 
       return updated!;
     },
@@ -132,9 +137,15 @@ export function createExpenseCategoryService(db: ReturnType<typeof createDb>) {
         throw new HTTPException(400, { message: 'category_in_use' });
       }
 
-      await db
-        .delete(expenseCategories)
-        .where(and(eq(expenseCategories.id, id), eq(expenseCategories.userId, userId)));
+      // Soft-deleted expenses still hold a FK to the category, so they must be
+      // purged before the category can be hard-deleted. They are already gone
+      // from the user's perspective. Batch keeps purge + delete atomic (CR-05).
+      await db.batch([
+        db.delete(expenses).where(and(eq(expenses.categoryId, id), eq(expenses.userId, userId))),
+        db
+          .delete(expenseCategories)
+          .where(and(eq(expenseCategories.id, id), eq(expenseCategories.userId, userId))),
+      ]);
     },
   };
 }
