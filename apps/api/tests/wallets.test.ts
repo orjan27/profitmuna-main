@@ -699,29 +699,339 @@ describe('wallets service', () => {
   // ─── WAL-04: manual transaction guard ────────────────────────────────────
 
   describe('WAL-04: manual transaction guard (assertCanInsertTransaction)', () => {
-    it.todo('blocks manual DEPOSIT on a PROFIT_FIRST wallet (manual_deposit_blocked_pf_wallet)');
-    it.todo(
-      'blocks manual DEPOSIT on a wallet with mapped income categories (manual_deposit_blocked_income_mapped)'
-    );
-    it.todo(
-      'blocks manual WITHDRAWAL on a wallet with mapped expense categories (manual_withdrawal_blocked_expense_mapped)'
-    );
-    it.todo(
-      'blocks manual WITHDRAWAL on a wallet with autoDeductAllExpenses=true (manual_withdrawal_blocked_expense_mapped)'
-    );
-    it.todo('allows manual WITHDRAWAL on a PROFIT_FIRST wallet with no expense mappings');
-    it.todo('creates and updates manual transactions on eligible wallets');
+    it('blocks manual DEPOSIT on a PROFIT_FIRST wallet (manual_deposit_blocked_pf_wallet)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal04a@test.com', name: 'User A', emailVerified: true });
+      const pfAccount = seedPfAccount(db, user.id);
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'PF Wallet',
+        sourceType: 'PROFIT_FIRST',
+        profitFirstAccountId: pfAccount.id,
+        color: '#10b981',
+      });
+
+      await expect(
+        svc.createTransaction(wallet.id, user.id, {
+          type: 'DEPOSIT',
+          amount: 1000,
+          transactionDate: '2026-01-01',
+        })
+      ).rejects.toMatchObject({ status: 400, message: 'manual_deposit_blocked_pf_wallet' });
+    });
+
+    it('blocks manual DEPOSIT on a wallet with mapped income categories (manual_deposit_blocked_income_mapped)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal04b@test.com', name: 'User B', emailVerified: true });
+      const incCat = seedIncomeCategory(db, user.id, 'Consulting');
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Mapped Wallet',
+        sourceType: 'BLANK',
+        color: '#8b5cf6',
+        incomeCategoryIds: [incCat.id],
+      });
+
+      await expect(
+        svc.createTransaction(wallet.id, user.id, {
+          type: 'DEPOSIT',
+          amount: 500,
+          transactionDate: '2026-01-01',
+        })
+      ).rejects.toMatchObject({ status: 400, message: 'manual_deposit_blocked_income_mapped' });
+    });
+
+    it('blocks manual WITHDRAWAL on a wallet with mapped expense categories (manual_withdrawal_blocked_expense_mapped)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal04c@test.com', name: 'User C', emailVerified: true });
+      const expCat = seedExpenseCategory(db, user.id, 'Rent');
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Expense Wallet',
+        sourceType: 'BLANK',
+        color: '#f59e0b',
+        expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
+      });
+
+      await expect(
+        svc.createTransaction(wallet.id, user.id, {
+          type: 'WITHDRAWAL',
+          amount: 300,
+          transactionDate: '2026-01-01',
+        })
+      ).rejects.toMatchObject({ status: 400, message: 'manual_withdrawal_blocked_expense_mapped' });
+    });
+
+    it('blocks manual WITHDRAWAL on a wallet with autoDeductAllExpenses=true (manual_withdrawal_blocked_expense_mapped)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal04d@test.com', name: 'User D', emailVerified: true });
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Auto All Wallet',
+        sourceType: 'BLANK',
+        color: '#f43f5e',
+        expenseMode: { kind: 'ALL' },
+      });
+
+      await expect(
+        svc.createTransaction(wallet.id, user.id, {
+          type: 'WITHDRAWAL',
+          amount: 200,
+          transactionDate: '2026-01-01',
+        })
+      ).rejects.toMatchObject({ status: 400, message: 'manual_withdrawal_blocked_expense_mapped' });
+    });
+
+    it('allows manual WITHDRAWAL on a PROFIT_FIRST wallet with no expense mappings', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal04e@test.com', name: 'User E', emailVerified: true });
+      const pfAccount = seedPfAccount(db, user.id);
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'PF Withdrawal Wallet',
+        sourceType: 'PROFIT_FIRST',
+        profitFirstAccountId: pfAccount.id,
+        color: '#10b981',
+      });
+
+      const tx = await svc.createTransaction(wallet.id, user.id, {
+        type: 'WITHDRAWAL',
+        amount: 500,
+        transactionDate: '2026-01-01',
+        description: 'Profit distribution',
+      });
+
+      expect(tx.type).toBe('WITHDRAWAL');
+      expect(tx.amount).toBe(500);
+      expect(tx.walletId).toBe(wallet.id);
+    });
+
+    it('creates and updates manual transactions on eligible wallets', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal04f@test.com', name: 'User F', emailVerified: true });
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Blank Wallet',
+        sourceType: 'BLANK',
+        color: '#3b82f6',
+      });
+
+      const tx = await svc.createTransaction(wallet.id, user.id, {
+        type: 'DEPOSIT',
+        amount: 1000,
+        transactionDate: '2026-01-01',
+        description: 'Initial deposit',
+      });
+
+      expect(tx.amount).toBe(1000);
+      expect(tx.type).toBe('DEPOSIT');
+      expect(tx.description).toBe('Initial deposit');
+      expect(tx.deletedAt).toBeNull();
+
+      // Update
+      const updated = await svc.updateTransaction(wallet.id, tx.id, user.id, {
+        amount: 2000,
+        description: 'Updated deposit',
+        transactionDate: '2026-01-02',
+      });
+
+      expect(updated.amount).toBe(2000);
+      expect(updated.description).toBe('Updated deposit');
+      expect(updated.transactionDate).toBe('2026-01-02');
+    });
   });
 
   // ─── WAL-05: transaction soft-delete and restore ─────────────────────────
 
   describe('WAL-05: transaction soft-delete and restore', () => {
-    it.todo('soft-delete sets deletedAt to ISO timestamp (null before delete)');
-    it.todo('restore clears deletedAt back to null');
-    it.todo('soft-deleted transactions appear in paginated history (D-09)');
-    it.todo('balance computation excludes soft-deleted transactions');
-    it.todo(
-      'paginated history merges 3 sources (manual, income_auto, expense_auto) sorted DESC by transactionDate then id'
-    );
+    it('soft-delete sets deletedAt to ISO timestamp (null before delete)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal05a@test.com', name: 'User A', emailVerified: true });
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+      });
+
+      const tx = await svc.createTransaction(wallet.id, user.id, {
+        type: 'DEPOSIT',
+        amount: 500,
+        transactionDate: '2026-01-01',
+      });
+
+      expect(tx.deletedAt).toBeNull();
+
+      const removed = await svc.removeTransaction(wallet.id, tx.id, user.id);
+      expect(removed.deletedAt).not.toBeNull();
+      expect(typeof removed.deletedAt).toBe('string');
+    });
+
+    it('restore clears deletedAt back to null', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal05b@test.com', name: 'User B', emailVerified: true });
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Wallet',
+        sourceType: 'BLANK',
+        color: '#8b5cf6',
+      });
+
+      const tx = await svc.createTransaction(wallet.id, user.id, {
+        type: 'DEPOSIT',
+        amount: 500,
+        transactionDate: '2026-01-01',
+      });
+
+      await svc.removeTransaction(wallet.id, tx.id, user.id);
+      const restored = await svc.restoreTransaction(wallet.id, tx.id, user.id);
+      expect(restored.deletedAt).toBeNull();
+    });
+
+    it('soft-deleted transactions appear in paginated history (D-09)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal05c@test.com', name: 'User C', emailVerified: true });
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Wallet',
+        sourceType: 'BLANK',
+        color: '#f59e0b',
+      });
+
+      const tx = await svc.createTransaction(wallet.id, user.id, {
+        type: 'DEPOSIT',
+        amount: 500,
+        transactionDate: '2026-01-01',
+      });
+
+      await svc.removeTransaction(wallet.id, tx.id, user.id);
+
+      // D-09: deleted transactions MUST appear in history
+      const detail = await svc.getById(wallet.id, user.id, { page: 0, size: 20 });
+      const found = detail.transactions.find((t) => t.id === tx.id);
+      expect(found).toBeDefined();
+      expect(found!.deletedAt).not.toBeNull();
+    });
+
+    it('balance computation excludes soft-deleted transactions', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal05d@test.com', name: 'User D', emailVerified: true });
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Wallet',
+        sourceType: 'BLANK',
+        color: '#f43f5e',
+      });
+
+      // Deposit 1000 then soft-delete it
+      const tx = await svc.createTransaction(wallet.id, user.id, {
+        type: 'DEPOSIT',
+        amount: 1000,
+        transactionDate: '2026-01-01',
+      });
+
+      // Before delete: balance should include the deposit
+      const beforeDelete = await svc.getById(wallet.id, user.id, { page: 0, size: 20 });
+      expect(beforeDelete.breakdown.depositsCents).toBe(1000);
+
+      await svc.removeTransaction(wallet.id, tx.id, user.id);
+
+      // After delete: balance should exclude it (Pitfall 4)
+      const afterDelete = await svc.getById(wallet.id, user.id, { page: 0, size: 20 });
+      expect(afterDelete.breakdown.depositsCents).toBe(0);
+    });
+
+    it('paginated history merges 3 sources (manual, income_auto, expense_auto) sorted DESC by transactionDate then id', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, { email: 'wal05e@test.com', name: 'User E', emailVerified: true });
+      const incCat = seedIncomeCategory(db, user.id, 'Salary');
+      const expCat = seedExpenseCategory(db, user.id, 'Rent');
+
+      // Seed income and expense records
+      const income = seedIncome(db, user.id, incCat.id, 5000, 'RECEIVED');
+      const expense = seedExpense(db, user.id, expCat.id, 2000);
+
+      const svc = createWalletService(dbD1);
+      // BLANK wallet with income + expense mappings to auto-include them in history
+      const wallet = await svc.create(user.id, {
+        name: 'Full Wallet',
+        sourceType: 'BLANK',
+        color: '#14b8a6',
+        incomeCategoryIds: [incCat.id],
+        expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
+      });
+
+      // Seed a manual transaction directly (income mapping blocks createTransaction DEPOSIT — correct behaviour)
+      db.insert(schema.walletTransactions)
+        .values({
+          walletId: wallet.id,
+          userId: user.id,
+          type: 'DEPOSIT',
+          amount: 750,
+          transactionDate: '2026-01-15',
+        })
+        .run();
+
+      const detail = await svc.getById(wallet.id, user.id, { page: 0, size: 20 });
+
+      // Should have entries from all 3 sources
+      const sources = detail.transactions.map((t) => t.source);
+      expect(sources).toContain('manual');
+      expect(sources).toContain('income');
+      expect(sources).toContain('expense');
+
+      // Verify pagination shape
+      expect(detail.pagination).toHaveProperty('page');
+      expect(detail.pagination).toHaveProperty('size');
+      expect(detail.pagination).toHaveProperty('total');
+      expect(detail.pagination).toHaveProperty('totalPages');
+
+      // Verify income and expense records used in test
+      expect(income.amount).toBe(5000);
+      expect(expense.amount).toBe(2000);
+
+      // Verify the transactions are sorted desc by transactionDate
+      for (let i = 1; i < detail.transactions.length; i++) {
+        const prev = detail.transactions[i - 1];
+        const curr = detail.transactions[i];
+        expect(prev.transactionDate >= curr.transactionDate).toBe(true);
+      }
+    });
+
+    it('getById returns 404 for another user wallet (ownership-scoped)', async () => {
+      const { dbD1, db } = createTestDb();
+      const user1 = seedUser(db, {
+        email: 'wal05f1@test.com',
+        name: 'User 1',
+        emailVerified: true,
+      });
+      const user2 = seedUser(db, {
+        email: 'wal05f2@test.com',
+        name: 'User 2',
+        emailVerified: true,
+      });
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user1.id, {
+        name: 'Private Wallet',
+        sourceType: 'BLANK',
+        color: '#10b981',
+      });
+
+      await expect(svc.getById(wallet.id, user2.id, { page: 0, size: 20 })).rejects.toMatchObject({
+        status: 404,
+        message: 'not_found',
+      });
+    });
   });
 });
