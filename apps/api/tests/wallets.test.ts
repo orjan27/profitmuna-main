@@ -1033,5 +1033,139 @@ describe('wallets service', () => {
         message: 'not_found',
       });
     });
+
+    it('two-page income history: page 0 returns 20 newest rows in DESC order, page 1 returns remaining 10 with no overlap', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, {
+        email: 'wal05g@test.com',
+        name: 'User G',
+        emailVerified: true,
+      });
+      const incCat = seedIncomeCategory(db, user.id, 'Freelance');
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Volume Wallet',
+        sourceType: 'BLANK',
+        color: '#6366f1',
+        incomeCategoryIds: [incCat.id],
+      });
+
+      // Insert 30 RECEIVED incomes with distinct ascending dates so ordering is observable
+      const insertedIds: number[] = [];
+      for (let i = 1; i <= 30; i++) {
+        const month = String(i).padStart(2, '0');
+        // Use 2026-01-01 through 2026-01-30 (i ≤ 30 — pad day)
+        const day = String(i).padStart(2, '0');
+        const [row] = db
+          .insert(schema.incomes)
+          .values({
+            userId: user.id,
+            categoryId: incCat.id,
+            categoryName: 'Freelance',
+            amount: i * 100,
+            incomeDate: `2026-01-${day}`,
+            moneyStatus: 'RECEIVED',
+            profitFirstAllocated: true,
+          })
+          .returning()
+          .all();
+        insertedIds.push(row.id);
+      }
+
+      const page0 = await svc.getById(wallet.id, user.id, { page: 0, size: 20 });
+      const page1 = await svc.getById(wallet.id, user.id, { page: 1, size: 20 });
+
+      // pagination.total must equal the true count (30), not the truncated merge
+      expect(page0.pagination.total).toBe(30);
+      expect(page0.pagination.totalPages).toBe(2);
+
+      // page 0: exactly 20 rows
+      expect(page0.transactions).toHaveLength(20);
+      // all rows are income source
+      expect(page0.transactions.every((t) => t.source === 'income')).toBe(true);
+      // first row must be the newest date (2026-01-30)
+      expect(page0.transactions[0].transactionDate).toBe('2026-01-30');
+      // rows are in strict DESC order
+      for (let i = 1; i < page0.transactions.length; i++) {
+        expect(
+          page0.transactions[i - 1].transactionDate >= page0.transactions[i].transactionDate
+        ).toBe(true);
+      }
+
+      // page 1: exactly 10 rows
+      expect(page1.transactions).toHaveLength(10);
+      // last row on page 1 must be the oldest date (2026-01-01)
+      expect(page1.transactions[page1.transactions.length - 1].transactionDate).toBe('2026-01-01');
+
+      // no overlap between page 0 and page 1 ids
+      const page0Ids = new Set(page0.transactions.map((t) => t.id));
+      const page1Ids = page1.transactions.map((t) => t.id);
+      for (const id of page1Ids) {
+        expect(page0Ids.has(id)).toBe(false);
+      }
+
+      // union of page0 + page1 covers all 30 distinct rows
+      const allIds = new Set([...page0.transactions.map((t) => t.id), ...page1Ids]);
+      expect(allIds.size).toBe(30);
+    });
+
+    it('autoDeductAllExpenses: single inArray query produces no duplicate rows and total equals true count', async () => {
+      const { dbD1, db } = createTestDb();
+      const user = seedUser(db, {
+        email: 'wal05h@test.com',
+        name: 'User H',
+        emailVerified: true,
+      });
+      const cat1 = seedExpenseCategory(db, user.id, 'Office');
+      const cat2 = seedExpenseCategory(db, user.id, 'Travel');
+
+      const svc = createWalletService(dbD1);
+      const wallet = await svc.create(user.id, {
+        name: 'Auto Expense Wallet',
+        sourceType: 'BLANK',
+        color: '#f97316',
+        expenseMode: { kind: 'ALL' },
+      });
+
+      // 5 expenses in cat1, 5 in cat2 = 10 total
+      for (let i = 1; i <= 5; i++) {
+        const day = String(i).padStart(2, '0');
+        db.insert(schema.expenses)
+          .values({
+            userId: user.id,
+            categoryId: cat1.id,
+            categoryName: 'Office',
+            amount: i * 50,
+            expenseDate: `2026-02-${day}`,
+            deletedAt: null,
+          })
+          .run();
+        db.insert(schema.expenses)
+          .values({
+            userId: user.id,
+            categoryId: cat2.id,
+            categoryName: 'Travel',
+            amount: i * 75,
+            expenseDate: `2026-02-${String(i + 10).padStart(2, '0')}`,
+            deletedAt: null,
+          })
+          .run();
+      }
+
+      const detail = await svc.getById(wallet.id, user.id, { page: 0, size: 20 });
+
+      // All 10 expenses are returned exactly once (no duplicates from per-category loop)
+      const expenseRows = detail.transactions.filter((t) => t.source === 'expense');
+      expect(expenseRows).toHaveLength(10);
+
+      // IDs are unique — no duplicate rows
+      const expenseIds = expenseRows.map((t) => t.id);
+      const uniqueIds = new Set(expenseIds);
+      expect(uniqueIds.size).toBe(10);
+
+      // total reflects the true count
+      expect(detail.pagination.total).toBe(10);
+    });
   });
 });
