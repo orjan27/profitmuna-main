@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { Income, IncomeCategory } from '@/types/income';
+import { createIncomeCategoryAction } from './category-actions';
 
 interface IncomeFormProps {
   categories: IncomeCategory[];
@@ -55,6 +57,39 @@ export function IncomeForm({
   // Pitfall 5: profitFirstAllocated defaults to true
   const [pfAllocated, setPfAllocated] = useState(initialValues?.profitFirstAllocated ?? true);
 
+  // Local categories copy so quick-add appears immediately without full page reload
+  const [localCategories, setLocalCategories] = useState<IncomeCategory[]>(categories);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
+    initialValues?.categoryId ? String(initialValues.categoryId) : ''
+  );
+  const [quickAddName, setQuickAddName] = useState('');
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isQuickAddPending, startQuickAddTransition] = useTransition();
+
+  /** Quick-add: create a new category and select it immediately. */
+  function handleQuickAdd() {
+    const trimmed = quickAddName.trim();
+    if (!trimmed) return;
+    startQuickAddTransition(async () => {
+      const result = await createIncomeCategoryAction(trimmed);
+      if ('error' in result) {
+        toast.error('Failed to create category. Please try again.');
+      } else {
+        const newCat: IncomeCategory = {
+          id: result.data.id,
+          name: result.data.name,
+          system: false,
+          userId: 0, // userId not needed by the select — placeholder
+        };
+        setLocalCategories((prev) => [...prev, newCat]);
+        setSelectedCategoryId(String(result.data.id));
+        toast.success(`"${trimmed}" added and selected.`);
+        setQuickAddName('');
+        setIsQuickAddOpen(false);
+      }
+    });
+  }
+
   // Amount displayed in pesos (cents / 100) when editing
   const initialAmountPesos =
     initialValues?.amount !== undefined ? (initialValues.amount / 100).toFixed(2) : '';
@@ -84,22 +119,64 @@ export function IncomeForm({
       {/* Category */}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="income-categoryId">Category</Label>
-        <Select
-          name="categoryId"
-          defaultValue={initialValues?.categoryId ? String(initialValues.categoryId) : undefined}
-          required
-        >
-          <SelectTrigger id="income-categoryId">
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((cat) => (
-              <SelectItem key={cat.id} value={String(cat.id)}>
-                {cat.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select
+            name="categoryId"
+            value={selectedCategoryId}
+            onValueChange={setSelectedCategoryId}
+            required
+          >
+            <SelectTrigger id="income-categoryId" className="flex-1">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {localCategories.map((cat) => (
+                <SelectItem key={cat.id} value={String(cat.id)}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setIsQuickAddOpen((v) => !v)}
+            aria-label="Add new category"
+            title="Add new category"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Quick-add new category inline (D-11) */}
+        {isQuickAddOpen ? (
+          <div className="flex items-center gap-2 pt-1">
+            <Input
+              value={quickAddName}
+              onChange={(e) => setQuickAddName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleQuickAdd();
+                }
+                if (e.key === 'Escape') setIsQuickAddOpen(false);
+              }}
+              placeholder="New category name"
+              className="flex-1 h-8 text-sm"
+              aria-label="New income category name"
+              autoFocus
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleQuickAdd}
+              disabled={isQuickAddPending || !quickAddName.trim()}
+            >
+              Add
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {/* Amount */}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useTransition, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PAYMENT_METHODS } from '@/lib/constants';
+import { createExpenseCategoryAction } from './category-actions';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,38 @@ function centsToDecimal(cents: number): string {
 export function ExpenseForm({ categories, action, initialValues, onSuccess }: ExpenseFormProps) {
   const [isPending, startTransition] = useTransition();
 
+  // Local categories copy so quick-add appears immediately without full page reload
+  const [localCategories, setLocalCategories] = useState<ExpenseCategory[]>(categories);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
+    initialValues?.categoryId?.toString() ?? ''
+  );
+  const [quickAddName, setQuickAddName] = useState('');
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isQuickAddPending, startQuickAddTransition] = useTransition();
+
+  /** Quick-add: create a new expense category and select it immediately (D-11). */
+  function handleQuickAdd() {
+    const trimmed = quickAddName.trim();
+    if (!trimmed) return;
+    startQuickAddTransition(async () => {
+      const result = await createExpenseCategoryAction(trimmed);
+      if ('error' in result) {
+        toast.error('Failed to create category. Please try again.');
+      } else {
+        const newCat: ExpenseCategory = {
+          id: result.data.id,
+          name: result.data.name,
+          system: false,
+        };
+        setLocalCategories((prev) => [...prev, newCat]);
+        setSelectedCategoryId(String(result.data.id));
+        toast.success(`"${trimmed}" added and selected.`);
+        setQuickAddName('');
+        setIsQuickAddOpen(false);
+      }
+    });
+  }
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
@@ -82,7 +116,6 @@ export function ExpenseForm({ categories, action, initialValues, onSuccess }: Ex
 
   const defaultDate = initialValues?.expenseDate ?? todayISO();
   const defaultAmount = initialValues?.amount != null ? centsToDecimal(initialValues.amount) : '';
-  const defaultCategory = initialValues?.categoryId?.toString() ?? '';
   const defaultPayment = initialValues?.paymentMethod ?? '';
   const defaultDescription = initialValues?.description ?? '';
 
@@ -91,18 +124,64 @@ export function ExpenseForm({ categories, action, initialValues, onSuccess }: Ex
       {/* Category */}
       <div className="flex flex-col gap-2">
         <Label htmlFor="categoryId">Category</Label>
-        <Select name="categoryId" defaultValue={defaultCategory} required>
-          <SelectTrigger id="categoryId">
-            <SelectValue placeholder="Select a category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((cat) => (
-              <SelectItem key={cat.id} value={String(cat.id)}>
-                {cat.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select
+            name="categoryId"
+            value={selectedCategoryId}
+            onValueChange={setSelectedCategoryId}
+            required
+          >
+            <SelectTrigger id="categoryId" className="flex-1">
+              <SelectValue placeholder="Select a category" />
+            </SelectTrigger>
+            <SelectContent>
+              {localCategories.map((cat) => (
+                <SelectItem key={cat.id} value={String(cat.id)}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setIsQuickAddOpen((v) => !v)}
+            aria-label="Add new category"
+            title="Add new category"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Quick-add new category inline (D-11) */}
+        {isQuickAddOpen ? (
+          <div className="flex items-center gap-2">
+            <Input
+              value={quickAddName}
+              onChange={(e) => setQuickAddName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleQuickAdd();
+                }
+                if (e.key === 'Escape') setIsQuickAddOpen(false);
+              }}
+              placeholder="New category name"
+              className="flex-1 h-8 text-sm"
+              aria-label="New expense category name"
+              autoFocus
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleQuickAdd}
+              disabled={isQuickAddPending || !quickAddName.trim()}
+            >
+              Add
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {/* Amount (decimal pesos — toCents conversion happens in the server action) */}
