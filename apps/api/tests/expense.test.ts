@@ -173,6 +173,15 @@ describe('expense service (EXP-01..04 + IDOR)', () => {
     expect(found).toBeDefined();
   });
 
+  it('EXP-04: restore rejects an already-active expense (WR-06)', async () => {
+    const expense = await svc.create(userId, { categoryId, amount: 5000, expenseDate: makeDate() });
+
+    await expect(svc.restore(expense.id, userId)).rejects.toMatchObject({
+      status: 409,
+      message: 'not_deleted',
+    });
+  });
+
   it('EXP-04: soft-deleted expense is excluded from totals', async () => {
     await svc.create(userId, { categoryId, amount: 5000, expenseDate: makeDate() });
     const toDelete = await svc.create(userId, {

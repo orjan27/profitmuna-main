@@ -237,6 +237,12 @@ export function createExpenseService(db: Db) {
         throw new HTTPException(404, { message: 'not_found' });
       }
 
+      // Restoring an already-active expense is a no-op write that would falsely
+      // report success and bump updatedAt — reject it (WR-06).
+      if (!existing.deletedAt) {
+        throw new HTTPException(409, { message: 'not_deleted' });
+      }
+
       const [updated] = await db
         .update(expenses)
         .set({ deletedAt: null })
