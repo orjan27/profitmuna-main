@@ -57,7 +57,12 @@ findings:
   warning: 9
   info: 6
   total: 20
-status: issues_found
+resolved:
+  critical: 5
+  warning: 9
+open:
+  info: 6
+status: fixed
 ---
 
 # Phase 2: Code Review Report
@@ -65,7 +70,7 @@ status: issues_found
 **Reviewed:** 2026-06-06
 **Depth:** standard
 **Files Reviewed:** 44
-**Status:** issues_found
+**Status:** fixed (all Critical + Warning resolved; Info left open)
 
 ## Summary
 
@@ -121,6 +126,8 @@ const categoriesData = await apiFetch<{ data: ExpenseCategory[] }>('/api/expense
 <ExpenseForm categories={categoriesData.data} action={createExpenseAction} />
 ```
 
+**Resolution:** fixed in 0cde93f — both expense pages now consume `{ data }`.
+
 ### CR-02: Income `amount` schema allows fractional cents — breaks the integer-cents invariant
 
 **File:** `apps/api/src/schemas/income.ts:6`
@@ -135,6 +142,8 @@ with implementation-defined coercion, corrupting money values. This is a data-in
 ```ts
 amount: z.number().int().positive(),
 ```
+
+**Resolution:** fixed in ca4f7a4 — income amount now requires integer cents.
 
 ### CR-03: `<SelectItem value="">` throws a runtime error in the expense form
 
@@ -152,6 +161,9 @@ content. The income status filter has the same pattern at
 ```
 
 Apply the same fix to the income status filter (map `"all"` → cleared filter).
+
+**Resolution:** fixed in f9afa16 — expense payment method uses `'none'` sentinel
+(mapped to null in both actions); income status filter uses `'all'` sentinel.
 
 ### CR-04: Expense category in-use check counts soft-deleted expenses, blocking deletion of effectively-empty categories
 
@@ -175,6 +187,10 @@ const [usageRow] = await db
 
 Decide and document the intended rule (block on active rows only, or on all rows including deleted);
 either way it must be consistent with the cascade-rename below (CR-05) and the UI behavior.
+
+**Resolution:** fixed in cc58f90 — in-use check now filters `isNull(deletedAt)`, blocking
+only on active rows. Soft-deleted rows are purged on category delete (see CR-05) to satisfy
+the FK constraint, keeping behavior consistent with soft-delete semantics.
 
 ### CR-05: Cascade rename and update operate on soft-deleted rows inconsistently, and the rename is not atomic
 
@@ -214,6 +230,11 @@ await db.batch([
 if (existing.deletedAt) throw new HTTPException(409, { message: 'expense_deleted' });
 ```
 
+**Resolution:** fixed in 1db071a — cascade rename now uses `db.batch` (D1 atomic) on both
+category services; `expense.update()` rejects edits on soft-deleted rows with 409
+`expense_deleted`; category delete purges soft-deleted expenses in the same batch. Test
+helper exposes a D1-driver drizzle (`dbD1`) so `db.batch` works under better-sqlite3.
+
 ## Warnings
 
 ### WR-01: Income router does not validate the `:id` path param
@@ -226,6 +247,9 @@ returning 404 instead of the documented 422 validation error, and produce incons
 the rest of the API. `/:id/receive` has the same gap.
 **Fix:** Add `zValidator('param', idParamSchema, hook)` to each `:id` income route and read
 `c.req.valid('param').id`, mirroring `routes/expenses.ts`.
+
+**Resolution:** fixed in 67e915a — all income `:id` routes now validate via `idParamSchema`
+and read `c.req.valid('param').id`, returning 422 on malformed ids.
 
 ### WR-02: Empty/zero amount silently sent as `toCents(0)` from the web actions
 
@@ -240,6 +264,10 @@ On `NaN`, `JSON.stringify({ amount: NaN })` emits `"amount":null`, which fails A
 generic error rather than a useful field message.
 **Fix:** Validate in the action before calling the API: if `!Number.isFinite(rawAmount) || rawAmount <= 0`,
 return `{ error: 'invalid_amount' }` (or parse with a Zod schema in the action).
+
+**Resolution:** fixed in 69bb2b4 — all four create/update actions guard
+`!Number.isFinite(rawAmount) || rawAmount <= 0` before calling the API; income form maps
+`invalid_amount` to a specific toast.
 
 ### WR-03: `formatDate(new Date(iso))` mis-parses `YYYY-MM-DD` as UTC, causing off-by-one day display
 
@@ -258,6 +286,9 @@ export function formatDate(iso: string): string {
 }
 ```
 
+**Resolution:** fixed in 350e166 — `formatDate` parses `YYYY-MM-DD` with `parse(...)` in
+local time, falling back to `parseISO` for datetimes.
+
 ### WR-04: Creating a duplicate or system-named category surfaces a generic 500, not a clean conflict
 
 **File:** `apps/api/src/services/income-category-service.ts:58-64`,
@@ -271,6 +302,10 @@ indication it is a duplicate.
 **Fix:** Catch the conflict (or pre-check) and throw `HTTPException(409, { message: 'category_exists' })`,
 then surface a specific toast in the dialogs.
 
+**Resolution:** fixed in 14a3dcd — both category services pre-check the (userId, name) unique
+index and throw 409 `category_exists`; manage dialogs and quick-add handlers surface a
+specific toast.
+
 ### WR-05: `updateExpenseAction` always overwrites description/paymentMethod, cannot represent "leave unchanged"
 
 **File:** `apps/web/src/app/expenses/_components/expense-actions.ts:53-68`
@@ -282,6 +317,9 @@ whereas clearing payment method works. Behavior is inconsistent and surprising.
 **Fix:** Decide on PUT-as-full-replace semantics and send `description: description ?? null`
 consistently with `paymentMethod`, or document that blanks are ignored.
 
+**Resolution:** fixed in 0fe00c5 — `updateExpenseAction` now sends `description: ... || null`
+(full-replace), matching `paymentMethod`.
+
 ### WR-06: `restore()` does not guard against restoring an already-active expense
 
 **File:** `apps/api/src/services/expense-service.ts:225-241`
@@ -290,6 +328,9 @@ restore on an active expense is a no-op write that returns 200 success, and bump
 state-machine looseness, but it lets the UI/API report "Expense restored" for a row that was never
 deleted.
 **Fix:** `if (!existing.deletedAt) throw new HTTPException(409, { message: 'not_deleted' });`
+
+**Resolution:** fixed in 2bf6f0f — `restore()` rejects an already-active expense with 409
+`not_deleted`.
 
 ### WR-07: Income `update` re-validates category on every call but duplicates a redundant branch
 
@@ -301,6 +342,9 @@ smell, it doubles the maintenance surface and obscures intent. (The expense serv
 single `if (input.categoryId !== undefined)` check at `expense-service.ts:183`.)
 **Fix:** Collapse to a single `if (input.categoryId !== undefined) { categoryName = await resolve... }`.
 
+**Resolution:** fixed in 8da382f — collapsed to a single `if (input.categoryId !== undefined)`
+branch in the income service update.
+
 ### WR-08: `IncomeForm` quick-add appends a category but the income status filter / list does not validate against stale local state
 
 **File:** `apps/web/src/app/income/_components/income-form.tsx:78-90`
@@ -311,6 +355,9 @@ id is correct so submit works, but the fabricated `userId: 0` is a latent foot-g
 reads `userId`. Low risk; flag for hygiene.
 **Fix:** Use the real category returned by the action (it already has the right id/name); drop the
 `userId: 0` placeholder or carry the real userId.
+
+**Resolution:** fixed in f31872d — `createIncomeCategoryAction` returns the full `IncomeCategory`
+echoed by the API; the form inserts it directly, dropping the `userId: 0` placeholder.
 
 ### WR-09: List `total`/pagination does two full-table scans and `last` math can mislead on exact-boundary pages
 
@@ -325,7 +372,13 @@ bugs when the income vs expense overviews share load-more logic assumptions.
 **Fix:** Standardize both services on one pagination strategy (prefer the `limit+1` look-ahead used
 by expenses; it avoids the second COUNT query and has unambiguous `last`).
 
+**Resolution:** fixed in f0ccfe6 — income list now uses the `limit+1` look-ahead (no second
+COUNT), matching the expense service.
+
 ## Info
+
+> Info findings (IN-01..IN-06) are intentionally left open — out of the
+> Critical+Warning fix scope for this pass.
 
 ### IN-01: `console.error` logs the full error object on unhandled errors
 
