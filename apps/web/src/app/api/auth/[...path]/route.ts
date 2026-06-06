@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { extractTokenFromSetCookie, isTokenNearExpiry } from '@/lib/auth-tokens';
+
 // BFF catch-all proxy (D-01): the browser only ever calls this same-origin route;
 // we forward server-to-server to the Workers API and relay Set-Cookie headers.
 // Transparent-refresh logic (slice 01-02): if the access token is near-expiry,
@@ -20,41 +22,6 @@ const UNAUTHED_PATHS = new Set([
   'google',
   'callback',
 ]);
-
-/**
- * Decodes the JWT exp claim without verifying the signature.
- * Verification is the API's responsibility — this is purely for near-expiry detection.
- * Returns true if the token is expiring within 60 seconds or the claim is absent/unreadable.
- */
-function isTokenNearExpiry(jwt: string): boolean {
-  try {
-    const parts = jwt.split('.');
-    if (parts.length !== 3) return true;
-    // base64url → base64 → parse
-    const payload = JSON.parse(
-      Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
-    ) as { exp?: number };
-    if (typeof payload.exp !== 'number') return true;
-    // Near-expiry window: 60 seconds
-    return payload.exp - Math.floor(Date.now() / 1000) < 60;
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Extracts a cookie value from a Set-Cookie array.
- */
-function extractTokenFromSetCookie(setCookies: string[], name: string): string | undefined {
-  for (const header of setCookies) {
-    const [nameValue] = header.split(';');
-    const [cookieName, ...valueParts] = nameValue.split('=');
-    if (cookieName.trim() === name) {
-      return valueParts.join('=').trim();
-    }
-  }
-  return undefined;
-}
 
 async function proxy(request: NextRequest, path: string[]): Promise<NextResponse> {
   // Server-only env — intentionally NOT NEXT_PUBLIC_
