@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { setCookie, deleteCookie, getCookie } from 'hono/cookie';
 
 import { createEmailService } from '@/lib/email';
 import {
@@ -12,8 +13,11 @@ import {
   register,
   verifyEmail,
   resendVerification,
-  assertLoginAllowed,
+  login,
+  refreshTokens,
+  logout,
 } from '@/services/auth-service';
+import { requireAuth } from '@/middleware/auth';
 import type { Bindings, Variables } from '@/types';
 
 const authRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -82,14 +86,58 @@ authRouter.post(
   }),
   async (c) => {
     const { email, password } = c.req.valid('json');
-    // This slice only enforces the verification gate (D-07) — 401/403 propagate.
-    // Session issuance (cookies, refresh rotation) lands in slice 01-02.
-    await assertLoginAllowed(c.env.DB, email, password);
-    return c.json(
-      { error: { code: 'not_implemented', message: 'Login session issuance arrives in slice 02' } },
-      501
-    );
+    const result = await login(c.env.DB, c.env.JWT_ACCESS_SECRET, email, password);
+    const isProduction = c.env.NODE_ENV === 'production';
+    setCookie(c, 'access_token', result.accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 1800, // 30 minutes
+    });
+    setCookie(c, 'refresh_token', result.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 604800, // 7 days
+    });
+    return c.json({ data: { userId: result.userId } });
   }
 );
+
+authRouter.post('/refresh', async (c) => {
+  const rawRefreshToken = getCookie(c, 'refresh_token');
+  if (!rawRefreshToken) {
+    return c.json({ error: { code: 'unauthorized', message: 'No refresh token' } }, 401);
+  }
+  const result = await refreshTokens(c.env.DB, c.env.JWT_ACCESS_SECRET, rawRefreshToken);
+  const isProduction = c.env.NODE_ENV === 'production';
+  setCookie(c, 'access_token', result.accessToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 1800,
+  });
+  setCookie(c, 'refresh_token', result.refreshToken, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: 604800,
+  });
+  return c.json({ data: { userId: result.userId } });
+});
+
+// requireAuth applied only to /logout (and future protected routes — not globally)
+authRouter.use('/logout', requireAuth);
+authRouter.post('/logout', async (c) => {
+  const userId = c.get('userId');
+  await logout(c.env.DB, userId);
+  deleteCookie(c, 'access_token', { path: '/' });
+  deleteCookie(c, 'refresh_token', { path: '/' });
+  return c.json({ data: { message: 'logged_out' } });
+});
 
 export { authRouter };

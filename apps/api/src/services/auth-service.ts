@@ -2,10 +2,23 @@ import { HTTPException } from 'hono/http-exception';
 import { eq, and } from 'drizzle-orm';
 
 import { createDb } from '@app/db';
-import { users, authTokens } from '@app/db/schema';
+import {
+  users,
+  authTokens,
+  refreshTokens as refreshTokensTable,
+  loginAttempts,
+} from '@app/db/schema';
 
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash } from '@/lib/token';
+import { signAccessToken } from '@/lib/jwt';
+
+/** Maximum failed attempts before lockout */
+const MAX_LOGIN_ATTEMPTS = 5;
+/** Lockout window in milliseconds (15 minutes) */
+const LOCKOUT_MS = 15 * 60 * 1000;
+/** Refresh token lifetime in milliseconds (7 days) */
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h (D-10)
 
@@ -146,4 +159,170 @@ export async function assertLoginAllowed(
     throw new HTTPException(403, { message: 'email_not_verified' });
   }
   return { userId: user.id };
+}
+
+export type LoginResult = {
+  userId: number;
+  accessToken: string;
+  refreshToken: string;
+};
+
+/**
+ * Authenticates a user and issues a new session (access JWT + opaque refresh token).
+ *
+ * - Checks login_attempts lockout first (T-02-02)
+ * - Validates credentials with constant-time password compare
+ * - Enforces email-verified gate (D-07)
+ * - On success: resets login_attempts, signs access JWT, inserts refresh_tokens row
+ *
+ * @throws HTTPException 429 too_many_requests when locked out
+ * @throws HTTPException 401 invalid_credentials for wrong password / unknown email
+ * @throws HTTPException 403 email_not_verified for unverified accounts
+ */
+export async function login(
+  d1: D1Database,
+  jwtAccessSecret: string,
+  email: string,
+  password: string
+): Promise<LoginResult> {
+  const db = createDb(d1);
+
+  // Check for existing lockout before touching the user row
+  const attemptRows = await db.select().from(loginAttempts).where(eq(loginAttempts.email, email));
+  const attempt = attemptRows[0];
+
+  if (attempt?.lockedUntil && new Date(attempt.lockedUntil) > new Date()) {
+    throw new HTTPException(429, { message: 'too_many_requests' });
+  }
+
+  // Load user
+  const userRows = await db.select().from(users).where(eq(users.email, email));
+  const user = userRows[0];
+
+  const passwordValid =
+    user?.passwordHash != null && (await verifyPassword(password, user.passwordHash));
+
+  if (!user || !passwordValid) {
+    // Increment or upsert login_attempts (D-10: non-atomic race accepted for v1)
+    if (attempt) {
+      const newCount = attempt.count + 1;
+      const lockedUntil =
+        newCount >= MAX_LOGIN_ATTEMPTS
+          ? new Date(Date.now() + LOCKOUT_MS).toISOString()
+          : attempt.lockedUntil;
+      await db
+        .update(loginAttempts)
+        .set({ count: newCount, lastAttemptAt: new Date().toISOString(), lockedUntil })
+        .where(eq(loginAttempts.email, email));
+      if (newCount >= MAX_LOGIN_ATTEMPTS) {
+        throw new HTTPException(429, { message: 'too_many_requests' });
+      }
+    } else {
+      await db.insert(loginAttempts).values({
+        email,
+        count: 1,
+        lastAttemptAt: new Date().toISOString(),
+      });
+    }
+    throw new HTTPException(401, { message: 'invalid_credentials' });
+  }
+
+  // Credentials valid — enforce email verification gate (D-07)
+  if (!user.emailVerified) {
+    throw new HTTPException(403, { message: 'email_not_verified' });
+  }
+
+  // Reset login_attempts on success
+  if (attempt) {
+    await db
+      .update(loginAttempts)
+      .set({ count: 0, lockedUntil: null })
+      .where(eq(loginAttempts.email, email));
+  }
+
+  // Sign access JWT and issue opaque refresh token
+  const accessToken = await signAccessToken(user.id, jwtAccessSecret);
+  const rawRefreshToken = generateSecureToken();
+  await db.insert(refreshTokensTable).values({
+    userId: user.id,
+    tokenHash: await sha256Hash(rawRefreshToken),
+    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS).toISOString(),
+  });
+
+  return { userId: user.id, accessToken, refreshToken: rawRefreshToken };
+}
+
+export type RefreshResult = {
+  accessToken: string;
+  refreshToken: string;
+  userId: number;
+};
+
+/**
+ * Rotates a refresh token (RESEARCH Pattern 7 / D-11).
+ *
+ * - Looks up the hashed token; missing → 401
+ * - Revoked token → revokes ALL tokens for the user (theft detection) → 401 refresh_reuse_detected
+ * - Expired token → 401
+ * - Valid token → revoke old row, insert new row (rotatedFrom = old id), sign new access JWT
+ *
+ * @throws HTTPException 401 on any failure
+ */
+export async function refreshTokens(
+  d1: D1Database,
+  jwtAccessSecret: string,
+  rawRefreshToken: string
+): Promise<RefreshResult> {
+  const db = createDb(d1);
+  const tokenHash = await sha256Hash(rawRefreshToken);
+
+  const storedRows = await db
+    .select()
+    .from(refreshTokensTable)
+    .where(eq(refreshTokensTable.tokenHash, tokenHash));
+  const stored = storedRows[0];
+
+  if (!stored) {
+    throw new HTTPException(401, { message: 'invalid_refresh_token' });
+  }
+
+  // Reuse detection: already-revoked token signals theft — revoke all for user
+  if (stored.revokedAt !== null) {
+    await db
+      .update(refreshTokensTable)
+      .set({ revokedAt: new Date().toISOString() })
+      .where(eq(refreshTokensTable.userId, stored.userId));
+    throw new HTTPException(401, { message: 'refresh_reuse_detected' });
+  }
+
+  // Expired (but not revoked) token
+  if (new Date(stored.expiresAt) < new Date()) {
+    throw new HTTPException(401, { message: 'refresh_token_expired' });
+  }
+
+  // Rotate: revoke old row, insert new row
+  await db
+    .update(refreshTokensTable)
+    .set({ revokedAt: new Date().toISOString() })
+    .where(eq(refreshTokensTable.id, stored.id));
+
+  const newRawToken = generateSecureToken();
+  await db.insert(refreshTokensTable).values({
+    userId: stored.userId,
+    tokenHash: await sha256Hash(newRawToken),
+    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS).toISOString(),
+    rotatedFrom: stored.id,
+  });
+
+  const accessToken = await signAccessToken(stored.userId, jwtAccessSecret);
+  return { accessToken, refreshToken: newRawToken, userId: stored.userId };
+}
+
+/**
+ * Logs out a user by deleting ALL their refresh token rows (D-12: global revocation).
+ * Idempotent — safe to call even if no rows exist.
+ */
+export async function logout(d1: D1Database, userId: number): Promise<void> {
+  const db = createDb(d1);
+  await db.delete(refreshTokensTable).where(eq(refreshTokensTable.userId, userId));
 }
