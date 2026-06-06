@@ -13,6 +13,16 @@ import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash } from '@/lib/token';
 import { signAccessToken } from '@/lib/jwt';
 
+/**
+ * A well-formed but unmatchable PBKDF2 hash used to equalise login timing
+ * (CR-03). When the email is unknown or the account is Google-only
+ * (passwordHash === null) we still run the full 210k-iteration derivation
+ * against this constant so the response time does not reveal account
+ * existence. The derived value is never expected to match a real password.
+ */
+const DUMMY_PASSWORD_HASH =
+  'pbkdf2$sha256$210000$9c26e209ce1cb20e680edbf93dc17a52$ea39536b2dc5d43e491537ab71dda69ddb190445ff8b8167232398a8eaa453fd';
+
 /** Maximum failed attempts before lockout */
 const MAX_LOGIN_ATTEMPTS = 5;
 /** Lockout window in milliseconds (15 minutes) */
@@ -206,8 +216,12 @@ export async function login(
   const userRows = await db.select().from(users).where(eq(users.email, email));
   const user = userRows[0];
 
-  const passwordValid =
-    user?.passwordHash != null && (await verifyPassword(password, user.passwordHash));
+  // Always run a PBKDF2 derivation — against a dummy hash when the user or
+  // passwordHash is absent — so unknown/Google-only accounts cost the same as
+  // a real one and cannot be enumerated via a timing side channel (CR-03).
+  const hashToCheck = user?.passwordHash ?? DUMMY_PASSWORD_HASH;
+  const passwordMatches = await verifyPassword(password, hashToCheck);
+  const passwordValid = passwordMatches && user?.passwordHash != null;
 
   if (!user || !passwordValid) {
     // Increment or upsert login_attempts (D-10: non-atomic race accepted for v1)
