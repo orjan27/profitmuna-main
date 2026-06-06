@@ -69,8 +69,24 @@ Plans:
 3. User can record an expense with category, amount, date, payment method, and description; soft-deleted expenses are excluded from totals but restorable
 4. User can browse a paginated expense list filtered by date range and edit or soft-delete records
 5. User can manage income and expense categories — create, edit, and delete custom categories; system default categories are protected and cannot be deleted
-   **Plans**: TBD
-   **UI hint**: yes
+   **Plans**: 4 plans
+
+Plans:
+
+**Wave 0**
+
+- [ ] 02-01-PLAN.md — Foundation: 4 DB tables + applied migration, CORS expansion + stub routers mounted behind requireAuth, server-only apiFetch client, currency/date/constants helpers, NuqsAdapter, in-memory D1 test helper (INC-01…06, EXP-01…05 infra)
+
+**Wave 1** _(blocked on Wave 0 completion; 02-02 and 02-03 run in parallel — no file overlap)_
+
+- [ ] 02-02-PLAN.md — Income slice: record/browse(search+status+date+load-more)/edit/delete/receive (INC-01, INC-02, INC-03, INC-04, INC-05)
+- [ ] 02-03-PLAN.md — Expense slice: record(payment method)/browse(date+load-more)/edit/soft-delete+restore (EXP-01, EXP-02, EXP-03, EXP-04)
+
+**Wave 2** _(blocked on Wave 1 completion)_
+
+- [ ] 02-04-PLAN.md — Category management: lazy seeding + create/rename(cascade)/delete(block-in-use)/system-protection for income + expenses (INC-06, EXP-05)
+
+**UI hint**: yes
 
 ### Phase 3: Profit First Allocation
 
@@ -137,8 +153,8 @@ Plans:
 
 | Phase                       | Plans Complete | Status      | Completed  |
 | --------------------------- | -------------- | ----------- | ---------- |
-| 1. Authentication           | 4/4 | Complete    | 2026-06-06 |
-| 2. Income & Expenses        | 0/0            | Not started | -          |
+| 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
+| 2. Income & Expenses        | 0/4            | Planned     | -          |
 | 3. Profit First Allocation  | 0/0            | Not started | -          |
 | 4. Wallets                  | 0/0            | Not started | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
