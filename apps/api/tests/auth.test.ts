@@ -311,12 +311,28 @@ describe('POST /api/auth/register', () => {
     });
 
     // Prime both keys with a first attempt
-    await postJson('/api/auth/register', { email: 'taken@user.test', name: 'X', password: 'password123' }, testEnv);
-    await postJson('/api/auth/register', { email: 'fresh@user.test', name: 'Y', password: 'password123' }, testEnv);
+    await postJson(
+      '/api/auth/register',
+      { email: 'taken@user.test', name: 'X', password: 'password123' },
+      testEnv
+    );
+    await postJson(
+      '/api/auth/register',
+      { email: 'fresh@user.test', name: 'Y', password: 'password123' },
+      testEnv
+    );
 
     // Rapid repeats — both throttled the same way regardless of existence
-    const repeatTaken = await postJson('/api/auth/register', { email: 'taken@user.test', name: 'X', password: 'password123' }, testEnv);
-    const repeatFresh = await postJson('/api/auth/register', { email: 'fresh@user.test', name: 'Y', password: 'password123' }, testEnv);
+    const repeatTaken = await postJson(
+      '/api/auth/register',
+      { email: 'taken@user.test', name: 'X', password: 'password123' },
+      testEnv
+    );
+    const repeatFresh = await postJson(
+      '/api/auth/register',
+      { email: 'fresh@user.test', name: 'Y', password: 'password123' },
+      testEnv
+    );
     expect(repeatTaken.status).toBe(429);
     expect(repeatFresh.status).toBe(429);
   });

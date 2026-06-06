@@ -54,10 +54,7 @@ const EMAIL_SEND_COOLDOWN_MS = 60 * 1000;
  *
  * @throws HTTPException 429 too_many_requests (with Retry-After) when throttled
  */
-async function enforceEmailCooldown(
-  db: ReturnType<typeof createDb>,
-  key: string
-): Promise<void> {
+async function enforceEmailCooldown(db: ReturnType<typeof createDb>, key: string): Promise<void> {
   const rows = await db.select().from(loginAttempts).where(eq(loginAttempts.email, key));
   const last = rows[0];
   const now = Date.now();
@@ -265,9 +262,7 @@ export async function login(
       const baseCount = lockoutExpired ? 0 : attempt.count;
       const newCount = baseCount + 1;
       const lockedUntil =
-        newCount >= MAX_LOGIN_ATTEMPTS
-          ? new Date(Date.now() + LOCKOUT_MS).toISOString()
-          : null;
+        newCount >= MAX_LOGIN_ATTEMPTS ? new Date(Date.now() + LOCKOUT_MS).toISOString() : null;
       await db
         .update(loginAttempts)
         .set({ count: newCount, lastAttemptAt: new Date().toISOString(), lockedUntil })
