@@ -40,17 +40,17 @@ Plans:
 
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Walking Skeleton: scaffold + register/verify/welcome email + login verification gate (AUTH-01, AUTH-06)
+- [x] 01-01-PLAN.md — Walking Skeleton: scaffold + register/verify/welcome email + login verification gate (AUTH-01, AUTH-06)
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Wave 2** _(blocked on Wave 1 completion)_
 
 - [ ] 01-02-PLAN.md — Login + JWT cookie sessions + transparent BFF refresh + logout (AUTH-02, AUTH-05)
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Wave 3** _(blocked on Wave 2 completion)_
 
 - [ ] 01-03-PLAN.md — Password reset via emailed single-use link (AUTH-04)
 
-**Wave 4** *(blocked on Wave 3 completion)*
+**Wave 4** _(blocked on Wave 3 completion)_
 
 - [ ] 01-04-PLAN.md — Google OAuth sign-in + account linking (AUTH-03)
 
@@ -137,7 +137,7 @@ Plans:
 
 | Phase                       | Plans Complete | Status      | Completed |
 | --------------------------- | -------------- | ----------- | --------- |
-| 1. Authentication           | 0/4            | Not started | -         |
+| 1. Authentication           | 1/4 | In Progress|  |
 | 2. Income & Expenses        | 0/0            | Not started | -         |
 | 3. Profit First Allocation  | 0/0            | Not started | -         |
 | 4. Wallets                  | 0/0            | Not started | -         |
