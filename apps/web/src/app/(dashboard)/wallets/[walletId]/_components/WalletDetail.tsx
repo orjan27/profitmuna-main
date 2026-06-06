@@ -379,9 +379,7 @@ export function WalletDetail({ detail }: WalletDetailProps) {
           <Badge variant="secondary">{sourceLabel(wallet.sourceType)}</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/wallets/${wallet.id}/edit`}>Edit</Link>
-          </Button>
+          {/* No /edit route in Phase 4 — wallet editing ships in a later phase (D-05) */}
           <Button variant="destructive" size="sm" onClick={() => setDeleteWalletOpen(true)}>
             Delete
           </Button>
