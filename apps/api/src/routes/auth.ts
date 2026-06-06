@@ -8,6 +8,8 @@ import {
   verifyEmailSchema,
   resendVerificationSchema,
   loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from '@/schemas/auth';
 import {
   register,
@@ -16,6 +18,8 @@ import {
   login,
   refreshTokens,
   logout,
+  forgotPassword,
+  resetPassword,
 } from '@/services/auth-service';
 import { requireAuth } from '@/middleware/auth';
 import type { Bindings, Variables } from '@/types';
@@ -139,5 +143,41 @@ authRouter.post('/logout', async (c) => {
   deleteCookie(c, 'refresh_token', { path: '/' });
   return c.json({ data: { message: 'logged_out' } });
 });
+
+// POST /forgot-password — always returns the same generic body (enumeration mitigation T-03-02)
+authRouter.post(
+  '/forgot-password',
+  zValidator('json', forgotPasswordSchema, (result, c) => {
+    if (!result.success) {
+      return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
+    }
+  }),
+  async (c) => {
+    const { email } = c.req.valid('json');
+    const result = await forgotPassword(c.env.DB, c.env.APP_BASE_URL, email);
+    // Email only when user actually exists — never reveal existence in response body (T-03-02)
+    if (result.exists && result.resetUrl) {
+      const emailSvc = createEmailService(c.env.RESEND_API_KEY, c.env.RESEND_FROM_EMAIL);
+      c.executionCtx.waitUntil(emailSvc.sendPasswordResetEmail(email, result.resetUrl));
+    }
+    // Generic response regardless of account existence
+    return c.json({ data: { message: 'reset_requested' } });
+  }
+);
+
+// POST /reset-password — redeems token and sets a new password; 400 propagates from service
+authRouter.post(
+  '/reset-password',
+  zValidator('json', resetPasswordSchema, (result, c) => {
+    if (!result.success) {
+      return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
+    }
+  }),
+  async (c) => {
+    const { token, password } = c.req.valid('json');
+    await resetPassword(c.env.DB, token, password);
+    return c.json({ data: { message: 'password_reset' } });
+  }
+);
 
 export { authRouter };

@@ -1095,3 +1095,110 @@ describe('auth-service: resetPassword', () => {
     });
   });
 });
+
+describe('POST /api/auth/forgot-password', () => {
+  beforeEach(() => {
+    sendMock.mockClear();
+  });
+
+  it('returns 200 with generic body for a known email and schedules reset email', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    seedUser(db, {
+      email: 'known@forgot.test',
+      name: 'Known User',
+      passwordHash: await hashPassword('somepass'),
+      emailVerified: true,
+    });
+
+    const res = await postJson(
+      '/api/auth/forgot-password',
+      { email: 'known@forgot.test' },
+      testEnv
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.message).toBe('reset_requested');
+
+    // Reset email should have been scheduled via waitUntil
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    const call = sendMock.mock.calls[0][0];
+    expect(call.subject).toContain('Reset');
+  });
+
+  it('returns identical 200 generic body for an unknown email (enumeration mitigation)', async () => {
+    const { d1 } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+
+    const res = await postJson(
+      '/api/auth/forgot-password',
+      { email: 'nobody@unknown.test' },
+      testEnv
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.message).toBe('reset_requested');
+
+    // No email should be sent for unknown address
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/auth/reset-password', () => {
+  it('returns 200 on successful reset (valid token + new password)', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    const user = seedUser(db, {
+      email: 'route@reset.test',
+      name: 'Route Reset',
+      passwordHash: await hashPassword('oldroute'),
+      emailVerified: true,
+    });
+
+    const rawToken = generateSecureToken();
+    db.insert(schema.authTokens)
+      .values({
+        userId: user.id,
+        tokenHash: await sha256Hash(rawToken),
+        purpose: 'reset_password',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      })
+      .run();
+
+    const res = await postJson(
+      '/api/auth/reset-password',
+      { token: rawToken, password: 'newroute123' },
+      testEnv
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.message).toBe('password_reset');
+  });
+
+  it('returns 400 for an invalid or already-used token', async () => {
+    const { d1 } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    const randomToken = generateSecureToken();
+
+    const res = await postJson(
+      '/api/auth/reset-password',
+      { token: randomToken, password: 'newpass123' },
+      testEnv
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe('invalid_or_expired_token');
+  });
+
+  it('returns 422 for a password shorter than 8 characters', async () => {
+    const { d1 } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+
+    const res = await postJson(
+      '/api/auth/reset-password',
+      { token: 'sometoken', password: 'short' },
+      testEnv
+    );
+    expect(res.status).toBe(422);
+  });
+});
