@@ -711,6 +711,19 @@ describe('auth-service: refreshTokens', () => {
     // Rotate once — this revokes the original
     await refreshTokens(d1, env.JWT_ACCESS_SECRET, rawRefresh);
 
+    // Backdate the rotated-out row's revocation past the concurrent-refresh
+    // grace window so the reuse below is treated as theft, not a benign race.
+    const rotatedOut = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all()
+      .find((r) => r.revokedAt !== null);
+    db.update(schema.refreshTokens)
+      .set({ revokedAt: new Date(Date.now() - 60_000).toISOString() })
+      .where(eq(schema.refreshTokens.id, rotatedOut!.id))
+      .run();
+
     // Reuse the already-revoked token — triggers theft detection
     await expect(refreshTokens(d1, env.JWT_ACCESS_SECRET, rawRefresh)).rejects.toMatchObject({
       status: 401,
@@ -758,6 +771,67 @@ describe('auth-service: refreshTokens', () => {
       .where(eq(schema.refreshTokens.userId, user.id))
       .all();
     expect(allRows[0].revokedAt).toBeNull();
+  });
+
+  it('returns a fresh access token without rotation when a just-rotated token is reused within grace (concurrent refresh)', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'grace@refresh.test',
+      name: 'Grace Refresh',
+      passwordHash: await hashPassword('pw5'),
+      emailVerified: true,
+    });
+    const { refreshToken: rawRefresh } = await login(
+      d1,
+      env.JWT_ACCESS_SECRET,
+      'grace@refresh.test',
+      'pw5'
+    );
+
+    // Rotate once — original row now revoked with a successor
+    await refreshTokens(d1, env.JWT_ACCESS_SECRET, rawRefresh);
+
+    // Immediate reuse (middleware prefetch race) — benign: fresh access JWT,
+    // no new refresh token, no chain-revoke
+    const result = await refreshTokens(d1, env.JWT_ACCESS_SECRET, rawRefresh);
+    expect(typeof result.accessToken).toBe('string');
+    expect(result.refreshToken).toBeUndefined();
+    expect(result.userId).toBe(user.id);
+
+    // The active successor must still be live
+    const allRows = db
+      .select()
+      .from(schema.refreshTokens)
+      .where(eq(schema.refreshTokens.userId, user.id))
+      .all();
+    const activeRows = allRows.filter((r) => r.revokedAt === null);
+    expect(activeRows).toHaveLength(1);
+  });
+
+  it('chain-revokes a revoked token with no rotated successor even within grace', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'nosuccessor@refresh.test',
+      name: 'No Successor',
+      passwordHash: null,
+      emailVerified: true,
+    });
+    // Revoked just now but NOT by rotation (no successor row) — e.g. a chain
+    // already killed by theft detection. Must stay theft, not grace.
+    const rawToken = generateSecureToken();
+    db.insert(schema.refreshTokens)
+      .values({
+        userId: user.id,
+        tokenHash: await sha256Hash(rawToken),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        revokedAt: new Date().toISOString(),
+      })
+      .run();
+
+    await expect(refreshTokens(d1, env.JWT_ACCESS_SECRET, rawToken)).rejects.toMatchObject({
+      status: 401,
+      message: 'refresh_reuse_detected',
+    });
   });
 });
 
@@ -980,6 +1054,46 @@ describe('POST /api/auth/refresh', () => {
   it('returns 401 when no refresh_token cookie is present', async () => {
     const res = await app.request('/api/auth/refresh', { method: 'POST' }, env, executionCtx);
     expect(res.status).toBe(401);
+  });
+
+  it('sets only access_token (no refresh rotation) on concurrent reuse within grace', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    seedUser(db, {
+      email: 'grace@route.test',
+      name: 'Grace Route',
+      passwordHash: await hashPassword('pw6'),
+      emailVerified: true,
+    });
+
+    const loginRes = await postJson(
+      '/api/auth/login',
+      { email: 'grace@route.test', password: 'pw6' },
+      testEnv
+    );
+    const rawRefreshToken = loginRes.headers
+      .getSetCookie()
+      .find((c) => c.startsWith('refresh_token='))!
+      .split(';')[0]
+      .replace('refresh_token=', '');
+
+    const doRefresh = () =>
+      app.request(
+        '/api/auth/refresh',
+        { method: 'POST', headers: { cookie: `refresh_token=${rawRefreshToken}` } },
+        testEnv,
+        executionCtx
+      );
+
+    // First call rotates; second presents the just-revoked token (grace path)
+    const first = await doRefresh();
+    expect(first.status).toBe(200);
+    const second = await doRefresh();
+    expect(second.status).toBe(200);
+
+    const secondCookies = second.headers.getSetCookie();
+    expect(secondCookies.find((c) => c.startsWith('access_token='))).toBeDefined();
+    expect(secondCookies.find((c) => c.startsWith('refresh_token='))).toBeUndefined();
   });
 });
 
