@@ -137,7 +137,7 @@ Plans:
 
 | Phase                       | Plans Complete | Status      | Completed  |
 | --------------------------- | -------------- | ----------- | ---------- |
-| 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
+| 1. Authentication           | 4/4 | Complete   | 2026-06-06 |
 | 2. Income & Expenses        | 0/0            | Not started | -          |
 | 3. Profit First Allocation  | 0/0            | Not started | -          |
 | 4. Wallets                  | 0/0            | Not started | -          |
