@@ -28,18 +28,19 @@ export function PfContent({ accounts, totalIncome }: PfContentProps) {
 
   return (
     <div className="flex flex-col">
-      {/* Hero: received income as typography on the paper, eye toggle alongside */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted-foreground">Received income</p>
+      {/* Hero: received income as typography on the paper, eye toggle anchored
+          to the balance it masks (financial-app convention) */}
+      <div>
+        <p className="text-sm text-muted-foreground">Received income</p>
+        <div className="mt-1.5 flex items-center gap-3">
           <MaskedAmount
             cents={totalIncome}
             visible={visible}
             mounted={mounted}
-            className="mt-1.5 block text-4xl font-semibold leading-none tracking-tight tabular-nums md:text-5xl"
+            className="block text-4xl font-semibold leading-none tracking-tight tabular-nums md:text-5xl"
           />
+          <AmountToggle visible={visible} toggle={toggle} />
         </div>
-        <AmountToggle visible={visible} toggle={toggle} />
       </div>
 
       {/* The split: one stacked 100% bar, segments in account colors */}
