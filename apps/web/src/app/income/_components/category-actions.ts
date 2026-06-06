@@ -3,19 +3,22 @@
 import { revalidatePath } from 'next/cache';
 
 import { apiFetch, ApiError } from '@/server/api';
+import type { IncomeCategory } from '@/types/income';
 
 /**
  * Create a new custom income category.
  * Returns { data: category } on success or { error: code } on failure.
+ * The API echoes the full category row (incl. userId/system) so callers can
+ * insert it into local state without fabricating a placeholder userId (WR-08).
  */
 export async function createIncomeCategoryAction(
   name: string
-): Promise<{ data: { id: number; name: string } } | { error: string }> {
+): Promise<{ data: IncomeCategory } | { error: string }> {
   try {
-    const result = await apiFetch<{ data: { id: number; name: string } }>(
-      '/api/income-categories',
-      { method: 'POST', body: JSON.stringify({ name }) }
-    );
+    const result = await apiFetch<{ data: IncomeCategory }>('/api/income-categories', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
     revalidatePath('/income');
     return result;
   } catch (err) {

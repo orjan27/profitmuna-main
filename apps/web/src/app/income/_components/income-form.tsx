@@ -79,13 +79,9 @@ export function IncomeForm({
             : 'Failed to create category. Please try again.'
         );
       } else {
-        const newCat: IncomeCategory = {
-          id: result.data.id,
-          name: result.data.name,
-          system: false,
-          userId: 0, // userId not needed by the select — placeholder
-        };
-        setLocalCategories((prev) => [...prev, newCat]);
+        // Use the real category echoed by the API (carries the correct
+        // userId/system) instead of a fabricated userId: 0 placeholder (WR-08).
+        setLocalCategories((prev) => [...prev, result.data]);
         setSelectedCategoryId(String(result.data.id));
         toast.success(`"${trimmed}" added and selected.`);
         setQuickAddName('');
