@@ -33,6 +33,16 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/', '.next/', 'dist/', '.wrangler/', 'coverage/', 'playwright-report/'],
+    ignores: [
+      'node_modules/',
+      '.next/',
+      // Workspace .next/ dirs (apps/web/.next/ etc.) — ESLint 9 flat config resolves
+      // ignores relative to the config root, so workspace sub-paths must be explicit.
+      'apps/**/.next/',
+      'dist/',
+      '.wrangler/',
+      'coverage/',
+      'playwright-report/',
+    ],
   },
 ];
