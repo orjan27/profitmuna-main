@@ -46,7 +46,7 @@ Declared values (must be multiples of 4):
 
 Exceptions:
 
-- Color swatch palette grid: 6px gap between swatches (design need; acceptable between xs and sm).
+- Color swatch palette grid: 6px gap between swatches (design need; acceptable between xs and sm). Executor must use `gap-1.5` (Tailwind class for 6px). Do NOT add a new spacing token for this value.
 - Progress bar height: 8px (sm token).
 - Amount masking toggle button: min touch target 44px height (accessibility — icon-only button, matches shadcn `size="icon"` at `size-9` = 36px + ensure 44px touch area via padding on mobile).
 
@@ -56,15 +56,17 @@ Exceptions:
 
 ## Typography
 
-| Role    | Size | Weight         | Line Height | Usage                                                     |
-| ------- | ---- | -------------- | ----------- | --------------------------------------------------------- |
-| Body    | 14px | 400 (regular)  | 1.5         | Account descriptions, filter labels, card metadata        |
-| Label   | 14px | 500 (medium)   | 1.4         | Form field labels, card subtitles, category chip text     |
-| Heading | 20px | 600 (semibold) | 1.2         | Page heading ("Profit First"), card titles (account name) |
-| Display | 28px | 600 (semibold) | 1.1         | Derived balance amount per account card                   |
+| Role    | Size | Weight         | Line Height | Usage                                                                                                                         |
+| ------- | ---- | -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Body    | 14px | 400 (regular)  | 1.5         | Account descriptions, filter labels, card metadata                                                                            |
+| Label   | 14px | 400 (regular)  | 1.4         | Form field labels, card subtitles, category chip text — differentiate from Body via `text-muted-foreground` color, not weight |
+| Heading | 20px | 600 (semibold) | 1.2         | Page heading ("Profit First"), card titles (account name)                                                                     |
+| Display | 28px | 600 (semibold) | 1.1         | Derived balance amount per account card                                                                                       |
 
 Notes:
 
+- Only 2 font weights are used: 400 (regular) for Body and Label; 600 (semibold) for Heading and Display. Weight 500 (medium) is not used.
+- Label is distinguished from Body by color: use `text-muted-foreground` for Label text; use default foreground for Body text.
 - Percentage values in the bulk editor inputs: 16px / weight 400 / line-height 1.5 (Body-class but rendered in `<Input>`).
 - Amount in masked state (`••••`): same Display size; replace text content only, not font metrics.
 - All monetary amounts (`₱X,XXX.XX`) use the Display role; masked amounts use the same slot.
@@ -173,7 +175,7 @@ Already installed (from Phase 1): `button`, `card`, `input`, `label`.
 
 - Color bar: 4px left border in account's `color` hex.
 - Badge: shown for non-CUSTOM accounts with type label (PROFIT / OWNERS_PAY / TAX / OPEX); hidden for CUSTOM.
-- Dropdown [⋮]: Edit / Delete (Delete disabled for non-CUSTOM; disabled state shown with `disabled` attribute + `opacity-50`).
+- Dropdown [⋮]: `DropdownMenuTrigger` must have `aria-label="Account options"` (icon-only trigger requires an accessible label). Edit / Delete (Delete disabled for non-CUSTOM; disabled state shown with `disabled` attribute + `opacity-50`).
 - Progress bar: `value = targetPercentage / 100` (0–100 range).
 
 ### Bulk Percentage Editor Panel
@@ -226,11 +228,11 @@ Already installed (from Phase 1): `button`, `card`, `input`, `label`.
 │  Delete "Account Name"?      │
 │  This cannot be undone.      │
 │                              │
-│     [Cancel]  [Delete]       │
+│     [Cancel]  [Delete Account] │
 └──────────────────────────────┘
 ```
 
-- "Delete" button uses `variant="destructive"`.
+- "Delete Account" button uses `variant="destructive"`. Label is "Delete Account" (matches "Add Account", "Save Changes" pattern).
 - Dialog is NOT shown for non-CUSTOM accounts (dropdown entry is visually disabled).
 
 ---
@@ -300,6 +302,7 @@ Storage key: `'pf-amounts-visible'` in `localStorage`.
 | Dialog title — edit                 | "Edit Account"                                                                    |
 | Dialog title — delete               | "Delete Account"                                                                  |
 | Dialog body — delete                | "Delete \"{name}\"? This cannot be undone."                                       |
+| Dialog confirm button — delete      | "Delete Account"                                                                  |
 | Percentage editor — total (valid)   | "Total: 100% ✓"                                                                   |
 | Percentage editor — total (invalid) | "Total: {n}% — must equal 100% to save"                                           |
 | Error — percentages don't sum       | "Percentages must total 100%. Current total: {n}%."                               |
@@ -323,7 +326,7 @@ Storage key: `'pf-amounts-visible'` in `localStorage`.
 
 Destructive actions in this phase:
 
-- **Delete custom account**: confirmation via Dialog (not inline); "Delete" button `variant="destructive"`; cannot be undone.
+- **Delete custom account**: confirmation via Dialog (not inline); "Delete Account" button `variant="destructive"`; cannot be undone.
 
 ---
 
