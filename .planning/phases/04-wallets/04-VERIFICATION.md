@@ -1,7 +1,7 @@
 ---
 phase: 04-wallets
 verified: 2026-06-06T22:17:00Z
-status: human_needed
+status: passed
 score: 5/5 must-haves verified
 overrides_applied: 0
 re_verification:
@@ -210,3 +210,10 @@ Five human verification items remain — four were present in the prior pass (vi
 _Verified: 2026-06-06T22:17:00Z_
 _Verifier: Claude (gsd-verifier)_
 _Re-verification after gap closure (04-04)_
+
+
+---
+
+## Human Verification Outcome (2026-06-06)
+
+All 5 human-verification items executed via a live Playwright browser session against the dev servers (see 04-HUMAN-UAT.md). All passed. Four UI defects found during UAT were fixed and committed in-session: D-04 quick-create preselect, dead Edit link, D-10 shallow-routing pagination, D-06 disabled pickers, and the zero-amount blocked-state proxy. Final state: 179/179 API tests, typecheck and lint clean on wallet files.
