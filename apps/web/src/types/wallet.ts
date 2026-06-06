@@ -22,6 +22,8 @@ export interface WalletListItem {
   incomeCategoryIds: number[];
   /** Expense category ids mapped to this wallet (D-06: disable in pickers elsewhere) */
   expenseCategoryIds: number[];
+  /** When true, ALL user expenses auto-deduct from this wallet (3-mode selector, D-07) */
+  autoDeductAllExpenses: boolean;
 }
 
 export interface WalletTransaction {

@@ -959,6 +959,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           balanceCents,
           transactionCount: manualRows.filter((r) => !r.deletedAt).length,
           mappingCount: incomeCatIds.length + expenseCatIds.length,
+          // Exact mapping presence — the UI blocked-state hints mirror assertCanInsertTransaction
+          incomeCategoryIds: incomeCatIds,
+          expenseCategoryIds: expenseCatIds,
         },
         breakdown: {
           pfAllocationCents,

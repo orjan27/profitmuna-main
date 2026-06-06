@@ -338,34 +338,14 @@ export function WalletDetail({ detail }: WalletDetailProps) {
     });
   }
 
-  // Blocking logic derived from wallet shape
-  const isDepositBlocked = !!wallet.profitFirstAccountId || wallet.mappingCount > 0;
-  // For deposit blocking, we check PF or income-mapped. For withdrawal, expense-mapped.
-  // We use the wallet detail data to derive these:
+  // Blocking hints mirror the server's assertCanInsertTransaction exactly —
+  // mapping PRESENCE blocks, not amounts (a mapped category with zero spend still blocks).
   const isPfWallet = wallet.sourceType === 'PROFIT_FIRST';
-  const hasIncomeMappings =
-    breakdown.mappedIncomeCents > 0 || (isPfWallet ? false : wallet.mappingCount > 0);
-
-  // Deposit is blocked if PF wallet OR has income-category mappings
-  // Withdrawal is blocked if has expense-category mappings or autoDeductAllExpenses
-  // Since we don't have the raw mapping lists in WalletDetailResponse, we infer:
-  // - PF wallet → deposit blocked
-  // - mappedIncomeCents > 0 → deposit blocked (income is flowing in automatically)
-  // - mappedExpensesCents > 0 → withdrawal blocked (expenses auto-deducted)
-  // Note: these are conservative — may block when no mapping exists but income/expense happened to be 0
-  // The server enforces the real guard; UI disables as a hint.
-  const depositBlocked = isPfWallet || breakdown.mappedIncomeCents > 0;
+  const depositBlocked = isPfWallet || wallet.incomeCategoryIds.length > 0;
   const depositBlockReason = isPfWallet ? BLOCKING_COPY.pf_deposit : BLOCKING_COPY.income_mapped;
 
-  // We can't fully know expense auto status from breakdown alone without extra fields.
-  // Use mappedExpensesCents as a proxy — if any expense was auto-deducted, block withdrawal.
-  // A more reliable approach: the server will enforce it anyway.
-  const withdrawalBlocked = breakdown.mappedExpensesCents > 0;
+  const withdrawalBlocked = wallet.autoDeductAllExpenses || wallet.expenseCategoryIds.length > 0;
   const withdrawalBlockReason = BLOCKING_COPY.expense_mapped;
-
-  // Suppress unused variable warning for hasIncomeMappings
-  void hasIncomeMappings;
-  void isDepositBlocked;
 
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
