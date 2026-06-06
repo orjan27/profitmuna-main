@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 04 Plan 01 complete (wallet foundation — schema, migration, BFF proxy, Zod schemas, types, test scaffold)
-last_updated: "2026-06-06T13:07:29.366Z"
+status: executing
+stopped_at: Phase 04 Plan 02 complete (wallet CRUD service, balance computation, create form, list page — WAL-01/02/03)
+last_updated: "2026-06-06T13:14:02.113Z"
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 50
 ---
 
@@ -34,8 +34,8 @@ progress:
 Phase: 04 (wallets) — EXECUTING
 Plan: 2 of 3
 **Phase:** 04
-**Plan:** Not started
-**Status:** Ready to plan
+**Plan:** Plan 02 complete — wallet CRUD service, balance computation, create form, list page
+**Status:** Executing Phase 04 — Plan 03 next (wallet detail, manual transactions, WAL-04/05)
 **Phase goal:** Users can create wallets with Profit First or standalone source types, configure income/expense mappings, and track money with computed balances
 
 ```
@@ -68,6 +68,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 03 P05 | ~8 min active | 2 tasks | 2 files |
 | Phase 03 P06 | ~10 min active | 2 tasks | 4 files |
 | Phase 04 P01 | ~6 min active | 3 tasks | 10 files |
+| Phase 04 P02 | 12 | 4 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -157,3 +158,7 @@ _State initialized: 2026-06-05_
 - [Phase 04-01]: profitFirstAccountId FK has no onDelete cascade — wallet delete-guard in Plan 02 service can block deletes of linked PF accounts (D-16)
 - [Phase 04-01]: (dashboard)/layout.tsx already existed from Phase 3 — left unchanged; wallet pages will nest inside it automatically
 - [Phase 04-01]: walletsRouter uses self-contained requireAuth at router level, matching profitFirstRouter pattern — no outer app.use needed (T-04-01)
+- [Phase 04-02]: walletBaseSchema extracted from createWalletSchema so updateWalletSchema can use .partial() — Zod v4 disallows .partial() on refined schemas
+- [Phase 04-02]: GET /api/profit-first/summary used for PF accounts (no standalone GET /accounts endpoint); accounts in summary.data.accounts
+- [Phase 04-02]: Edit dropdown in WalletCard navigates to /wallets/{id} detail page (D-05); no separate /edit route created in Phase 4
+- [Phase 04-02]: setIncomeCategoryMappings/setExpenseMappings implemented in Task 1a factory alongside create/update; WAL-02 tests were green on first run (plan-authorized ordering)
