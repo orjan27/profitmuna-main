@@ -53,7 +53,9 @@ export async function updateExpenseAction(
   }
   const categoryId = Number(formData.get('categoryId'));
   const expenseDate = formData.get('expenseDate') as string;
-  const description = (formData.get('description') as string) || undefined;
+  // PUT is full-replace: send explicit null for blanks so a cleared description
+  // is persisted, consistent with paymentMethod (WR-05).
+  const description = (formData.get('description') as string) || null;
   const paymentMethodRaw = formData.get('paymentMethod') as string | null;
   // 'none' sentinel from the Select means "no payment method" (Radix forbids value="").
   const paymentMethod = paymentMethodRaw && paymentMethodRaw !== 'none' ? paymentMethodRaw : null;
