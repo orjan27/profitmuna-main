@@ -643,22 +643,27 @@ export const PF_DEFAULT_COLORS = [
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Wallet guard stub timing (Claude's Discretion)**
+All three open questions were resolved during planning. Each is annotated with the resolving plan below.
+
+1. **Wallet guard stub timing (Claude's Discretion)** — **RESOLVED in 03-02 Task 1.**
    - What we know: `deleteAccount` must eventually check for a linked wallet (Phase 4). The wallet table doesn't exist in Phase 3.
    - What's unclear: Whether to stub the guard with a comment (simpler) or write the check with a conditional `try/catch` around the DB query (safer at runtime).
    - Recommendation: Stub with a commented-out block (reference pattern verbatim) — the planner should document this as a Phase 4 activation task. At Phase 3 runtime the wallets table doesn't exist, so any live query would error.
+   - **RESOLUTION (03-02 Task 1):** `deleteAccount` includes the Phase 4 wallet-link guard as a COMMENTED block verbatim from the Code Examples §Delete Guard. It is a stub now and is activated in Phase 4 when the `wallets` table exists; a live query in Phase 3 would error against the non-existent table. An acceptance criterion asserts the commented guard is present.
 
-2. **Dashboard layout group existence**
+2. **Dashboard layout group existence** — **RESOLVED in 03-03.**
    - What we know: Phase 2 likely creates `apps/web/src/app/(dashboard)/` with a shared layout (sidebar nav, auth guard). Phase 2 has no plans yet.
    - What's unclear: Exact route group name and layout file.
    - Recommendation: Phase 3 planner should note the dependency — if Phase 2 hasn't been executed, a minimal `(dashboard)/layout.tsx` with auth guard must be added to Phase 3 Wave 0.
+   - **RESOLUTION (03-03 Task 1):** Phase 2 is not executed (no `(dashboard)` route group exists), so plan 03-03 creates a MINIMAL `apps/web/src/app/(dashboard)/layout.tsx` — an auth-guarded shell (auth already enforced by `middleware.ts`; the layout only renders the surface) that Phase 2/5 will EXTEND rather than recreate. The `<phase_dependency_note>` in 03-03 records this.
 
-3. **API response shape for `targetPercentage`**
+3. **API response shape for `targetPercentage`** — **RESOLVED in 03-02 Task 1.**
    - What we know: Reference returns `targetPercentage / 100` (percent) in API responses; UI then shows whole numbers. Server actions multiply by 100 to send basis points back.
    - What's unclear: Profitmuna hasn't yet committed to this convention in any code.
    - Recommendation: Planner should lock this — **return percent (0–100) in API responses for human-readable display; service layer stores basis points**. Document in Zod response schema.
+   - **RESOLUTION (03-02 Task 1):** `getSummary` returns `targetPercentage` as PERCENT (bp/100, e.g. 5 not 500) in the API response so the UI editor's `total === 100` check works; the service stores and validates basis points internally, and the web server action (03-04) converts percent→bp via `Math.round(pct * 100)` on writes. Documented in the response shape and the <behavior> block.
 
 ---
 
