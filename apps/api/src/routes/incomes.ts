@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 
 import { createDb } from '@app/db';
@@ -9,12 +10,20 @@ import {
   updateIncomeSchema,
   receiveIncomeSchema,
 } from '@/schemas/income';
+import { idParamSchema } from '@/schemas/common';
 import type { Bindings, Variables } from '@/types';
 
 const incomesRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // security.md: validation failures return 422 (zValidator defaults to 400),
 // hence the explicit hook on every zValidator below.
+
+/** Validation hook: returns 422 on param/body schema failure (security.md). */
+function paramValidationHook(result: { success: boolean }, c: Context) {
+  if (!result.success) {
+    return c.json({ error: { code: 'validation_error', message: 'Invalid id param' } }, 422);
+  }
+}
 
 // GET / — paginated list with filters
 incomesRouter.get(
@@ -53,13 +62,14 @@ incomesRouter.post(
 // PUT /:id/receive — MUST be registered before /:id to avoid param shadowing
 incomesRouter.put(
   '/:id/receive',
+  zValidator('param', idParamSchema, paramValidationHook),
   zValidator('json', receiveIncomeSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
     }
   }),
   async (c) => {
-    const id = Number(c.req.param('id'));
+    const { id } = c.req.valid('param');
     const { receivedDate } = c.req.valid('json');
     const userId = c.get('userId');
     const svc = createIncomeService(createDb(c.env.DB));
@@ -69,8 +79,8 @@ incomesRouter.put(
 );
 
 // GET /:id — fetch single income
-incomesRouter.get('/:id', async (c) => {
-  const id = Number(c.req.param('id'));
+incomesRouter.get('/:id', zValidator('param', idParamSchema, paramValidationHook), async (c) => {
+  const { id } = c.req.valid('param');
   const userId = c.get('userId');
   const svc = createIncomeService(createDb(c.env.DB));
   const result = await svc.getById(id, userId);
@@ -80,13 +90,14 @@ incomesRouter.get('/:id', async (c) => {
 // PUT /:id — update income
 incomesRouter.put(
   '/:id',
+  zValidator('param', idParamSchema, paramValidationHook),
   zValidator('json', updateIncomeSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { code: 'validation_error', message: 'Invalid request body' } }, 422);
     }
   }),
   async (c) => {
-    const id = Number(c.req.param('id'));
+    const { id } = c.req.valid('param');
     const input = c.req.valid('json');
     const userId = c.get('userId');
     const svc = createIncomeService(createDb(c.env.DB));
@@ -96,8 +107,8 @@ incomesRouter.put(
 );
 
 // DELETE /:id — hard-delete income
-incomesRouter.delete('/:id', async (c) => {
-  const id = Number(c.req.param('id'));
+incomesRouter.delete('/:id', zValidator('param', idParamSchema, paramValidationHook), async (c) => {
+  const { id } = c.req.valid('param');
   const userId = c.get('userId');
   const svc = createIncomeService(createDb(c.env.DB));
   await svc.delete(id, userId);
