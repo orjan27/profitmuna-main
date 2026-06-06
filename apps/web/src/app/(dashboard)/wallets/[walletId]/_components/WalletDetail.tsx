@@ -291,8 +291,13 @@ export function WalletDetail({ detail }: WalletDetailProps) {
   const router = useRouter();
   const { wallet, breakdown, transactions, pagination } = detail;
 
-  // Pagination state via nuqs URL param (D-10)
-  const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(0));
+  // Pagination state via nuqs URL param (D-10).
+  // shallow: false — the RSC page reads `page` from searchParams, so the URL
+  // change must round-trip through the server to fetch the new page of rows.
+  const [page, setPage] = useQueryState(
+    'page',
+    parseAsInteger.withDefault(0).withOptions({ shallow: false })
+  );
 
   // Dialog state
   const [txDialogMode, setTxDialogMode] = useState<
