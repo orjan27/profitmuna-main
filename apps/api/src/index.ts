@@ -13,7 +13,10 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 // (security.md: never reflect a wildcard origin from an auth API).
 app.use('/*', (c, next) =>
   cors({
-    origin: c.env.APP_BASE_URL,
+    // Optional chain: app.request() may be invoked without bindings (tests,
+    // health checks). Falling back to '' allowlists no cross-origin, which is
+    // the safe default for an auth API.
+    origin: c.env?.APP_BASE_URL ?? '',
     allowMethods: ['GET', 'POST'],
     credentials: false,
   })(c, next)
