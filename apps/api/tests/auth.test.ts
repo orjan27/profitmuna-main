@@ -260,7 +260,7 @@ describe('POST /api/auth/register', () => {
     expect(sendMock).toHaveBeenCalledTimes(2);
   });
 
-  it('returns the same generic 201 for an existing email without a second row', async () => {
+  it('throttles a rapid repeat of the same email and creates no second row (CR-02)', async () => {
     const { d1, db } = createTestDb();
     const testEnv = mockEnv({}, d1);
 
@@ -269,18 +269,19 @@ describe('POST /api/auth/register', () => {
       { email: 'dupe@user.test', name: 'First', password: 'password123' },
       testEnv
     );
-    const firstBody = await first.json();
+    expect(first.status).toBe(201);
     sendMock.mockClear();
 
+    // Within the email-send cooldown the repeat is rate-limited (CR-02)
     const second = await postJson(
       '/api/auth/register',
       { email: 'dupe@user.test', name: 'Second', password: 'password456' },
       testEnv
     );
-    expect(second.status).toBe(201);
-    const secondBody = await second.json();
-    expect(secondBody).toEqual(firstBody); // identical shape — no enumeration signal
+    expect(second.status).toBe(429);
+    expect(second.headers.get('Retry-After')).toBeTruthy();
 
+    // No second row, no extra email
     const rows = db
       .select()
       .from(schema.users)
@@ -289,6 +290,27 @@ describe('POST /api/auth/register', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].name).toBe('First');
     expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('rate-limits register identically for unknown vs existing emails (no enumeration leak, CR-02)', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    seedUser(db, {
+      email: 'taken@user.test',
+      name: 'Taken',
+      passwordHash: await hashPassword('password123'),
+      emailVerified: true,
+    });
+
+    // Prime both keys with a first attempt
+    await postJson('/api/auth/register', { email: 'taken@user.test', name: 'X', password: 'password123' }, testEnv);
+    await postJson('/api/auth/register', { email: 'fresh@user.test', name: 'Y', password: 'password123' }, testEnv);
+
+    // Rapid repeats — both throttled the same way regardless of existence
+    const repeatTaken = await postJson('/api/auth/register', { email: 'taken@user.test', name: 'X', password: 'password123' }, testEnv);
+    const repeatFresh = await postJson('/api/auth/register', { email: 'fresh@user.test', name: 'Y', password: 'password123' }, testEnv);
+    expect(repeatTaken.status).toBe(429);
+    expect(repeatFresh.status).toBe(429);
   });
 
   it('rejects passwords shorter than 8 chars with 422', async () => {
@@ -357,6 +379,41 @@ describe('POST /api/auth/verify-email', () => {
 
     const after = db.select().from(schema.users).where(eq(schema.users.id, user.id)).all()[0];
     expect(after.emailVerified).toBe(false);
+  });
+});
+
+describe('POST /api/auth/resend-verification (rate limit, CR-02)', () => {
+  beforeEach(() => {
+    sendMock.mockClear();
+  });
+
+  it('sends one email then throttles a rapid repeat with 429 + Retry-After', async () => {
+    const { d1, db } = createTestDb();
+    const testEnv = mockEnv({}, d1);
+    seedUser(db, {
+      email: 'resend@user.test',
+      name: 'Resend',
+      passwordHash: await hashPassword('password123'),
+      emailVerified: false,
+    });
+
+    const first = await postJson(
+      '/api/auth/resend-verification',
+      { email: 'resend@user.test' },
+      testEnv
+    );
+    expect(first.status).toBe(200);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+
+    const second = await postJson(
+      '/api/auth/resend-verification',
+      { email: 'resend@user.test' },
+      testEnv
+    );
+    expect(second.status).toBe(429);
+    expect(second.headers.get('Retry-After')).toBeTruthy();
+    // No second email scheduled while throttled
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 });
 

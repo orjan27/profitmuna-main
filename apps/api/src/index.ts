@@ -16,7 +16,11 @@ app.use('/*', securityHeaders);
 app.onError((err, c) => {
   if (err instanceof HTTPException) {
     const code = err.message || 'error';
-    return c.json({ error: { code, message: code } }, err.status);
+    // Preserve a Retry-After header when the thrower attached one (e.g. 429
+    // rate-limit responses — security.md requires Retry-After on throttling).
+    const retryAfter = err.res?.headers.get('Retry-After');
+    const headers = retryAfter ? { 'Retry-After': retryAfter } : undefined;
+    return c.json({ error: { code, message: code } }, err.status, headers);
   }
   console.error('unhandled error:', { path: c.req.path, error: err });
   return c.json({ error: { code: 'internal_error', message: 'Something went wrong' } }, 500);

@@ -38,6 +38,51 @@ const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
  * Mitigates T-03-03 email-sending flood; reuses login_attempts table.
  */
 const RESET_COOLDOWN_MS = 5 * 60 * 1000;
+/**
+ * Per-email cooldown for email-sending auth endpoints (register,
+ * resend-verification). Mitigates the email-bomb / Resend cost-abuse vector
+ * (CR-02); reuses the login_attempts table via a namespaced key.
+ */
+const EMAIL_SEND_COOLDOWN_MS = 60 * 1000;
+
+/**
+ * Enforces a per-key cooldown using the login_attempts table as lightweight
+ * rate-limit storage (CR-02). Throws 429 with a Retry-After header when the
+ * key is still within EMAIL_SEND_COOLDOWN_MS of its last recorded attempt;
+ * otherwise records this attempt and returns. We only track lastAttemptAt
+ * (no unread counter — cf. WR-08).
+ *
+ * @throws HTTPException 429 too_many_requests (with Retry-After) when throttled
+ */
+async function enforceEmailCooldown(
+  db: ReturnType<typeof createDb>,
+  key: string
+): Promise<void> {
+  const rows = await db.select().from(loginAttempts).where(eq(loginAttempts.email, key));
+  const last = rows[0];
+  const now = Date.now();
+
+  if (last?.lastAttemptAt) {
+    const elapsed = now - new Date(last.lastAttemptAt).getTime();
+    if (elapsed < EMAIL_SEND_COOLDOWN_MS) {
+      const retryAfterS = Math.ceil((EMAIL_SEND_COOLDOWN_MS - elapsed) / 1000);
+      throw new HTTPException(429, {
+        message: 'too_many_requests',
+        res: new Response(null, { headers: { 'Retry-After': String(retryAfterS) } }),
+      });
+    }
+  }
+
+  const nowIso = new Date(now).toISOString();
+  if (last) {
+    await db
+      .update(loginAttempts)
+      .set({ lastAttemptAt: nowIso })
+      .where(eq(loginAttempts.email, key));
+  } else {
+    await db.insert(loginAttempts).values({ email: key, count: 0, lastAttemptAt: nowIso });
+  }
+}
 
 export type RegisterInput = {
   email: string;
@@ -87,6 +132,10 @@ export async function register(
   input: RegisterInput
 ): Promise<RegisterResult> {
   const db = createDb(d1);
+
+  // Throttle email-sending before any existence check so the cooldown applies
+  // uniformly and never leaks whether the address exists (CR-02).
+  await enforceEmailCooldown(db, `__register__${input.email}`);
 
   const existing = await db.select().from(users).where(eq(users.email, input.email));
   if (existing.length > 0) return null;
@@ -146,6 +195,11 @@ export async function resendVerification(
   email: string
 ): Promise<{ verifyUrl: string; email: string } | null> {
   const db = createDb(d1);
+
+  // Throttle email-sending before any existence check so the cooldown applies
+  // uniformly and never leaks whether the address exists (CR-02).
+  await enforceEmailCooldown(db, `__verify__${email}`);
+
   const rows = await db.select().from(users).where(eq(users.email, email));
   const user = rows[0];
   if (!user || user.emailVerified) return null;
