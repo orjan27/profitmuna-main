@@ -124,6 +124,34 @@ export const expenseCategories = sqliteTable(
   ]
 );
 
+// ─── Phase 3: Profit First Allocation tables ─────────────────────────────────
+
+export const profitFirstAccounts = sqliteTable(
+  'profit_first_accounts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    /** Basis points (0–10000). 500 = 5.00% */
+    targetPercentage: integer('target_percentage').notNull(),
+    /** Hex color from PF_DEFAULT_COLORS palette */
+    color: text('color').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    accountType: text('account_type', {
+      enum: ['PROFIT', 'OWNERS_PAY', 'TAX', 'OPEX', 'CUSTOM'],
+    })
+      .notNull()
+      .default('CUSTOM'),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at')
+      .$defaultFn(() => new Date().toISOString())
+      .$onUpdateFn(() => new Date().toISOString()),
+  },
+  (table) => [uniqueIndex('pfa_user_name_unique').on(table.userId, table.name)]
+);
+
 export const expenses = sqliteTable(
   'expenses',
   {
