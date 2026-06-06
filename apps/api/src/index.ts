@@ -9,6 +9,7 @@ import { incomesRouter } from '@/routes/incomes';
 import { incomeCategoriesRouter } from '@/routes/income-categories';
 import { expensesRouter } from '@/routes/expenses';
 import { expenseCategoriesRouter } from '@/routes/expense-categories';
+import { profitFirstRouter } from '@/routes/profit-first';
 import type { Bindings, Variables } from '@/types';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -66,5 +67,8 @@ app.route('/api/expenses', expensesRouter);
 
 app.use('/api/expense-categories/*', requireAuth);
 app.route('/api/expense-categories', expenseCategoriesRouter);
+
+// Profit First allocation routes — auth guard applied inside profitFirstRouter via .use('/*', requireAuth)
+app.route('/api/profit-first', profitFirstRouter);
 
 export default app;
