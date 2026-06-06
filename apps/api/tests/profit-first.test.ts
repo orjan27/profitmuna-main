@@ -534,4 +534,77 @@ describe('PF-04: allocation summary', () => {
     // Math.round((100000 * 500) / 10000) = 5000
     expect(profitAcc?.computedBalance).toBe(5000);
   });
+
+  it('returns distinct income categories present in user income', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, {
+      email: 'categories@pf.test',
+      name: 'Categories User',
+      emailVerified: true,
+    });
+    const { createDb } = await import('@app/db');
+    const drizzleDb = createDb(d1);
+    const svc = createProfitFirstService(drizzleDb);
+
+    // Seed a PF account so getSummary has accounts to return
+    db.insert(schema.profitFirstAccounts)
+      .values({
+        name: 'Profit',
+        targetPercentage: 500,
+        color: '#10b981',
+        sortOrder: 0,
+        accountType: 'PROFIT',
+        userId: user.id,
+      })
+      .run();
+
+    // Seed two distinct income categories
+    const [catSales] = db
+      .insert(schema.incomeCategories)
+      .values({ name: 'Sales', userId: user.id, system: false })
+      .returning()
+      .all();
+
+    const [catConsulting] = db
+      .insert(schema.incomeCategories)
+      .values({ name: 'Consulting', userId: user.id, system: false })
+      .returning()
+      .all();
+
+    // Two RECEIVED + profitFirstAllocated incomes under different categories
+    db.insert(schema.incomes)
+      .values({
+        categoryId: catSales.id,
+        categoryName: 'Sales',
+        amount: 50000,
+        incomeDate: '2026-01-15',
+        moneyStatus: 'RECEIVED',
+        profitFirstAllocated: true,
+        userId: user.id,
+      })
+      .run();
+
+    db.insert(schema.incomes)
+      .values({
+        categoryId: catConsulting.id,
+        categoryName: 'Consulting',
+        amount: 80000,
+        incomeDate: '2026-02-10',
+        moneyStatus: 'RECEIVED',
+        profitFirstAllocated: true,
+        userId: user.id,
+      })
+      .run();
+
+    const summary = await svc.getSummary(user.id);
+
+    // categories must include both distinct categories, ordered by name
+    expect(summary.categories).toHaveLength(2);
+    const names = summary.categories.map((c) => c.name);
+    expect(names).toContain('Sales');
+    expect(names).toContain('Consulting');
+    // ids must be numbers matching the seeded category rows
+    const salesCat = summary.categories.find((c) => c.name === 'Sales');
+    expect(salesCat?.id).toBe(catSales.id);
+  });
 });

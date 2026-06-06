@@ -89,6 +89,12 @@ export type ProfitFirstSummary = {
   /** Total received + allocated income in cents */
   totalIncome: number;
   accounts: AccountSummaryItem[];
+  /**
+   * Distinct income categories present in the user's RECEIVED + profitFirstAllocated income.
+   * Always the full set regardless of active date/category filters — provides filter options.
+   * Empty array when the user has no qualifying income.
+   */
+  categories: Array<{ id: number; name: string }>;
 };
 
 export type CreateAccountInput = {
@@ -172,6 +178,33 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
   }
 
   /**
+   * Returns the DISTINCT (categoryId, categoryName) pairs from the user's
+   * RECEIVED + profitFirstAllocated income, ordered by name.
+   *
+   * Intentionally does NOT apply date-range or categoryIds filters — the option
+   * list must remain complete regardless of which filter is active (T-03-06-01:
+   * scoped strictly to userId to prevent cross-user data leakage).
+   *
+   * @param userId  Authenticated user ID — always server-supplied, never from input
+   * @returns Ordered list of distinct categories; empty array when no qualifying income
+   */
+  async function getIncomeCategories(userId: number): Promise<Array<{ id: number; name: string }>> {
+    const rows = await db
+      .selectDistinct({ id: incomes.categoryId, name: incomes.categoryName })
+      .from(incomes)
+      .where(
+        and(
+          eq(incomes.userId, userId),
+          eq(incomes.moneyStatus, 'RECEIVED'),
+          eq(incomes.profitFirstAllocated, true)
+        )
+      )
+      .orderBy(incomes.categoryName);
+
+    return rows.map((r) => ({ id: r.id, name: r.name }));
+  }
+
+  /**
    * Computes the derived balance for a single account.
    * Integer math only — no floating point (Pitfall 2, D-08).
    *
@@ -197,13 +230,15 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       filters?: SummaryFilters
     ): Promise<ProfitFirstSummary> {
       // Parallel queries to minimize D1 round-trips
-      const [totalIncome, accounts] = await Promise.all([
+      const [totalIncome, accounts, categories] = await Promise.all([
         getTotalReceivedIncome(userId, dateRange, filters),
         db
           .select()
           .from(profitFirstAccounts)
           .where(eq(profitFirstAccounts.userId, userId))
           .orderBy(profitFirstAccounts.sortOrder),
+        // Category list is always unfiltered — must show all options regardless of active filter
+        getIncomeCategories(userId),
       ]);
 
       return {
@@ -218,6 +253,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
           accountType: a.accountType,
           computedBalance: computeBalance(totalIncome, a.targetPercentage),
         })),
+        categories,
       };
     },
 
