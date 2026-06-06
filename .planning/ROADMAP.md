@@ -34,7 +34,7 @@
 4. User can reset a forgotten password by entering their email and following the Resend-delivered link
 5. User can log out from any page and have all tokens cleared
 6. User receives a welcome email after successful registration
-   **Plans**: 4 plans
+   **Plans**: 6 plans (4 original + 2 gap-closure)
 
 Plans:
 
@@ -69,7 +69,7 @@ Plans:
 3. User can record an expense with category, amount, date, payment method, and description; soft-deleted expenses are excluded from totals but restorable
 4. User can browse a paginated expense list filtered by date range and edit or soft-delete records
 5. User can manage income and expense categories — create, edit, and delete custom categories; system default categories are protected and cannot be deleted
-   **Plans**: 4 plans
+   **Plans**: 6 plans (4 original + 2 gap-closure)
 
 Plans:
 
@@ -100,7 +100,7 @@ Plans:
 2. User can update allocation percentages, with the system validating that all percentages sum to exactly 100% (stored as basis points)
 3. User can create and delete custom allocation accounts; default accounts cannot be deleted; an account linked to a wallet cannot be deleted
 4. User can view an allocation summary showing the derived balance per account (totalReceivedAllocatedIncome × targetPercentage / 10000), filterable by date range and income category
-   **Plans**: 4 plans
+   **Plans**: 6 plans (4 original + 2 gap-closure)
 
 Plans:
 
@@ -119,6 +119,11 @@ Plans:
 **Wave 4** _(blocked on Wave 3 completion)_
 
 - [x] 03-04-PLAN.md — Mutation UI: percent→bp server actions, bulk percentage editor (100% gate), create/edit/delete account dialogs with preset swatches, wired per-account dropdown (PF-02, PF-03)
+
+**Gap closure** _(VERIFICATION 2026-06-06: SC2 partial, SC4 partial)_
+
+- [ ] 03-05-PLAN.md — Gap 2 (CR-01): updatePercentages enforces exact user-owned account coverage before sum-to-100% validation; partial-set 400 regression test (PF-02)
+- [ ] 03-06-PLAN.md — Gap 1 (WR-01): getSummary returns distinct user income categories; page.tsx derives categoryOptions and passes to PfFilters; empty-state when no categories (PF-04)
 
 **UI hint**: yes
 
@@ -188,7 +193,7 @@ Plans:
 | Phase                       | Plans Complete | Status      | Completed  |
 | --------------------------- | -------------- | ----------- | ---------- |
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
-| 2. Income & Expenses        | 3/4 | In Progress|  |
+| 2. Income & Expenses        | 3/4            | In Progress |            |
 | 3. Profit First Allocation  | 4/4            | Complete    | 2026-06-06 |
 | 4. Wallets                  | 0/3            | Planned     | -          |
 | 5. Dashboard                | 0/0            | Not started | -          |
