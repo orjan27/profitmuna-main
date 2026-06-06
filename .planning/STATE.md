@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 04 Plan 02 complete (wallet CRUD service, balance computation, create form, list page — WAL-01/02/03)
-last_updated: "2026-06-06T13:14:02.113Z"
+stopped_at: Phase 04 Plan 03 complete — wallet detail, manual transactions, WAL-04/05 (Phase 4 fully complete)
+last_updated: '2026-06-06T21:30:00.000Z'
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 17
-  completed_plans: 16
-  percent: 50
+  completed_plans: 17
+  percent: 100
 ---
 
 # State: Profitmuna
@@ -69,6 +69,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 03 P06 | ~10 min active | 2 tasks | 4 files |
 | Phase 04 P01 | ~6 min active | 3 tasks | 10 files |
 | Phase 04 P02 | 12 | 4 tasks | 10 files |
+| Phase 04 P03 | 12 | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -107,11 +108,17 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 
 None currently.
 
+### Quick Tasks Completed
+
+| #          | Description                                                                                                               | Date       | Commit  | Directory                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| 260606-tln | Shared navbar in (dashboard) shell; moved /income + /expenses into route group; ROADMAP Phase 5 nav-shell criterion added | 2026-06-06 | 14fb3e6 | [260606-tln-add-shared-navbar-to-authenticated-app-s](./quick/260606-tln-add-shared-navbar-to-authenticated-app-s/) |
+
 ---
 
 ## Session Continuity
 
-**Stopped at:** Phase 04 Plan 01 complete (wallet foundation — schema, migration, BFF proxy, Zod schemas, types, test scaffold)
+**Stopped at:** Phase 5 UI-SPEC approved
 **Next:** Phase 04 Plan 02 — wallet CRUD service, server actions, wallet list UI
 
 **Phase 1 completed files (Plans 01-02):**
@@ -162,3 +169,6 @@ _State initialized: 2026-06-05_
 - [Phase 04-02]: GET /api/profit-first/summary used for PF accounts (no standalone GET /accounts endpoint); accounts in summary.data.accounts
 - [Phase 04-02]: Edit dropdown in WalletCard navigates to /wallets/{id} detail page (D-05); no separate /edit route created in Phase 4
 - [Phase 04-02]: setIncomeCategoryMappings/setExpenseMappings implemented in Task 1a factory alongside create/update; WAL-02 tests were green on first run (plan-authorized ordering)
+- [Phase ?]: [Phase 04-03]: assertCanInsertTransaction module-level, pure (no DB), runs before insert — double-count guard (T-04-12)
+- [Phase ?]: [Phase 04-03]: getById balance queries exclude deletedAt; history queries include deletedAt — Pitfall 4 distinct queries
+- [Phase ?]: [Phase 04-03]: WalletDetail blocking uses breakdown cents as conservative proxy; server enforces assertCanInsertTransaction regardless
