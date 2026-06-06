@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+
+@theme {
+  /*
+   * Warm monochrome ramp. The surface is white, warm gray, near-black.
+   * Color means money: income/expense hues appear only on monetary
+   * amounts and allocation states, always paired with a sign or label.
+   * No pure #000 or #fff anywhere (The No Pure Extremes Rule).
+   */
+  --color-paper: oklch(0.982 0.004 80);
+  --color-ink: oklch(0.21 0.007 75);
+  --color-ink-soft: oklch(0.45 0.006 75);
+  --color-ink-faint: oklch(0.52 0.006 75);
+  --color-hairline: oklch(0.9 0.004 80);
+  --color-raised: oklch(0.96 0.005 80);
+
+  /* Semantic: money only */
+  --color-income: oklch(0.48 0.11 155);
+  --color-expense: oklch(0.51 0.14 27);
+
+  /* shadcn/ui token mapping onto the monochrome ramp */
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-ink);
+  --color-card: oklch(0.99 0.003 85);
+  --color-card-foreground: var(--color-ink);
+  --color-popover: oklch(0.99 0.003 85);
+  --color-popover-foreground: var(--color-ink);
+  --color-primary: var(--color-ink);
+  --color-primary-foreground: var(--color-paper);
+  --color-secondary: var(--color-raised);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted: var(--color-raised);
+  --color-muted-foreground: var(--color-ink-soft);
+  --color-accent: var(--color-raised);
+  --color-accent-foreground: var(--color-ink);
+  --color-destructive: var(--color-expense);
+  --color-border: var(--color-hairline);
+  --color-input: var(--color-hairline);
+  --color-ring: oklch(0.65 0.006 75);
+
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+
+  /* Ease-out exponential only; no bounce, no elastic */
+  --animate-rise: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fill: fill 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fill {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
