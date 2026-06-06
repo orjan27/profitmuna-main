@@ -16,6 +16,9 @@ const UNAUTHED_PATHS = new Set([
   'reset-password',
   'resend-verification',
   'refresh',
+  // OAuth flow — no session cookie exists at this point
+  'google',
+  'callback',
 ]);
 
 /**
