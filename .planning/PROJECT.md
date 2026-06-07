@@ -33,14 +33,15 @@ The finance functionality must work **exactly like** the existing rentals app at
 - ✓ Profit First accounts with configurable percentages (server-enforced sum-to-100% validation), custom accounts — Validated in Phase 3: Profit First Allocation
 - ✓ Allocation summary with derived balances, date-range and category filters — Validated in Phase 3: Profit First Allocation
 
+- ✓ In-app notification center (read/unread, bell badge, mark-all-read, deep links) — Validated in Phase 6: Settings & Notifications
+- ✓ Scheduled income-logging reminder emails based on user preference (Workers hourly cron + Resend, Manila time) — Validated in Phase 6: Settings & Notifications
+- ✓ User-selectable currency setting (app-wide via CurrencyProvider) — Validated in Phase 6: Settings & Notifications
+
 ### Active
 
 - [ ] Income CRUD with categories, PENDING/RECEIVED status, receive transition
 - [ ] Expense CRUD with categories, payment method, soft delete
 - [ ] Wallets with PF-account linking, category mappings, manual transactions, computed balances
-- [ ] In-app notification center (read/unread)
-- [ ] Scheduled income-logging reminder emails based on user preference (Workers cron)
-- [ ] User-selectable currency setting
 
 ### Out of Scope
 
@@ -97,4 +98,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-06-06 — Phase 4 (Wallets) complete: PROFIT_FIRST/BLANK wallets, category mapping with conflict blocking, computed balances, manual transactions with soft-delete/restore, paginated history; 5/5 browser UAT items passed in 04-HUMAN-UAT.md_
+_Last updated: 2026-06-07 — Phase 6 (Settings & Notifications) complete: display-currency setting with app-wide CurrencyProvider, income reminder schedule (Daily/Weekly/Monthly, Manila hour), notification center with bell/badge/mark-read, hourly Workers cron producing Resend reminder emails + INCOME_REMINDER/PENDING_INCOME_DUE notifications; 4 human-UAT items pending in 06-HUMAN-UAT.md_
