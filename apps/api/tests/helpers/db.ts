@@ -9,7 +9,7 @@ import type { Bindings } from '@/types';
 type SqliteDb = InstanceType<typeof Database>;
 
 // Raw DDL mirroring packages/db/src/schema.ts — keep in sync with the Drizzle schema.
-// Phase 1: auth tables; Phase 2: income/expense tables.
+// Phase 1: auth tables; Phase 2: income/expense tables; Phase 6: notifications + settings.
 const DDL = `
 CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,6 +19,12 @@ CREATE TABLE users (
   email_verified INTEGER NOT NULL DEFAULT 0,
   verified_at TEXT,
   google_id TEXT UNIQUE,
+  display_currency TEXT NOT NULL DEFAULT 'PHP',
+  reminder_enabled INTEGER NOT NULL DEFAULT 0,
+  reminder_frequency TEXT,
+  reminder_day_of_week INTEGER,
+  reminder_day_of_month INTEGER,
+  reminder_hour INTEGER,
   created_at TEXT
 );
 CREATE TABLE refresh_tokens (
@@ -68,6 +74,7 @@ CREATE TABLE incomes (
   received_date TEXT,
   profit_first_allocated INTEGER NOT NULL DEFAULT 1,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pending_due_notified_at TEXT,
   created_at TEXT,
   updated_at TEXT
 );
@@ -169,6 +176,20 @@ CREATE TABLE wallet_transactions (
 );
 CREATE INDEX wt_user_wallet_idx ON wallet_transactions (user_id, wallet_id);
 CREATE INDEX wt_wallet_date_idx ON wallet_transactions (wallet_id, transaction_date);
+
+-- Phase 6: Notifications table
+CREATE TABLE notifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  link TEXT,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT
+);
+CREATE INDEX notif_user_read_created_idx ON notifications (user_id, read, created_at);
+CREATE INDEX notif_user_read_idx ON notifications (user_id, read);
 `;
 
 function makeStatement(sqlite: SqliteDb, query: string, params: unknown[]) {

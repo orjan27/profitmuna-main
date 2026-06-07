@@ -11,6 +11,18 @@ export const users = sqliteTable('users', {
   verifiedAt: text('verified_at'),
   // Nullable — set when a Google identity is linked
   googleId: text('google_id').unique(),
+  // Phase 6: Settings columns — inserted before createdAt
+  // ISO 4217 currency code; default PHP (₱) preserves all existing call sites (SET-01)
+  displayCurrency: text('display_currency').notNull().default('PHP'),
+  // Reminders off by default until explicitly configured (D-02 recommendation)
+  reminderEnabled: integer('reminder_enabled', { mode: 'boolean' }).notNull().default(false),
+  reminderFrequency: text('reminder_frequency', { enum: ['DAILY', 'WEEKLY', 'MONTHLY'] }),
+  // 0–6 (Sun–Sat); null if not WEEKLY
+  reminderDayOfWeek: integer('reminder_day_of_week'),
+  // 1–28; null if not MONTHLY (capped at 28 to avoid day-31 short-month pitfall)
+  reminderDayOfMonth: integer('reminder_day_of_month'),
+  // 0–23 Manila time; null if reminders disabled
+  reminderHour: integer('reminder_hour'),
   createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
 });
 
@@ -93,6 +105,8 @@ export const incomes = sqliteTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    // Phase 6: dedup guard — set once when PENDING_INCOME_DUE notification fires (D-07)
+    pendingDueNotifiedAt: text('pending_due_notified_at'),
     createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
     updatedAt: text('updated_at')
       .$defaultFn(() => new Date().toISOString())
@@ -295,5 +309,29 @@ export const walletTransactions = sqliteTable(
   (table) => [
     index('wt_user_wallet_idx').on(table.userId, table.walletId),
     index('wt_wallet_date_idx').on(table.walletId, table.transactionDate),
+  ]
+);
+
+// ─── Phase 6: Notifications ───────────────────────────────────────────────────
+
+export const notifications = sqliteTable(
+  'notifications',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: text('type', { enum: ['INCOME_REMINDER', 'PENDING_INCOME_DUE'] }).notNull(),
+    title: text('title').notNull(),
+    message: text('message').notNull(),
+    link: text('link'),
+    read: integer('read', { mode: 'boolean' }).notNull().default(false),
+    createdAt: text('created_at')
+      .$defaultFn(() => new Date().toISOString())
+      .notNull(),
+  },
+  (table) => [
+    index('notif_user_read_created_idx').on(table.userId, table.read, table.createdAt),
+    index('notif_user_read_idx').on(table.userId, table.read),
   ]
 );
