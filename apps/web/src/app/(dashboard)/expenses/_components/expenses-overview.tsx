@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useCallback } from 'react';
+import { useState, useTransition, useCallback, useEffect } from 'react';
 import { useQueryState } from 'nuqs';
 import { MoreHorizontal, Plus, SlidersHorizontal } from 'lucide-react';
 
@@ -66,6 +66,15 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
   const [isLast, setIsLast] = useState(initialData.last);
 
   const [isLoadingMore, startLoadMoreTransition] = useTransition();
+
+  // Re-sync accumulator when the RSC parent re-fetches after router.refresh()
+  // (e.g. after a create via the Record sheet). useState ignores prop changes
+  // after initial mount, so an effect is needed to pick up the new initialData.
+  useEffect(() => {
+    setExpenses(initialData.content);
+    setCurrentPage(initialData.page);
+    setIsLast(initialData.last);
+  }, [initialData]);
 
   const activeFilterCount = [from, to].filter(Boolean).length;
   // Collapsed unless a shared/refreshed URL already carries a filter
@@ -187,7 +196,8 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm" onClick={() => openRecordSheet('expense')}>
+            {/* Hidden on mobile: RecordFab is the record affordance there. */}
+            <Button size="sm" className="max-md:hidden" onClick={() => openRecordSheet('expense')}>
               <Plus aria-hidden="true" />
               Record expense
             </Button>
