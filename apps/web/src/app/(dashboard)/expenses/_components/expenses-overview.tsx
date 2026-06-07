@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
-import { formatCurrency } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { fetchExpensesAction } from './expense-actions';
 import { ExpenseList } from './expense-list';
 import type { ExpenseRow } from './edit-expense-dialog';
@@ -55,6 +55,7 @@ const PAGE_LIMIT = 20;
  */
 export function ExpensesOverview({ initialData, categories }: ExpensesOverviewProps) {
   const { openRecordSheet } = useRecordSheet();
+  const formatCurrency = useFormatCurrency();
 
   // Date-range filter via nuqs (D-07) — synced to URL search params
   const [from, setFrom] = useQueryState('from', { defaultValue: '' });

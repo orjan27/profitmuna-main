@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import type { Income, IncomeCategory } from '@/types/income';
-import { formatCurrency } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { IncomeFilters } from './income-filters';
 import { IncomeList } from './income-list';
 import { EditIncomeDialog } from './edit-income-dialog';
@@ -40,6 +40,7 @@ interface IncomeOverviewProps {
  */
 export function IncomeOverview({ initialData, categories }: IncomeOverviewProps) {
   const { openRecordSheet } = useRecordSheet();
+  const formatCurrency = useFormatCurrency();
 
   const [items, setItems] = useState<Income[]>(initialData.content);
   const [currentPage, setCurrentPage] = useState(initialData.page);

@@ -18,6 +18,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Expenses', href: '/expenses' },
   { label: 'Profit First', href: '/profit-first' },
   { label: 'Wallets', href: '/wallets' },
+  { label: 'Settings', href: '/settings' },
 ] as const;
 
 /**

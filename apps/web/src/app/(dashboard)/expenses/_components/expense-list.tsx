@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
-import { formatCurrency } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { formatDateGroup } from '@/lib/format-date';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import { restoreExpenseAction } from './expense-actions';
@@ -65,6 +65,7 @@ interface DeletedRowProps {
 }
 
 function DeletedExpenseRow({ expense, onMutated }: DeletedRowProps) {
+  const formatCurrency = useFormatCurrency();
   const [isPending, startTransition] = useTransition();
 
   function handleRestore() {
@@ -115,6 +116,7 @@ interface ActiveRowProps {
 }
 
 function ActiveExpenseRow({ expense, categories, onMutated }: ActiveRowProps) {
+  const formatCurrency = useFormatCurrency();
   const [dialogOpen, setDialogOpen] = useState(false);
   const pmLabel = paymentMethodLabel(expense.paymentMethod);
 

@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Income } from '@/types/income';
-import { formatCurrency } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { receiveIncomeAction } from './income-actions';
 
 interface ReceiveIncomeDialogProps {
@@ -40,6 +40,7 @@ function todayLocal(): string {
  * Only reachable from PENDING rows in the income list.
  */
 export function ReceiveIncomeDialog({ income, open, onClose }: ReceiveIncomeDialogProps) {
+  const formatCurrency = useFormatCurrency();
   const [receivedDate, setReceivedDate] = useState(todayLocal());
   const [isPending, startTransition] = useTransition();
 
