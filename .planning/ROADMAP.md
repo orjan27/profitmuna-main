@@ -218,8 +218,8 @@ Plans:
 
 **Wave 1** _(blocked on 06-01; 06-02 and 06-03 run in parallel — no file overlap)_
 
-- [ ] 06-02-PLAN.md — Settings slice: settings service/schema/router behind requireAuth, BFF proxy, SSR settings page + form (currency + Daily/Weekly/Monthly reminder schedule), CurrencyProvider wired into layout, Settings nav link (SET-01, SET-02)
-- [ ] 06-03-PLAN.md — Notification center slice: notification service (list/unread-count/markAsRead/markAllAsRead/create)/router behind requireAuth, BFF proxy, NotificationBell + NotificationList, bell wired into nav with SSR unread count (NOTIF-01)
+- [x] 06-02-PLAN.md — Settings slice: settings service/schema/router behind requireAuth, BFF proxy, SSR settings page + form (currency + Daily/Weekly/Monthly reminder schedule), CurrencyProvider wired into layout, Settings nav link (SET-01, SET-02)
+- [x] 06-03-PLAN.md — Notification center slice: notification service (list/unread-count/markAsRead/markAllAsRead/create)/router behind requireAuth, BFF proxy, NotificationBell + NotificationList, bell wired into nav with SSR unread count (NOTIF-01)
 
 **Wave 2** _(blocked on 06-02 + 06-03 completion)_
 
@@ -238,7 +238,7 @@ Plans:
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
 | 4. Wallets                  | 4/4            | Complete    | 2026-06-06 |
 | 5. Dashboard                | 0/3            | Gap closure | -          |
-| 6. Settings & Notifications | 1/4 | In Progress|  |
+| 6. Settings & Notifications | 3/4 | In Progress|  |
 
 ---
 
