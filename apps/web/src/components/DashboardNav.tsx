@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { BrandMark } from '@/components/BrandMark';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import type { Notification } from '@/types/notifications';
 
 interface NavItem {
   readonly label: string;
@@ -21,26 +23,34 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Settings', href: '/settings' },
 ] as const;
 
+interface DashboardNavProps {
+  /** SSR-fetched unread notification count for the bell badge. */
+  unreadCount?: number;
+  /** SSR-fetched notifications list for the dropdown panel. */
+  notifications?: Notification[];
+}
+
 /**
  * Shared top bar for all authenticated pages. At md+ it carries the brand
- * lockup and five quiet text links; on mobile the links hide and this becomes
- * a slim brand bar — navigation moves to BottomNav. Active state is carried
- * by ink color and weight, not pills or icons — the chrome stays out of the
- * money's way.
+ * lockup and nav links; on mobile the links hide and this becomes a slim brand
+ * bar — navigation moves to BottomNav. Active state is carried by ink color
+ * and weight, not pills or icons — the chrome stays out of the money's way.
  *
- * Record actions live in page content (one labeled primary per page; the
- * mobile RecordFab on record pages), not in the chrome — one primary action
- * per view.
+ * The bell (NOTIF-01) sits rightmost in the third column, after ThemeToggle,
+ * with ml-auto. Unread count and list are fetched SSR in the layout and passed
+ * down; client-side optimistic updates live in NotificationList.
  *
- * Client Component: usePathname for active state. Sits on the deeper chrome
- * gray (paper-deep) so the content surface reads as the page.
+ * Client Component: usePathname for active state.
  */
-export function DashboardNav(): React.JSX.Element {
+export function DashboardNav({
+  unreadCount = 0,
+  notifications = [],
+}: DashboardNavProps): React.JSX.Element {
   const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-10 border-b border-hairline bg-paper-deep/90 backdrop-blur">
-      {/* Three-zone grid: brand | centered links | theme toggle.
+      {/* Three-zone grid: brand | centered links | actions (theme toggle + bell).
           Equal 1fr side columns keep the menu truly centered in the bar. */}
       <div className="mx-auto grid h-14 w-full max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-4 md:px-8">
         <Link
@@ -76,8 +86,12 @@ export function DashboardNav(): React.JSX.Element {
           </ul>
         </nav>
 
-        <div className="col-start-3 justify-self-end">
+        {/* Right-side actions: theme toggle + notification bell (bell is ml-auto rightmost) */}
+        <div className="col-start-3 flex items-center justify-self-end gap-1">
           <ThemeToggle />
+          <div className="ml-auto">
+            <NotificationBell unreadCount={unreadCount} notifications={notifications} />
+          </div>
         </div>
       </div>
     </header>
