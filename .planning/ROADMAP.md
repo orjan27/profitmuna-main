@@ -238,7 +238,7 @@ Plans:
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
 | 4. Wallets                  | 4/4            | Complete    | 2026-06-06 |
 | 5. Dashboard                | 0/3            | Gap closure | -          |
-| 6. Settings & Notifications | 4/4 | Complete   | 2026-06-07 |
+| 6. Settings & Notifications | 4/4            | Complete    | 2026-06-07 |
 
 ---
 

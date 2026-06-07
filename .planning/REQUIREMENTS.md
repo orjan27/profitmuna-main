@@ -50,13 +50,13 @@ Requirements for initial release. Each maps to roadmap phases. Finance behavior 
 
 ### Notifications
 
-- [ ] **NOTIF-01**: User has an in-app notification center with read/unread states
-- [ ] **NOTIF-02**: User receives scheduled income-logging reminder emails based on their configured preference (Workers cron + Resend)
+- [x] **NOTIF-01**: User has an in-app notification center with read/unread states
+- [x] **NOTIF-02**: User receives scheduled income-logging reminder emails based on their configured preference (Workers cron + Resend)
 
 ### Settings
 
-- [ ] **SET-01**: User can select their display currency
-- [ ] **SET-02**: User can configure their income reminder schedule
+- [x] **SET-01**: User can select their display currency
+- [x] **SET-02**: User can configure their income reminder schedule
 
 ### Dashboard
 
@@ -111,10 +111,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WAL-04      | Phase 4 | Complete |
 | WAL-05      | Phase 4 | Complete |
 | DASH-01     | Phase 5 | Complete |
-| SET-01      | Phase 6 | Pending  |
-| SET-02      | Phase 6 | Pending  |
-| NOTIF-01    | Phase 6 | Pending  |
-| NOTIF-02    | Phase 6 | Pending  |
+| SET-01      | Phase 6 | Complete |
+| SET-02      | Phase 6 | Complete |
+| NOTIF-01    | Phase 6 | Complete |
+| NOTIF-02    | Phase 6 | Complete |
 
 **Coverage:**
 
