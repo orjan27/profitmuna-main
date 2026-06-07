@@ -13,6 +13,7 @@ import { profitFirstRouter } from '@/routes/profit-first';
 import { walletsRouter } from '@/routes/wallets';
 import { dashboardRouter } from '@/routes/dashboard';
 import { settingsRouter } from '@/routes/settings';
+import { notificationsRouter } from '@/routes/notifications';
 import type { Bindings, Variables } from '@/types';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -82,5 +83,8 @@ app.route('/api/dashboard', dashboardRouter);
 
 // Settings routes — auth guard applied inside settingsRouter via .use('/*', requireAuth) (T-6-03)
 app.route('/api/settings', settingsRouter);
+
+// Notification routes — auth guard applied inside notificationsRouter via .use('/*', requireAuth) (T-6-07)
+app.route('/api/notifications', notificationsRouter);
 
 export default app;
