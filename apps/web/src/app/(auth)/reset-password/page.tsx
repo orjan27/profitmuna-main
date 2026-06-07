@@ -14,7 +14,7 @@ export default async function ResetPasswordPage({ searchParams }: ResetPasswordP
     return (
       <main className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
         <Link href="/" aria-label="Profitmuna home" className="mb-10">
-          <BrandMark markClassName="h-6" />
+          <BrandMark markClassName="h-12" />
         </Link>
         <div className="w-full max-w-sm">
           <h1 className="text-xl font-semibold tracking-tight">Invalid reset link</h1>
@@ -35,7 +35,7 @@ export default async function ResetPasswordPage({ searchParams }: ResetPasswordP
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
       <Link href="/" aria-label="Profitmuna home" className="mb-10">
-        <BrandMark markClassName="h-6" />
+        <BrandMark markClassName="h-12" />
       </Link>
       <ResetPasswordForm token={token} />
     </main>

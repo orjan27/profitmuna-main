@@ -7,7 +7,7 @@ export default function RegisterPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
       <Link href="/" aria-label="Profitmuna home" className="mb-10">
-        <BrandMark markClassName="h-6" />
+        <BrandMark markClassName="h-12" />
       </Link>
       <RegisterForm />
     </main>

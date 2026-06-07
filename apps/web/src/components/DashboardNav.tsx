@@ -47,7 +47,7 @@ export function DashboardNav(): React.JSX.Element {
           aria-label="Profitmuna overview"
           className="shrink-0 justify-self-start"
         >
-          <BrandMark />
+          <BrandMark markClassName="h-8" />
         </Link>
 
         {/* md+: BottomNav owns primary navigation on mobile. */}
