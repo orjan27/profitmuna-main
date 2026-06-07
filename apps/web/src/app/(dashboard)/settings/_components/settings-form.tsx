@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { StellaSprite } from '@/components/Stella';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -120,7 +121,9 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
         throw new Error('Settings save failed');
       }
 
-      toast.success('Settings saved.');
+      toast.success('Settings saved.', {
+        icon: <StellaSprite mood="wink" size={20} decorative />,
+      });
       router.refresh();
     } catch {
       toast.error('Could not save settings. Please try again.');

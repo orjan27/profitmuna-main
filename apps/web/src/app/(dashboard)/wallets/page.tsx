@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/format-currency';
 import type { CurrencyCode } from '@/lib/format-currency';
 import type { UserSettings } from '@/types/settings';
 import { Button } from '@/components/ui/button';
+import { StellaSprite } from '@/components/Stella';
 import { WalletFab } from '@/components/WalletFab';
 import type { WalletListItem, PfAccount } from '@/types/wallet';
 import { WalletRow } from './_components/WalletRow';
@@ -93,7 +94,8 @@ export default async function WalletsPage() {
       ) : (
         /* Empty state (D-04) */
         <div className="py-20 text-center">
-          <p className="text-base font-medium">No wallets yet</p>
+          <StellaSprite mood="sleeping" size={64} className="mx-auto" />
+          <p className="mt-5 text-base font-medium">No wallets yet</p>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-faint">
             Track where your money actually sits by creating a wallet for each allocation account.
           </p>

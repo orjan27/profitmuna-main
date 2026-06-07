@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Income } from '@/types/income';
 import { useFormatCurrency } from '@/components/CurrencyProvider';
+import { StellaSprite } from '@/components/Stella';
 import { receiveIncomeAction } from './income-actions';
 
 interface ReceiveIncomeDialogProps {
@@ -51,7 +52,10 @@ export function ReceiveIncomeDialog({ income, open, onClose }: ReceiveIncomeDial
         toast.error('Failed to mark income as received. Please try again.');
         return;
       }
-      toast.success('Income marked as received.');
+      // The split moment — the money just landed in the buckets.
+      toast.success('Income marked as received.', {
+        icon: <StellaSprite mood="happy" size={20} decorative />,
+      });
       onClose();
     });
   }

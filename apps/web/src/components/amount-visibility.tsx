@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useFormatCurrency } from '@/components/CurrencyProvider';
+import { StellaSprite } from '@/components/Stella';
 
 const STORAGE_KEY = 'pf-amounts-visible';
 
@@ -47,7 +47,8 @@ interface AmountToggleProps {
 
 /**
  * Icon-only button that toggles amount visibility.
- * Uses Eye (show) / EyeOff (hide) lucide icons with tooltip labels.
+ * Shows a tiny Stella: eyes open while amounts show, eyes closed while they
+ * hide ("Stella's not looking"). Crossfades between the two poses.
  * Minimum 44px touch target via padding (accessibility requirement).
  */
 export function AmountToggle({ visible, toggle }: AmountToggleProps) {
@@ -61,7 +62,7 @@ export function AmountToggle({ visible, toggle }: AmountToggleProps) {
           aria-label={visible ? 'Hide amounts' : 'Show amounts'}
           className="min-h-[44px] min-w-[44px]"
         >
-          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          <StellaSprite mood={visible ? 'smiling' : 'happy'} size={24} animated decorative />
         </Button>
       </TooltipTrigger>
       <TooltipContent>

@@ -7,6 +7,7 @@ import type { Income } from '@/types/income';
 import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { formatDateGroup } from '@/lib/format-date';
 import { Button } from '@/components/ui/button';
+import { StellaSprite } from '@/components/Stella';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 
 interface IncomeListProps {
@@ -61,7 +62,8 @@ export function IncomeList({ items, filtered, onEditRow, onReceiveRow }: IncomeL
     }
     return (
       <div className="py-20 text-center">
-        <p className="text-base font-medium">Nothing recorded yet</p>
+        <StellaSprite mood="sleeping" size={64} className="mx-auto" />
+        <p className="mt-5 text-base font-medium">Nothing recorded yet</p>
         <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-ink-faint">
           Record your first income and watch it split across your buckets.
         </p>

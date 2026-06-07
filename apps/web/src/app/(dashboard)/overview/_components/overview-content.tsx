@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/format-date';
 import { Button } from '@/components/ui/button';
 import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
+import { StellaSprite, useIdleWink, type StellaMood } from '@/components/Stella';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import { PfAllocationBar } from '@/app/(dashboard)/profit-first/_components/pf-allocation-bar';
 import type { DashboardSummary, RecentTransaction } from '@/types/dashboard';
@@ -85,6 +86,30 @@ export function OverviewContent({
   const walletBalanceCents = summary?.totalWalletBalanceCents ?? 0;
   const netIncomeCents = summary?.netIncomeCents ?? 0;
 
+  // Stella's mood is a readout of the period's financial state. Priority:
+  // privacy (eyes closed) > trouble (teary) > quiet period (asleep) > healthy.
+  // Her expression never carries the meaning alone — the caption does.
+  let stellaMood: StellaMood = 'smiling';
+  let stellaCaption = "Everything's sorted.";
+  if (mounted && !visible) {
+    stellaMood = 'happy';
+    stellaCaption = "Stella's not looking.";
+  } else if (
+    walletBalanceCents < 0 ||
+    netIncomeCents < 0 ||
+    accounts.some((account) => account.computedBalance < 0)
+  ) {
+    stellaMood = 'sad';
+    stellaCaption = 'One of your buckets needs attention.';
+  } else if (
+    (summary?.totalIncomeReceivedCents ?? 0) === 0 &&
+    (summary?.totalExpensesCents ?? 0) === 0
+  ) {
+    stellaMood = 'sleeping';
+    stellaCaption = "Quiet period. Stella's napping.";
+  }
+  const displayedMood = useIdleWink(stellaMood, stellaMood === 'smiling');
+
   // First-run welcome: the default period is effectively empty and the user
   // hasn't filtered. PF accounts are seeded at registration, so account count
   // can't distinguish a new user — the figures and feed do.
@@ -127,7 +152,8 @@ export function OverviewContent({
   if (isFirstRun) {
     return (
       <div className="mx-auto max-w-3xl py-24 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">Welcome to Profitmuna</h1>
+        <StellaSprite mood="sleeping" size={64} className="mx-auto" />
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight">Welcome to Profitmuna</h1>
         <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-ink-soft">
           Record income and it splits across your buckets automatically. You always know exactly how
           much belongs where.
@@ -171,7 +197,13 @@ export function OverviewContent({
           job, and the nav carries no record button (one primary per view). */}
       <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div>
-          <p className="text-sm text-ink-faint">{greeting}</p>
+          <div className="flex items-center gap-3">
+            <StellaSprite mood={displayedMood} size={48} animated decorative />
+            <div>
+              <p className="text-sm text-ink-faint">{greeting}</p>
+              <p className="mt-0.5 text-sm text-ink-soft">{stellaCaption}</p>
+            </div>
+          </div>
           <div className="mt-3 flex items-center gap-2">
             <MaskedAmount
               cents={walletBalanceCents}
