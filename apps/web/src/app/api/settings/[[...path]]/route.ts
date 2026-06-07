@@ -1,12 +1,14 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-// BFF catch-all proxy for /api/settings/*: the browser only ever calls this same-origin route;
-// we forward server-to-server to the Workers API.
+// BFF catch-all proxy for /api/settings and /api/settings/*: the browser only ever calls this
+// same-origin route; we forward server-to-server to the Workers API.
+// Optional catch-all ([[...path]]) so the bare PUT /api/settings — what SettingsForm sends —
+// matches too; a required [...path] 404s on the zero-segment case.
 // All settings routes require authentication — no unauthenticated-path branching needed.
 // middleware.ts redirects unauthenticated users to /login before they can reach these routes.
 
-async function proxy(request: NextRequest, path: string[]): Promise<NextResponse> {
+async function proxy(request: NextRequest, path: string[] | undefined): Promise<NextResponse> {
   // Server-only env — intentionally NOT NEXT_PUBLIC_
   const apiBaseUrl = process.env.API_BASE_URL ?? 'http://localhost:8793';
 
@@ -22,7 +24,8 @@ async function proxy(request: NextRequest, path: string[]): Promise<NextResponse
   if (cookieHeader) headers.set('cookie', cookieHeader);
   if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
 
-  const url = `${apiBaseUrl}/api/settings/${path.join('/')}${request.nextUrl.search}`;
+  const suffix = path && path.length > 0 ? `/${path.join('/')}` : '';
+  const url = `${apiBaseUrl}/api/settings${suffix}${request.nextUrl.search}`;
   const apiRes = await fetch(url, {
     method: request.method,
     headers,
@@ -36,12 +39,12 @@ async function proxy(request: NextRequest, path: string[]): Promise<NextResponse
   });
 }
 
-export async function GET(request: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+export async function GET(request: NextRequest, ctx: { params: Promise<{ path?: string[] }> }) {
   const { path } = await ctx.params;
   return proxy(request, path);
 }
 
-export async function PUT(request: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
+export async function PUT(request: NextRequest, ctx: { params: Promise<{ path?: string[] }> }) {
   const { path } = await ctx.params;
   return proxy(request, path);
 }
