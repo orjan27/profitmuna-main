@@ -214,7 +214,7 @@ Plans:
 
 **Wave 0**
 
-- [ ] 06-01-PLAN.md — Foundation: notifications table + users settings columns + incomes.pendingDueNotifiedAt [BLOCKING migration], test DDL sync, RED test scaffolds, currency-aware formatCurrency + shared web contract types (SET-01, SET-02, NOTIF-01, NOTIF-02 infra)
+- [x] 06-01-PLAN.md — Foundation: notifications table + users settings columns + incomes.pendingDueNotifiedAt [BLOCKING migration], test DDL sync, RED test scaffolds, currency-aware formatCurrency + shared web contract types (SET-01, SET-02, NOTIF-01, NOTIF-02 infra)
 
 **Wave 1** _(blocked on 06-01; 06-02 and 06-03 run in parallel — no file overlap)_
 
@@ -238,7 +238,7 @@ Plans:
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
 | 4. Wallets                  | 4/4            | Complete    | 2026-06-06 |
 | 5. Dashboard                | 0/3            | Gap closure | -          |
-| 6. Settings & Notifications | 0/0            | Not started | -          |
+| 6. Settings & Notifications | 1/4 | In Progress|  |
 
 ---
 
