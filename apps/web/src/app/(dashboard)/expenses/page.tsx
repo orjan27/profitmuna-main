@@ -17,7 +17,8 @@ interface Expense {
   amount: number;
   description: string | null;
   expenseDate: string;
-  paymentMethod: string | null;
+  walletId: number | null;
+  walletName: string | null;
   deletedAt: string | null;
   createdAt: string | null;
 }
@@ -27,6 +28,12 @@ interface PaginatedExpenses {
   page: number;
   last: boolean;
   totalElements: number;
+}
+
+interface WalletListItem {
+  id: number;
+  name: string;
+  isDefault: boolean;
 }
 
 interface SearchParams {
@@ -54,10 +61,12 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
 
   let expensesData: PaginatedExpenses;
   let categoriesData: { data: ExpenseCategory[] };
+  let walletsData: { data: WalletListItem[] };
   try {
-    [expensesData, categoriesData] = await Promise.all([
+    [expensesData, categoriesData, walletsData] = await Promise.all([
       apiFetch<PaginatedExpenses>(`/api/expenses?${qs.toString()}`),
       apiFetch<{ data: ExpenseCategory[] }>('/api/expense-categories'),
+      apiFetch<{ data: WalletListItem[] }>('/api/wallets'),
     ]);
   } catch (err) {
     // A decodable-but-rejected token passes getSession but 401s at the API
@@ -67,9 +76,17 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
     throw err;
   }
 
+  const wallets = walletsData.data.map((w) => ({ id: w.id, name: w.name }));
+  const defaultWalletId = walletsData.data.find((w) => w.isDefault)?.id ?? null;
+
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <ExpensesOverview initialData={expensesData} categories={categoriesData.data} />
+      <ExpensesOverview
+        initialData={expensesData}
+        categories={categoriesData.data}
+        wallets={wallets}
+        defaultWalletId={defaultWalletId}
+      />
     </div>
   );
 }

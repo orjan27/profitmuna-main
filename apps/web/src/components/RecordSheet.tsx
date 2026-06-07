@@ -28,8 +28,8 @@ import {
 import { cn } from '@/lib/utils';
 import { toCents } from '@/lib/format-currency';
 import { useFormatCurrency } from '@/components/CurrencyProvider';
+import { Stella, StellaSprite } from '@/components/Stella';
 import { todayLocal } from '@/lib/format-date';
-import { PAYMENT_METHODS } from '@/lib/constants';
 import {
   getRecordSheetData,
   recordIncomeFromSheet,
@@ -245,11 +245,16 @@ function SplitPreview({ accounts, amountCents, pending }: SplitPreviewProps): Re
         ))}
       </ul>
 
-      <p className="mt-3 text-[11px] text-ink-faint">
-        {pending
-          ? 'Splits across your buckets when you mark it received.'
-          : 'Split applied the moment you record it.'}
-      </p>
+      {/* Stella perks up the moment the split comes alive — the app's core
+          promise gets a face at the moment of entry. */}
+      <div className="mt-3 flex items-center gap-2">
+        <StellaSprite mood="smiling" size={24} decorative />
+        <p className="text-[11px] text-ink-faint">
+          {pending
+            ? 'Splits across your buckets when you mark it received.'
+            : 'Split applied the moment you record it.'}
+        </p>
+      </div>
     </div>
   );
 }
@@ -295,7 +300,9 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
         toast.error(errorMessage(result.error));
         return;
       }
-      toast.success(`${formatCurrency(amountCents)} recorded.`);
+      toast.success(`${formatCurrency(amountCents)} recorded.`, {
+        icon: <StellaSprite mood="happy" size={20} decorative />,
+      });
       setAmount('');
       setDescription('');
       setExpectedReleaseDate('');
@@ -441,12 +448,20 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('none');
+  const [walletId, setWalletId] = useState(
+    data.defaultWalletId != null ? String(data.defaultWalletId) : ''
+  );
   const [expenseDate, setExpenseDate] = useState(todayLocal());
   const [description, setDescription] = useState('');
 
   const amountPesos = Number(amount);
   const amountCents = Number.isFinite(amountPesos) && amountPesos > 0 ? toCents(amountPesos) : 0;
+
+  // Stella reacts live as the amount grows: smiling while the expense fits
+  // inside the Operating Expenses bucket, teary once it would overdraw it.
+  // A warning with a face — submission stays allowed either way.
+  const opex = data.accounts.find((account) => account.accountType === 'OPEX');
+  const overOpex = opex !== undefined && amountCents > opex.computedBalance;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -455,14 +470,16 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
         categoryId: Number(categoryId),
         amountPesos,
         expenseDate,
-        paymentMethod: paymentMethod !== 'none' ? paymentMethod : undefined,
+        walletId: Number(walletId),
         description: description.trim() || undefined,
       });
       if ('error' in result) {
         toast.error(errorMessage(result.error));
         return;
       }
-      toast.success(`${formatCurrency(amountCents)} expense recorded.`);
+      toast.success(`${formatCurrency(amountCents)} expense recorded.`, {
+        icon: <StellaSprite mood="wink" size={20} decorative />,
+      });
       setAmount('');
       setDescription('');
       onDone();
@@ -487,6 +504,19 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
           autoFocus
           required
         />
+        {opex && amountCents > 0 ? (
+          <Stella
+            mood={overOpex ? 'sad' : 'smiling'}
+            animated
+            size={28}
+            className="mt-1"
+            caption={
+              overOpex
+                ? `That's more than your ${opex.name} bucket (${formatCurrency(opex.computedBalance)}).`
+                : `Within your ${opex.name} bucket.`
+            }
+          />
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -507,16 +537,15 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="record-expense-method">Paid with</Label>
-          <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-            <SelectTrigger id="record-expense-method">
-              <SelectValue />
+          <Label htmlFor="record-expense-wallet">Paid with</Label>
+          <Select value={walletId} onValueChange={setWalletId} required>
+            <SelectTrigger id="record-expense-wallet">
+              <SelectValue placeholder="Select a wallet" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Not set</SelectItem>
-              {PAYMENT_METHODS.map((pm) => (
-                <SelectItem key={pm.value} value={pm.value}>
-                  {pm.label}
+              {data.wallets.map((w) => (
+                <SelectItem key={w.id} value={String(w.id)}>
+                  {w.name}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -14,14 +14,14 @@ export interface WalletListItem {
   profitFirstAccountId: number | null;
   /** Count of non-deleted wallet_transactions (for delete impact dialog) */
   transactionCount: number;
-  /** Count of income + expense category mappings (for delete impact dialog) */
+  /** Count of income category mappings (for delete impact dialog) */
   mappingCount: number;
   /** Income category ids mapped to this wallet (D-06: disable in pickers elsewhere) */
   incomeCategoryIds: number[];
-  /** Expense category ids mapped to this wallet (D-06: disable in pickers elsewhere) */
-  expenseCategoryIds: number[];
-  /** When true, ALL user expenses auto-deduct from this wallet (3-mode selector, D-07) */
-  autoDeductAllExpenses: boolean;
+  /** Undeletable per-user Default wallet flag */
+  isDefault: boolean;
+  /** null = active; ISO string = soft-deleted */
+  deletedAt: string | null;
 }
 
 export interface WalletTransaction {
@@ -57,7 +57,6 @@ export interface CreateWalletInput {
   color?: string;
   sortOrder?: number;
   incomeCategoryIds?: number[];
-  expenseMode?: { kind: 'NONE' } | { kind: 'ALL' } | { kind: 'CATEGORIES'; ids: number[] };
 }
 
 export type UpdateWalletInput = Partial<CreateWalletInput>;

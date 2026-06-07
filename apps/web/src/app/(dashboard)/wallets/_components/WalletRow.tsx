@@ -50,7 +50,11 @@ export function WalletRow({ wallet }: WalletRowProps) {
     startTransition(async () => {
       const result = await deleteWalletAction(wallet.id);
       if (result && 'error' in result) {
-        toast.error('Something went wrong. Please try again.');
+        toast.error(
+          result.error === 'cannot_delete_default_wallet'
+            ? 'The Default wallet cannot be deleted.'
+            : 'Something went wrong. Please try again.'
+        );
         setDeleteOpen(false);
         return;
       }
@@ -106,12 +110,15 @@ export function WalletRow({ wallet }: WalletRowProps) {
           <DropdownMenuItem asChild>
             <Link href={`/wallets/${wallet.id}?edit=1`}>Edit</Link>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onSelect={() => setDeleteOpen(true)}
-          >
-            Delete
-          </DropdownMenuItem>
+          {/* The Default wallet is undeletable — hide the Delete action entirely */}
+          {!wallet.isDefault && (
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => setDeleteOpen(true)}
+            >
+              Delete
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -121,9 +128,8 @@ export function WalletRow({ wallet }: WalletRowProps) {
           <DialogHeader>
             <DialogTitle>Delete Wallet</DialogTitle>
             <DialogDescription>
-              Delete &ldquo;{wallet.name}&rdquo;? This will permanently remove{' '}
-              {wallet.transactionCount} transaction{wallet.transactionCount !== 1 ? 's' : ''} and
-              all category mappings. This cannot be undone.
+              Delete &ldquo;{wallet.name}&rdquo;? Its income mappings and bucket link will be
+              unlinked. Past expenses keep this wallet on their record.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -5,10 +5,10 @@ import { Plus, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { StellaSprite } from '@/components/Stella';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { formatDateGroup } from '@/lib/format-date';
-import { PAYMENT_METHODS } from '@/lib/constants';
 import { restoreExpenseAction } from './expense-actions';
 import { EditExpenseDialog, type ExpenseRow } from './edit-expense-dialog';
 
@@ -20,22 +20,25 @@ interface ExpenseCategory {
   system: boolean;
 }
 
+interface WalletOption {
+  id: number;
+  name: string;
+}
+
 interface ExpenseListProps {
   expenses: ExpenseRow[];
   /** True when URL filters are narrowing the list — changes the empty state. */
   filtered: boolean;
   categories: ExpenseCategory[];
+  /** Wallets for the edit dialog's "Paid with" selector */
+  wallets: WalletOption[];
+  /** Default wallet id used to preselect legacy NULL-wallet rows */
+  defaultWalletId: number | null;
   /** Called after any mutation so parent can refresh state */
   onMutated: () => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function paymentMethodLabel(value: string | null): string | null {
-  if (!value) return null;
-  const match = PAYMENT_METHODS.find((pm) => pm.value === value);
-  return match ? match.label : value;
-}
 
 interface DateGroup {
   label: string;
@@ -112,16 +115,24 @@ function DeletedExpenseRow({ expense, onMutated }: DeletedRowProps) {
 interface ActiveRowProps {
   expense: ExpenseRow;
   categories: ExpenseCategory[];
+  wallets: WalletOption[];
+  defaultWalletId: number | null;
   onMutated: () => void;
 }
 
-function ActiveExpenseRow({ expense, categories, onMutated }: ActiveRowProps) {
+function ActiveExpenseRow({
+  expense,
+  categories,
+  wallets,
+  defaultWalletId,
+  onMutated,
+}: ActiveRowProps) {
   const formatCurrency = useFormatCurrency();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const pmLabel = paymentMethodLabel(expense.paymentMethod);
 
-  // Second line: description and payment method as quiet text, no badges
-  const detail = [expense.description, pmLabel].filter(Boolean).join(' · ');
+  // Second line: description and wallet name as quiet text (walletName is
+  // denormalized, so it renders even when the wallet has been soft-deleted)
+  const detail = [expense.description, expense.walletName].filter(Boolean).join(' · ');
 
   return (
     <li>
@@ -152,6 +163,8 @@ function ActiveExpenseRow({ expense, categories, onMutated }: ActiveRowProps) {
         onOpenChange={setDialogOpen}
         expense={expense}
         categories={categories}
+        wallets={wallets}
+        defaultWalletId={defaultWalletId}
         onMutated={onMutated}
       />
     </li>
@@ -166,7 +179,14 @@ function ActiveExpenseRow({ expense, categories, onMutated }: ActiveRowProps) {
  * dialog (EXP-03); soft-deleted rows surface below with a restore affordance
  * (EXP-04).
  */
-export function ExpenseList({ expenses, filtered, categories, onMutated }: ExpenseListProps) {
+export function ExpenseList({
+  expenses,
+  filtered,
+  categories,
+  wallets,
+  defaultWalletId,
+  onMutated,
+}: ExpenseListProps) {
   const { openRecordSheet } = useRecordSheet();
 
   const activeExpenses = expenses.filter((e) => e.deletedAt === null);
@@ -185,7 +205,8 @@ export function ExpenseList({ expenses, filtered, categories, onMutated }: Expen
     }
     return (
       <div className="py-20 text-center">
-        <p className="text-base font-medium">No expenses recorded yet</p>
+        <StellaSprite mood="sleeping" size={64} className="mx-auto" />
+        <p className="mt-5 text-base font-medium">No expenses recorded yet</p>
         <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-ink-faint">
           Record what you spend and keep every bucket honest.
         </p>
@@ -210,6 +231,8 @@ export function ExpenseList({ expenses, filtered, categories, onMutated }: Expen
                 key={expense.id}
                 expense={expense}
                 categories={categories}
+                wallets={wallets}
+                defaultWalletId={defaultWalletId}
                 onMutated={onMutated}
               />
             ))}

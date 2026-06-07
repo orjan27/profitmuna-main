@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { PAYMENT_METHODS } from '@/lib/constants';
 import { createExpenseCategoryAction } from './category-actions';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -26,17 +25,27 @@ interface ExpenseCategory {
   system: boolean;
 }
 
+interface WalletOption {
+  id: number;
+  name: string;
+}
+
 interface InitialValues {
   categoryId?: number;
   /** Amount in cents — form displays as decimal pesos */
   amount?: number;
   expenseDate?: string;
-  paymentMethod?: string | null;
+  /** Wallet this expense is paid from (null for legacy pre-migration rows) */
+  walletId?: number | null;
   description?: string | null;
 }
 
 interface ExpenseFormProps {
   categories: ExpenseCategory[];
+  /** Wallets to choose from in the required "Paid with" selector */
+  wallets: WalletOption[];
+  /** Default wallet id used to preselect (covers legacy NULL-wallet rows) */
+  defaultWalletId: number | null;
   /** Server action (create or update). Returns { error } on failure, void on success. */
   action: (formData: FormData) => Promise<{ error: string } | undefined>;
   /** When provided, pre-populates the form for editing */
@@ -65,10 +74,12 @@ function centsToDecimal(cents: number): string {
  * Accepts an `action` prop so create and update actions can share the same UI.
  * When `initialValues` is provided the fields are pre-populated (edit mode).
  *
- * Payment method is optional per D-09/D-10 — a blank option is always included.
+ * "Paid with" is a required wallet selector; legacy NULL-wallet rows preselect Default.
  */
 export function ExpenseForm({
   categories,
+  wallets,
+  defaultWalletId,
   action,
   initialValues,
   onSuccess,
@@ -129,9 +140,11 @@ export function ExpenseForm({
 
   const defaultDate = initialValues?.expenseDate ?? todayISO();
   const defaultAmount = initialValues?.amount != null ? centsToDecimal(initialValues.amount) : '';
-  // Radix Select forbids empty-string item values — use 'none' sentinel,
-  // translated back to null in the server actions.
-  const defaultPayment = initialValues?.paymentMethod ?? 'none';
+  // "Paid with" preselects the row's wallet, falling back to Default (covers legacy NULL rows).
+  const preselectedWalletId = initialValues?.walletId ?? defaultWalletId;
+  const [selectedWalletId, setSelectedWalletId] = useState<string>(
+    preselectedWalletId != null ? String(preselectedWalletId) : ''
+  );
   const defaultDescription = initialValues?.description ?? '';
 
   return (
@@ -226,19 +239,22 @@ export function ExpenseForm({
         />
       </div>
 
-      {/* Payment method — optional, blank = no payment method recorded */}
+      {/* Paid with — required wallet selector; the expense deducts from this wallet */}
       <div className="flex flex-col gap-2">
-        <Label htmlFor="paymentMethod">Payment Method (optional)</Label>
-        <Select name="paymentMethod" defaultValue={defaultPayment}>
-          <SelectTrigger id="paymentMethod">
-            <SelectValue placeholder="No payment method" />
+        <Label htmlFor="walletId">Paid with</Label>
+        <Select
+          name="walletId"
+          value={selectedWalletId}
+          onValueChange={setSelectedWalletId}
+          required
+        >
+          <SelectTrigger id="walletId">
+            <SelectValue placeholder="Select a wallet" />
           </SelectTrigger>
           <SelectContent>
-            {/* 'none' sentinel clears the payment method (Radix forbids value="") */}
-            <SelectItem value="none">None</SelectItem>
-            {PAYMENT_METHODS.map((pm) => (
-              <SelectItem key={pm.value} value={pm.value}>
-                {pm.label}
+            {wallets.map((w) => (
+              <SelectItem key={w.id} value={String(w.id)}>
+                {w.name}
               </SelectItem>
             ))}
           </SelectContent>

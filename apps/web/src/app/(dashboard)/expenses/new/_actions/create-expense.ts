@@ -10,7 +10,7 @@ import { toCents } from '@/lib/format-currency';
  * Server action to create a new expense.
  * Converts decimal peso amount to integer cents before sending to the API (Pitfall 2 / D-08).
  *
- * @param formData - Form data containing categoryId, amount, expenseDate, paymentMethod, description
+ * @param formData - Form data containing categoryId, amount, expenseDate, walletId, description
  * @returns Error object on failure; redirects to /expenses on success.
  */
 export async function createExpenseAction(
@@ -23,9 +23,10 @@ export async function createExpenseAction(
   const categoryId = Number(formData.get('categoryId'));
   const expenseDate = formData.get('expenseDate') as string;
   const description = (formData.get('description') as string) || undefined;
-  const paymentMethodRaw = formData.get('paymentMethod') as string | null;
-  // 'none' sentinel from the Select means "no payment method" (Radix forbids value="").
-  const paymentMethod = paymentMethodRaw && paymentMethodRaw !== 'none' ? paymentMethodRaw : null;
+  const walletId = Number(formData.get('walletId'));
+  if (!Number.isInteger(walletId) || walletId <= 0) {
+    return { error: 'Select a wallet to pay with.' };
+  }
 
   const amount = toCents(rawAmount);
 
@@ -37,7 +38,7 @@ export async function createExpenseAction(
         amount,
         expenseDate,
         description,
-        paymentMethod,
+        walletId,
       }),
     });
   } catch (err) {

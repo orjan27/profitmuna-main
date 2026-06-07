@@ -31,7 +31,7 @@ export async function createWalletAction(input: CreateWalletInput) {
 }
 
 /**
- * Updates a wallet's mutable fields (name, color, mappings, expense mode).
+ * Updates a wallet's mutable fields (name, color, income mappings).
  * On success: revalidates /wallets and the wallet detail page.
  * On ApiError: returns { error: code } for the form to surface.
  */

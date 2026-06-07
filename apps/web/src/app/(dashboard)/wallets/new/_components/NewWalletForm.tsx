@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -32,7 +31,7 @@ import {
 } from '@/components/ui/command';
 
 import { createWalletAction } from '../../_actions/wallet-actions';
-import type { PfAccount, IncomeCategory, ExpenseCategory } from '@/types/wallet';
+import type { PfAccount, IncomeCategory } from '@/types/wallet';
 
 // 8 preset color swatches per D-15 and UI-SPEC
 const COLOR_SWATCHES = [
@@ -46,27 +45,21 @@ const COLOR_SWATCHES = [
   { hex: '#f97316', name: 'Orange' },
 ] as const;
 
-type ExpenseMode = 'NONE' | 'ALL' | 'CATEGORIES';
-
 interface NewWalletFormProps {
   pfAccounts: PfAccount[];
   linkedPfAccountIds: Set<number>;
   incomeCategories: IncomeCategory[];
-  expenseCategories: ExpenseCategory[];
   prefilledPfAccountId?: number;
-  /** D-06: categories already mapped to another wallet appear disabled in the pickers */
+  /** D-06: categories already mapped to another wallet appear disabled in the picker */
   mappedIncomeCategoryIds: Set<number>;
-  mappedExpenseCategoryIds: Set<number>;
 }
 
 export function NewWalletForm({
   pfAccounts,
   linkedPfAccountIds,
   incomeCategories,
-  expenseCategories,
   prefilledPfAccountId,
   mappedIncomeCategoryIds,
-  mappedExpenseCategoryIds,
 }: NewWalletFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -85,24 +78,15 @@ export function NewWalletForm({
   const isPf = pfAccountId !== STANDALONE;
   const [color, setColor] = useState<string>(COLOR_SWATCHES[0].hex);
   const [selectedIncomeCategoryIds, setSelectedIncomeCategoryIds] = useState<number[]>([]);
-  const [expenseMode, setExpenseMode] = useState<ExpenseMode>('NONE');
-  const [selectedExpenseCategoryIds, setSelectedExpenseCategoryIds] = useState<number[]>([]);
 
   // Combobox open state
   const [incomePickerOpen, setIncomePickerOpen] = useState(false);
-  const [expensePickerOpen, setExpensePickerOpen] = useState(false);
 
   // Validation error
   const [formError, setFormError] = useState<string | null>(null);
 
   function toggleIncomeCategory(id: number) {
     setSelectedIncomeCategoryIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
-
-  function toggleExpenseCategory(id: number) {
-    setSelectedExpenseCategoryIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   }
@@ -116,25 +100,6 @@ export function NewWalletForm({
       setFormError('Wallet Name is required.');
       return;
     }
-    if (expenseMode === 'CATEGORIES' && selectedExpenseCategoryIds.length === 0) {
-      setFormError('Select at least one expense category.');
-      return;
-    }
-
-    // Build expenseMode discriminated union
-    type ExpenseModeInput =
-      | { kind: 'NONE' }
-      | { kind: 'ALL' }
-      | { kind: 'CATEGORIES'; ids: number[] };
-
-    let expenseModeInput: ExpenseModeInput | undefined;
-    if (expenseMode === 'ALL') {
-      expenseModeInput = { kind: 'ALL' };
-    } else if (expenseMode === 'CATEGORIES') {
-      expenseModeInput = { kind: 'CATEGORIES', ids: selectedExpenseCategoryIds };
-    } else {
-      expenseModeInput = { kind: 'NONE' };
-    }
 
     setSubmitting(true);
     try {
@@ -143,7 +108,6 @@ export function NewWalletForm({
         profitFirstAccountId: isPf ? Number(pfAccountId) : null,
         color,
         incomeCategoryIds: !isPf ? selectedIncomeCategoryIds : undefined,
-        expenseMode: expenseModeInput,
       });
 
       // createWalletAction redirects on success — result only arrives on error
@@ -316,102 +280,6 @@ export function NewWalletForm({
           </div>
         </>
       )}
-
-      <Separator />
-
-      {/* Expense Settings — 3-mode radio (D-07) */}
-      <div className="space-y-2">
-        <Label asChild id="expense-settings-label">
-          <span>Expense Settings</span>
-        </Label>
-        <RadioGroup
-          value={expenseMode}
-          onValueChange={(v) => setExpenseMode(v as ExpenseMode)}
-          disabled={submitting}
-          aria-labelledby="expense-settings-label"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="NONE" id="expense-none" />
-            <Label htmlFor="expense-none">No automatic expenses</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="ALL" id="expense-all" />
-            <Label htmlFor="expense-all">Auto-deduct all expenses</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="CATEGORIES" id="expense-categories" />
-            <Label htmlFor="expense-categories">Specific expense categories</Label>
-          </div>
-        </RadioGroup>
-
-        {/* Expense category picker — shown only when CATEGORIES is selected */}
-        {expenseMode === 'CATEGORIES' && (
-          <div className="space-y-2">
-            <Label htmlFor="expense-categories-trigger">Expense Categories</Label>
-            <Popover open={expensePickerOpen} onOpenChange={setExpensePickerOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  id="expense-categories-trigger"
-                  type="button"
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={expensePickerOpen}
-                  className="w-full justify-between"
-                  disabled={submitting}
-                >
-                  {selectedExpenseCategoryIds.length > 0
-                    ? `${selectedExpenseCategoryIds.length} selected`
-                    : 'Select categories…'}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search expense categories…" />
-                  <CommandList>
-                    <CommandEmpty>No categories found.</CommandEmpty>
-                    <CommandGroup>
-                      {expenseCategories.map((cat) => {
-                        // D-06: already mapped to another wallet — disabled, server enforces 409
-                        const isMapped = mappedExpenseCategoryIds.has(cat.id);
-                        return (
-                          <CommandItem
-                            key={cat.id}
-                            value={cat.name}
-                            disabled={isMapped}
-                            onSelect={() => toggleExpenseCategory(cat.id)}
-                          >
-                            <Checkbox
-                              checked={selectedExpenseCategoryIds.includes(cat.id)}
-                              disabled={isMapped}
-                              className="mr-2"
-                              onCheckedChange={() => toggleExpenseCategory(cat.id)}
-                            />
-                            {cat.name}
-                            {isMapped && (
-                              <span className="text-muted-foreground ml-2 text-xs">
-                                (already mapped)
-                              </span>
-                            )}
-                            <Check
-                              className={cn(
-                                'ml-auto h-4 w-4',
-                                selectedExpenseCategoryIds.includes(cat.id)
-                                  ? 'opacity-100'
-                                  : 'opacity-0'
-                              )}
-                            />
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
-      </div>
 
       {/* Form-level error */}
       {formError && (

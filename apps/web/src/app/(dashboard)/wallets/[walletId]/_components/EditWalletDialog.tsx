@@ -17,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -30,7 +29,7 @@ import {
 } from '@/components/ui/command';
 
 import { updateWalletAction } from '../../_actions/wallet-actions';
-import type { WalletListItem, IncomeCategory, ExpenseCategory } from '@/types/wallet';
+import type { WalletListItem, IncomeCategory } from '@/types/wallet';
 
 // 8 preset color swatches per D-15 and UI-SPEC — mirrors NewWalletForm
 const COLOR_SWATCHES = [
@@ -44,24 +43,18 @@ const COLOR_SWATCHES = [
   '#f97316', // Orange
 ] as const;
 
-type ExpenseMode = 'NONE' | 'ALL' | 'CATEGORIES';
-
 interface EditWalletDialogProps {
   open: boolean;
   onClose: () => void;
   wallet: WalletListItem;
   incomeCategories: IncomeCategory[];
-  expenseCategories: ExpenseCategory[];
-  /** D-06: category ids already mapped to a DIFFERENT wallet — disabled in pickers */
+  /** D-06: category ids already mapped to a DIFFERENT wallet — disabled in picker */
   mappedIncomeCategoryIds: Set<number>;
-  mappedExpenseCategoryIds: Set<number>;
-  /** Pitfall 1: only one wallet may auto-deduct all expenses — disable ALL when claimed elsewhere */
-  otherWalletHasAutoDeductAll: boolean;
 }
 
 /**
- * Dialog for editing a wallet's mutable fields: name, color, income category
- * mappings (hidden for PF-linked wallets per D-08), and expense settings (D-07).
+ * Dialog for editing a wallet's mutable fields: name, color, and income category
+ * mappings (hidden for PF-linked wallets per D-08).
  * Wallet type and PF account link are immutable after creation.
  */
 export function EditWalletDialog({
@@ -69,10 +62,7 @@ export function EditWalletDialog({
   onClose,
   wallet,
   incomeCategories,
-  expenseCategories,
   mappedIncomeCategoryIds,
-  mappedExpenseCategoryIds,
-  otherWalletHasAutoDeductAll,
 }: EditWalletDialogProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -85,32 +75,15 @@ export function EditWalletDialog({
   const [selectedIncomeCategoryIds, setSelectedIncomeCategoryIds] = useState<number[]>(
     wallet.incomeCategoryIds
   );
-  const [expenseMode, setExpenseMode] = useState<ExpenseMode>(
-    wallet.autoDeductAllExpenses
-      ? 'ALL'
-      : wallet.expenseCategoryIds.length > 0
-        ? 'CATEGORIES'
-        : 'NONE'
-  );
-  const [selectedExpenseCategoryIds, setSelectedExpenseCategoryIds] = useState<number[]>(
-    wallet.expenseCategoryIds
-  );
 
   // Combobox open state
   const [incomePickerOpen, setIncomePickerOpen] = useState(false);
-  const [expensePickerOpen, setExpensePickerOpen] = useState(false);
 
   // Validation error
   const [formError, setFormError] = useState<string | null>(null);
 
   function toggleIncomeCategory(id: number) {
     setSelectedIncomeCategoryIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
-
-  function toggleExpenseCategory(id: number) {
-    setSelectedExpenseCategoryIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   }
@@ -127,22 +100,6 @@ export function EditWalletDialog({
       setFormError('Wallet Name is required.');
       return;
     }
-    if (expenseMode === 'CATEGORIES' && selectedExpenseCategoryIds.length === 0) {
-      setFormError('Select at least one expense category.');
-      return;
-    }
-
-    type ExpenseModeInput =
-      | { kind: 'NONE' }
-      | { kind: 'ALL' }
-      | { kind: 'CATEGORIES'; ids: number[] };
-
-    const expenseModeInput: ExpenseModeInput =
-      expenseMode === 'ALL'
-        ? { kind: 'ALL' }
-        : expenseMode === 'CATEGORIES'
-          ? { kind: 'CATEGORIES', ids: selectedExpenseCategoryIds }
-          : { kind: 'NONE' };
 
     setSubmitting(true);
     try {
@@ -151,18 +108,12 @@ export function EditWalletDialog({
         color,
         // D-08: PF wallets never touch income mappings
         incomeCategoryIds: isPfWallet ? undefined : selectedIncomeCategoryIds,
-        expenseMode: expenseModeInput,
       });
 
       if (result?.error) {
         const code = result.error;
-        if (
-          code === 'income_category_already_mapped' ||
-          code === 'expense_category_already_mapped'
-        ) {
+        if (code === 'income_category_already_mapped') {
           setFormError('Already mapped to another wallet — remove it there first.');
-        } else if (code === 'auto_deduct_all_already_set') {
-          setFormError('Another wallet already auto-deducts all expenses.');
         } else {
           setFormError('Something went wrong. Please try again.');
         }
@@ -290,112 +241,6 @@ export function EditWalletDialog({
               </Popover>
             </div>
           )}
-
-          <Separator />
-
-          {/* Expense Settings — 3-mode radio (D-07) */}
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Expense Settings</p>
-            <RadioGroup
-              value={expenseMode}
-              onValueChange={(v) => setExpenseMode(v as ExpenseMode)}
-              disabled={submitting}
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="NONE" id="edit-expense-none" />
-                <Label htmlFor="edit-expense-none">No automatic expenses</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="ALL"
-                  id="edit-expense-all"
-                  disabled={otherWalletHasAutoDeductAll}
-                />
-                <Label
-                  htmlFor="edit-expense-all"
-                  className={cn(otherWalletHasAutoDeductAll && 'opacity-50')}
-                >
-                  Auto-deduct all expenses
-                  {otherWalletHasAutoDeductAll && (
-                    <span className="text-muted-foreground ml-1 text-xs">
-                      (claimed by another wallet)
-                    </span>
-                  )}
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="CATEGORIES" id="edit-expense-categories" />
-                <Label htmlFor="edit-expense-categories">Specific expense categories</Label>
-              </div>
-            </RadioGroup>
-
-            {/* Expense category picker — shown only when CATEGORIES is selected */}
-            {expenseMode === 'CATEGORIES' && (
-              <div className="mt-2 space-y-2">
-                <Label>Expense Categories</Label>
-                <Popover open={expensePickerOpen} onOpenChange={setExpensePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={expensePickerOpen}
-                      className="w-full justify-between"
-                      disabled={submitting}
-                    >
-                      {selectedExpenseCategoryIds.length > 0
-                        ? `${selectedExpenseCategoryIds.length} selected`
-                        : 'Search and select categories…'}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Search expense categories…" />
-                      <CommandList>
-                        <CommandEmpty>No categories found.</CommandEmpty>
-                        <CommandGroup>
-                          {expenseCategories.map((cat) => {
-                            // D-06: mapped to a different wallet — disabled, server enforces 409
-                            const isMapped = mappedExpenseCategoryIds.has(cat.id);
-                            return (
-                              <CommandItem
-                                key={cat.id}
-                                value={cat.name}
-                                disabled={isMapped}
-                                onSelect={() => toggleExpenseCategory(cat.id)}
-                              >
-                                <Checkbox
-                                  checked={selectedExpenseCategoryIds.includes(cat.id)}
-                                  disabled={isMapped}
-                                  className="mr-2"
-                                  onCheckedChange={() => toggleExpenseCategory(cat.id)}
-                                />
-                                {cat.name}
-                                {isMapped && (
-                                  <span className="text-muted-foreground ml-2 text-xs">
-                                    (already mapped)
-                                  </span>
-                                )}
-                                <Check
-                                  className={cn(
-                                    'ml-auto h-4 w-4',
-                                    selectedExpenseCategoryIds.includes(cat.id)
-                                      ? 'opacity-100'
-                                      : 'opacity-0'
-                                  )}
-                                />
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
-          </div>
 
           {/* Form-level error */}
           {formError && <p className="text-destructive text-sm">{formError}</p>}

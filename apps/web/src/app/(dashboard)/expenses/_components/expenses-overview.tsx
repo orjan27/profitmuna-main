@@ -28,6 +28,11 @@ interface ExpenseCategory {
   system: boolean;
 }
 
+interface WalletOption {
+  id: number;
+  name: string;
+}
+
 interface PaginatedExpenses {
   content: ExpenseRow[];
   page: number;
@@ -38,6 +43,8 @@ interface PaginatedExpenses {
 interface ExpensesOverviewProps {
   initialData: PaginatedExpenses;
   categories: ExpenseCategory[];
+  wallets: WalletOption[];
+  defaultWalletId: number | null;
 }
 
 const PAGE_LIMIT = 20;
@@ -53,7 +60,12 @@ const PAGE_LIMIT = 20;
  * "Load more" appends the next page to the accumulated list without resetting (D-06).
  * The header total sums ACTIVE (non-deleted) amounts only.
  */
-export function ExpensesOverview({ initialData, categories }: ExpensesOverviewProps) {
+export function ExpensesOverview({
+  initialData,
+  categories,
+  wallets,
+  defaultWalletId,
+}: ExpensesOverviewProps) {
   const { openRecordSheet } = useRecordSheet();
   const formatCurrency = useFormatCurrency();
 
@@ -258,6 +270,8 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
         expenses={expenses}
         filtered={activeFilterCount > 0}
         categories={categories}
+        wallets={wallets}
+        defaultWalletId={defaultWalletId}
         onMutated={handleMutated}
       />
 

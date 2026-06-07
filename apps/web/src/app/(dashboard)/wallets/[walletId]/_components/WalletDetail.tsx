@@ -42,12 +42,7 @@ import {
   deleteWalletAction,
 } from '../../_actions/wallet-actions';
 import { EditWalletDialog } from './EditWalletDialog';
-import type {
-  WalletDetailResponse,
-  WalletTransaction,
-  IncomeCategory,
-  ExpenseCategory,
-} from '@/types/wallet';
+import type { WalletDetailResponse, WalletTransaction, IncomeCategory } from '@/types/wallet';
 
 // ── Copywriting Contract ──────────────────────────────────────────────────────
 const BLOCKING_COPY = {
@@ -89,11 +84,8 @@ function todayIso(): string {
 interface WalletDetailProps {
   detail: WalletDetailResponse;
   incomeCategories: IncomeCategory[];
-  expenseCategories: ExpenseCategory[];
-  /** D-06: category ids already mapped to a DIFFERENT wallet */
+  /** D-06: income category ids already mapped to a DIFFERENT wallet */
   mappedIncomeCategoryIds: Set<number>;
-  mappedExpenseCategoryIds: Set<number>;
-  otherWalletHasAutoDeductAll: boolean;
   /** When true (via ?edit=1), the edit dialog opens on first render */
   initialEditOpen: boolean;
 }
@@ -306,10 +298,7 @@ function DeleteTxDialog({ tx, walletId, onClose }: DeleteTxDialogProps) {
 export function WalletDetail({
   detail,
   incomeCategories,
-  expenseCategories,
   mappedIncomeCategoryIds,
-  mappedExpenseCategoryIds,
-  otherWalletHasAutoDeductAll,
   initialEditOpen,
 }: WalletDetailProps) {
   const formatCurrency = useFormatCurrency();
@@ -357,7 +346,11 @@ export function WalletDetail({
     startDeleteWallet(async () => {
       const result = await deleteWalletAction(wallet.id);
       if (result && 'error' in result) {
-        toast.error('Something went wrong. Please try again.');
+        toast.error(
+          result.error === 'cannot_delete_default_wallet'
+            ? 'The Default wallet cannot be deleted.'
+            : 'Something went wrong. Please try again.'
+        );
         setDeleteWalletOpen(false);
         return;
       }
@@ -372,8 +365,7 @@ export function WalletDetail({
   const depositBlocked = isPfWallet || wallet.incomeCategoryIds.length > 0;
   const depositBlockReason = isPfWallet ? BLOCKING_COPY.pf_deposit : BLOCKING_COPY.income_mapped;
 
-  const withdrawalBlocked = wallet.autoDeductAllExpenses || wallet.expenseCategoryIds.length > 0;
-  const withdrawalBlockReason = BLOCKING_COPY.expense_mapped;
+  // Withdrawals are allowed on all wallets — the expense-mapping guard was dropped.
 
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
@@ -397,9 +389,12 @@ export function WalletDetail({
             <Pencil className="h-3.5 w-3.5 mr-1" />
             Edit
           </Button>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteWalletOpen(true)}>
-            Delete
-          </Button>
+          {/* The Default wallet is undeletable (server returns 409) — hide the action */}
+          {!wallet.isDefault && (
+            <Button variant="destructive" size="sm" onClick={() => setDeleteWalletOpen(true)}>
+              Delete
+            </Button>
+          )}
         </div>
       </div>
 
@@ -490,13 +485,8 @@ export function WalletDetail({
               <ArrowDownLeft className="h-3.5 w-3.5 mr-1" />
               Add Deposit
             </Button>
-            {/* Add Withdrawal */}
-            <Button
-              size="sm"
-              onClick={() => setTxDialogMode('add-withdrawal')}
-              disabled={withdrawalBlocked}
-              title={withdrawalBlocked ? withdrawalBlockReason : undefined}
-            >
+            {/* Add Withdrawal — allowed on all wallets */}
+            <Button size="sm" onClick={() => setTxDialogMode('add-withdrawal')}>
               <ArrowUpRight className="h-3.5 w-3.5 mr-1" />
               Add Withdrawal
             </Button>
@@ -642,10 +632,7 @@ export function WalletDetail({
           onClose={() => setEditWalletOpen(false)}
           wallet={wallet}
           incomeCategories={incomeCategories}
-          expenseCategories={expenseCategories}
           mappedIncomeCategoryIds={mappedIncomeCategoryIds}
-          mappedExpenseCategoryIds={mappedExpenseCategoryIds}
-          otherWalletHasAutoDeductAll={otherWalletHasAutoDeductAll}
         />
       )}
 
@@ -655,9 +642,8 @@ export function WalletDetail({
           <DialogHeader>
             <DialogTitle>Delete Wallet</DialogTitle>
             <DialogDescription>
-              Delete &ldquo;{wallet.name}&rdquo;? This will permanently remove{' '}
-              {wallet.transactionCount} transaction{wallet.transactionCount !== 1 ? 's' : ''} and
-              all category mappings. This cannot be undone.
+              Delete &ldquo;{wallet.name}&rdquo;? Its income mappings and bucket link will be
+              unlinked. Past expenses keep this wallet on their record.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

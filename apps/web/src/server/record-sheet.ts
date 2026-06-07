@@ -18,6 +18,9 @@ export interface SplitAccount {
   color: string;
   /** Whole-number percent (e.g. 50 = 50%) — API returns bp/100 */
   targetPercentage: number;
+  accountType: 'PROFIT' | 'OWNERS_PAY' | 'TAX' | 'OPEX' | 'CUSTOM';
+  /** Derived balance in integer cents — drives the expense-form Stella reaction */
+  computedBalance: number;
 }
 
 export interface ExpenseCategoryOption {
@@ -26,10 +29,19 @@ export interface ExpenseCategoryOption {
   system: boolean;
 }
 
+export interface WalletOption {
+  id: number;
+  name: string;
+}
+
 export interface RecordSheetData {
   incomeCategories: IncomeCategory[];
   expenseCategories: ExpenseCategoryOption[];
   accounts: SplitAccount[];
+  /** Wallets for the "Paid with" expense selector */
+  wallets: WalletOption[];
+  /** Default wallet id used to preselect "Paid with" */
+  defaultWalletId: number | null;
 }
 
 interface SummaryResponse {
@@ -39,8 +51,14 @@ interface SummaryResponse {
       name: string;
       color: string;
       targetPercentage: number;
+      accountType: 'PROFIT' | 'OWNERS_PAY' | 'TAX' | 'OPEX' | 'CUSTOM';
+      computedBalance: number;
     }>;
   };
+}
+
+interface WalletsResponse {
+  data: Array<{ id: number; name: string; isDefault: boolean }>;
 }
 
 type ActionResult = { ok: true } | { error: string };
@@ -53,21 +71,28 @@ type ActionResult = { ok: true } | { error: string };
  * preview. Called lazily the first time the sheet opens.
  */
 export async function getRecordSheetData(): Promise<RecordSheetData> {
-  const [incomeCategoriesRes, expenseCategoriesRes, summaryRes] = await Promise.all([
+  const [incomeCategoriesRes, expenseCategoriesRes, summaryRes, walletsRes] = await Promise.all([
     apiFetch<{ data: IncomeCategory[] }>('/api/income-categories'),
     apiFetch<{ data: ExpenseCategoryOption[] }>('/api/expense-categories'),
     apiFetch<SummaryResponse>('/api/profit-first/summary'),
+    apiFetch<WalletsResponse>('/api/wallets'),
   ]);
 
   return {
     incomeCategories: incomeCategoriesRes.data,
     expenseCategories: expenseCategoriesRes.data,
-    accounts: summaryRes.data.accounts.map(({ id, name, color, targetPercentage }) => ({
-      id,
-      name,
-      color,
-      targetPercentage,
-    })),
+    accounts: summaryRes.data.accounts.map(
+      ({ id, name, color, targetPercentage, accountType, computedBalance }) => ({
+        id,
+        name,
+        color,
+        targetPercentage,
+        accountType,
+        computedBalance,
+      })
+    ),
+    wallets: walletsRes.data.map((w) => ({ id: w.id, name: w.name })),
+    defaultWalletId: walletsRes.data.find((w) => w.isDefault)?.id ?? null,
   };
 }
 
@@ -132,7 +157,7 @@ export async function recordExpenseFromSheet(input: {
   /** Decimal pesos from the form input */
   amountPesos: number;
   expenseDate: string;
-  paymentMethod?: string;
+  walletId: number;
   description?: string;
 }): Promise<ActionResult> {
   if (!Number.isFinite(input.amountPesos) || input.amountPesos <= 0) {
@@ -140,6 +165,9 @@ export async function recordExpenseFromSheet(input: {
   }
   if (!Number.isInteger(input.categoryId) || input.categoryId <= 0) {
     return { error: 'invalid_category' };
+  }
+  if (!Number.isInteger(input.walletId) || input.walletId <= 0) {
+    return { error: 'invalid_wallet' };
   }
 
   try {
@@ -149,7 +177,7 @@ export async function recordExpenseFromSheet(input: {
         categoryId: input.categoryId,
         amount: toCents(input.amountPesos),
         expenseDate: input.expenseDate,
-        paymentMethod: input.paymentMethod || null,
+        walletId: input.walletId,
         description: input.description || undefined,
       }),
     });

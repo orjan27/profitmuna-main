@@ -22,6 +22,11 @@ interface ExpenseCategory {
   system: boolean;
 }
 
+interface WalletOption {
+  id: number;
+  name: string;
+}
+
 export interface ExpenseRow {
   id: number;
   categoryId: number;
@@ -30,7 +35,10 @@ export interface ExpenseRow {
   amount: number;
   description: string | null;
   expenseDate: string;
-  paymentMethod: string | null;
+  /** Wallet this expense is paid from (null for legacy pre-migration rows) */
+  walletId: number | null;
+  /** Denormalized wallet name — renders even for soft-deleted wallets */
+  walletName: string | null;
   deletedAt: string | null;
 }
 
@@ -39,6 +47,10 @@ interface EditExpenseDialogProps {
   onOpenChange: (open: boolean) => void;
   expense: ExpenseRow;
   categories: ExpenseCategory[];
+  /** Wallets for the "Paid with" selector */
+  wallets: WalletOption[];
+  /** Default wallet id used to preselect legacy NULL-wallet rows */
+  defaultWalletId: number | null;
   /** Called after a successful edit or delete so the parent can refresh state */
   onMutated: () => void;
 }
@@ -57,6 +69,8 @@ export function EditExpenseDialog({
   onOpenChange,
   expense,
   categories,
+  wallets,
+  defaultWalletId,
   onMutated,
 }: EditExpenseDialogProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -119,12 +133,14 @@ export function EditExpenseDialog({
           <div className="flex flex-col gap-6">
             <ExpenseForm
               categories={categories}
+              wallets={wallets}
+              defaultWalletId={defaultWalletId}
               action={boundUpdateAction}
               initialValues={{
                 categoryId: expense.categoryId,
                 amount: expense.amount,
                 expenseDate: expense.expenseDate,
-                paymentMethod: expense.paymentMethod,
+                walletId: expense.walletId,
                 description: expense.description,
               }}
               onSuccess={handleFormSuccess}
