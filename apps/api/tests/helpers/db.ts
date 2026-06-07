@@ -99,7 +99,8 @@ CREATE TABLE expenses (
   amount INTEGER NOT NULL,
   description TEXT,
   expense_date TEXT NOT NULL,
-  payment_method TEXT,
+  wallet_id INTEGER REFERENCES wallets(id),
+  wallet_name TEXT,
   deleted_at TEXT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TEXT,
@@ -108,6 +109,7 @@ CREATE TABLE expenses (
 CREATE INDEX expenses_user_idx ON expenses (user_id);
 CREATE INDEX expenses_user_date_idx ON expenses (user_id, expense_date);
 CREATE INDEX expenses_user_category_idx ON expenses (user_id, category_id);
+CREATE INDEX expenses_user_wallet_idx ON expenses (user_id, wallet_id);
 
 -- Phase 3: Profit First Allocation tables
 CREATE TABLE profit_first_accounts (
@@ -129,7 +131,8 @@ CREATE TABLE wallets (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   profit_first_account_id INTEGER REFERENCES profit_first_accounts(id),
-  auto_deduct_all_expenses INTEGER NOT NULL DEFAULT 0,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  deleted_at TEXT,
   color TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT,
@@ -149,18 +152,6 @@ CREATE TABLE wallet_income_category_mappings (
 CREATE UNIQUE INDEX wicm_income_category_unique ON wallet_income_category_mappings (income_category_id);
 CREATE INDEX wicm_user_idx ON wallet_income_category_mappings (user_id);
 CREATE INDEX wicm_wallet_idx ON wallet_income_category_mappings (wallet_id);
-
-CREATE TABLE wallet_expense_category_mappings (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  wallet_id INTEGER NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
-  expense_category_id INTEGER NOT NULL REFERENCES expense_categories(id) ON DELETE CASCADE,
-  user_id INTEGER NOT NULL REFERENCES users(id),
-  created_at TEXT,
-  updated_at TEXT
-);
-CREATE UNIQUE INDEX wecm_expense_category_unique ON wallet_expense_category_mappings (expense_category_id);
-CREATE INDEX wecm_user_idx ON wallet_expense_category_mappings (user_id);
-CREATE INDEX wecm_wallet_idx ON wallet_expense_category_mappings (wallet_id);
 
 CREATE TABLE wallet_transactions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

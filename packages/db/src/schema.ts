@@ -179,8 +179,11 @@ export const expenses = sqliteTable(
     amount: integer('amount').notNull(),
     description: text('description'),
     expenseDate: text('expense_date').notNull(),
-    // Nullable text — enum enforced at Zod layer, not DB (D-10)
-    paymentMethod: text('payment_method'),
+    // Wallet this expense is paid from (required for new/edited; legacy rows NULL).
+    // No cascade — lazy arrow ref is fine even though expenses is declared before wallets.
+    walletId: integer('wallet_id').references(() => wallets.id),
+    // Denormalized wallet name so soft-deleted wallet names render without a join.
+    walletName: text('wallet_name'),
     // Soft delete: set deletedAt to ISO string; null = active (EXP-04)
     deletedAt: text('deleted_at'),
     userId: integer('user_id')
@@ -195,6 +198,7 @@ export const expenses = sqliteTable(
     index('expenses_user_idx').on(t.userId),
     index('expenses_user_date_idx').on(t.userId, t.expenseDate),
     index('expenses_user_category_idx').on(t.userId, t.categoryId),
+    index('expenses_user_wallet_idx').on(t.userId, t.walletId),
   ]
 );
 
@@ -213,10 +217,10 @@ export const wallets = sqliteTable(
     profitFirstAccountId: integer('profit_first_account_id').references(
       () => profitFirstAccounts.id
     ),
-    // When true, all expenses are auto-deducted from this wallet
-    autoDeductAllExpenses: integer('auto_deduct_all_expenses', { mode: 'boolean' })
-      .notNull()
-      .default(false),
+    // Undeletable per-user "Default" wallet flag
+    isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
+    // Soft delete: null = active; ISO string = soft-deleted
+    deletedAt: text('deleted_at'),
     // Hex color string (e.g. #RRGGBB)
     color: text('color').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
@@ -255,32 +259,6 @@ export const walletIncomeCategoryMappings = sqliteTable(
     uniqueIndex('wicm_income_category_unique').on(table.incomeCategoryId),
     index('wicm_user_idx').on(table.userId),
     index('wicm_wallet_idx').on(table.walletId),
-  ]
-);
-
-export const walletExpenseCategoryMappings = sqliteTable(
-  'wallet_expense_category_mappings',
-  {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    walletId: integer('wallet_id')
-      .notNull()
-      .references(() => wallets.id, { onDelete: 'cascade' }),
-    expenseCategoryId: integer('expense_category_id')
-      .notNull()
-      .references(() => expenseCategories.id, { onDelete: 'cascade' }),
-    userId: integer('user_id')
-      .notNull()
-      .references(() => users.id),
-    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
-    updatedAt: text('updated_at')
-      .$defaultFn(() => new Date().toISOString())
-      .$onUpdateFn(() => new Date().toISOString()),
-  },
-  (table) => [
-    // One wallet per expense category across all user's wallets
-    uniqueIndex('wecm_expense_category_unique').on(table.expenseCategoryId),
-    index('wecm_user_idx').on(table.userId),
-    index('wecm_wallet_idx').on(table.walletId),
   ]
 );
 
