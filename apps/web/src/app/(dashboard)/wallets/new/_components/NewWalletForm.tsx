@@ -8,6 +8,7 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { FormActions } from '@/components/FormActions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -35,14 +36,14 @@ import type { PfAccount, IncomeCategory, ExpenseCategory } from '@/types/wallet'
 
 // 8 preset color swatches per D-15 and UI-SPEC
 const COLOR_SWATCHES = [
-  '#10b981', // Emerald
-  '#8b5cf6', // Violet
-  '#f59e0b', // Amber
-  '#f43f5e', // Rose
-  '#3b82f6', // Blue
-  '#ec4899', // Pink
-  '#14b8a6', // Teal
-  '#f97316', // Orange
+  { hex: '#10b981', name: 'Emerald' },
+  { hex: '#8b5cf6', name: 'Violet' },
+  { hex: '#f59e0b', name: 'Amber' },
+  { hex: '#f43f5e', name: 'Rose' },
+  { hex: '#3b82f6', name: 'Blue' },
+  { hex: '#ec4899', name: 'Pink' },
+  { hex: '#14b8a6', name: 'Teal' },
+  { hex: '#f97316', name: 'Orange' },
 ] as const;
 
 type ExpenseMode = 'NONE' | 'ALL' | 'CATEGORIES';
@@ -82,7 +83,7 @@ export function NewWalletForm({
   );
   // Non-sentinel selection means the wallet is funded by a Profit First allocation
   const isPf = pfAccountId !== STANDALONE;
-  const [color, setColor] = useState<string>(COLOR_SWATCHES[0]);
+  const [color, setColor] = useState<string>(COLOR_SWATCHES[0].hex);
   const [selectedIncomeCategoryIds, setSelectedIncomeCategoryIds] = useState<number[]>([]);
   const [expenseMode, setExpenseMode] = useState<ExpenseMode>('NONE');
   const [selectedExpenseCategoryIds, setSelectedExpenseCategoryIds] = useState<number[]>([]);
@@ -186,7 +187,7 @@ export function NewWalletForm({
 
       {/* Allocation Account — optional; blank (Standalone) means no Profit First funding */}
       <div className="space-y-2">
-        <Label>Allocation Account</Label>
+        <Label htmlFor="allocation-account">Allocation Account</Label>
         <Select
           value={pfAccountId}
           onValueChange={(v) => {
@@ -196,50 +197,42 @@ export function NewWalletForm({
           }}
           disabled={submitting}
         >
-          <SelectTrigger>
+          <SelectTrigger id="allocation-account" className="w-full">
             <SelectValue placeholder="Select allocation account" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={STANDALONE}>
-              <div>
-                <div className="font-medium">Standalone (no allocation)</div>
-                <div className="text-muted-foreground text-xs">
-                  Manually managed wallet with no automatic allocation.
-                </div>
-              </div>
-            </SelectItem>
+            <SelectItem value={STANDALONE}>Standalone (no allocation)</SelectItem>
             {pfAccounts.map((account) => {
               const isLinked = linkedPfAccountIds.has(account.id);
               return (
-                <SelectItem
-                  key={account.id}
-                  value={String(account.id)}
-                  disabled={isLinked}
-                  className={cn(isLinked && 'cursor-not-allowed opacity-50')}
-                >
+                <SelectItem key={account.id} value={String(account.id)} disabled={isLinked}>
                   {account.name}
-                  {isLinked && ' (already linked)'}
+                  {isLinked && <span className="text-muted-foreground">(already linked)</span>}
                 </SelectItem>
               );
             })}
           </SelectContent>
         </Select>
+        <p className="text-muted-foreground text-xs">
+          Standalone wallets are managed manually with no automatic allocation.
+        </p>
       </div>
 
       {/* Color Picker */}
       <div className="space-y-2">
         <Label>Color</Label>
-        <div className="flex gap-2">
-          {COLOR_SWATCHES.map((hex) => (
+        <div className="flex gap-3">
+          {COLOR_SWATCHES.map(({ hex, name: colorName }) => (
             <button
               key={hex}
               type="button"
               onClick={() => setColor(hex)}
               disabled={submitting}
-              aria-label={`Select color ${hex}`}
+              aria-label={`Select color ${colorName}`}
+              aria-pressed={color === hex}
               className={cn(
-                'h-6 w-6 rounded-full transition-shadow',
-                color === hex && 'ring-2 ring-primary ring-offset-2'
+                'h-8 w-8 rounded-full transition-shadow',
+                color === hex && 'ring-primary ring-offset-background ring-2 ring-offset-2'
               )}
               style={{ backgroundColor: hex }}
             />
@@ -247,89 +240,95 @@ export function NewWalletForm({
         </div>
       </div>
 
-      <Separator />
-
-      {/* Income Categories — hidden for PF-funded wallets (D-08) */}
+      {/* Income Categories — hidden for PF-funded wallets (D-08); separator lives
+          inside the conditional so hiding the section doesn't stack two hairlines */}
       {!isPf && (
-        <div className="space-y-2">
-          <div>
-            <p className="text-sm font-medium">Income Categories</p>
-            <p className="text-muted-foreground text-xs">
-              Income from these categories will automatically credit this wallet.
-            </p>
-          </div>
-          <Popover open={incomePickerOpen} onOpenChange={setIncomePickerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                role="combobox"
-                aria-expanded={incomePickerOpen}
-                className="w-full justify-between"
-                disabled={submitting}
-              >
-                {selectedIncomeCategoryIds.length > 0
-                  ? `${selectedIncomeCategoryIds.length} selected`
-                  : 'Search and select categories…'}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Search income categories…" />
-                <CommandList>
-                  <CommandEmpty>No categories found.</CommandEmpty>
-                  <CommandGroup>
-                    {incomeCategories.map((cat) => {
-                      // D-06: already mapped to another wallet — disabled, server enforces 409
-                      const isMapped = mappedIncomeCategoryIds.has(cat.id);
-                      return (
-                        <CommandItem
-                          key={cat.id}
-                          value={cat.name}
-                          disabled={isMapped}
-                          onSelect={() => toggleIncomeCategory(cat.id)}
-                        >
-                          <Checkbox
-                            checked={selectedIncomeCategoryIds.includes(cat.id)}
+        <>
+          <Separator />
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <Label htmlFor="income-categories-trigger">Income Categories</Label>
+              <p className="text-muted-foreground text-xs">
+                Income from these categories will automatically credit this wallet.
+              </p>
+            </div>
+            <Popover open={incomePickerOpen} onOpenChange={setIncomePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  id="income-categories-trigger"
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={incomePickerOpen}
+                  className="w-full justify-between"
+                  disabled={submitting}
+                >
+                  {selectedIncomeCategoryIds.length > 0
+                    ? `${selectedIncomeCategoryIds.length} selected`
+                    : 'Select categories…'}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search income categories…" />
+                  <CommandList>
+                    <CommandEmpty>No categories found.</CommandEmpty>
+                    <CommandGroup>
+                      {incomeCategories.map((cat) => {
+                        // D-06: already mapped to another wallet — disabled, server enforces 409
+                        const isMapped = mappedIncomeCategoryIds.has(cat.id);
+                        return (
+                          <CommandItem
+                            key={cat.id}
+                            value={cat.name}
                             disabled={isMapped}
-                            className="mr-2"
-                            onCheckedChange={() => toggleIncomeCategory(cat.id)}
-                          />
-                          {cat.name}
-                          {isMapped && (
-                            <span className="text-muted-foreground ml-2 text-xs">
-                              (already mapped)
-                            </span>
-                          )}
-                          <Check
-                            className={cn(
-                              'ml-auto h-4 w-4',
-                              selectedIncomeCategoryIds.includes(cat.id)
-                                ? 'opacity-100'
-                                : 'opacity-0'
+                            onSelect={() => toggleIncomeCategory(cat.id)}
+                          >
+                            <Checkbox
+                              checked={selectedIncomeCategoryIds.includes(cat.id)}
+                              disabled={isMapped}
+                              className="mr-2"
+                              onCheckedChange={() => toggleIncomeCategory(cat.id)}
+                            />
+                            {cat.name}
+                            {isMapped && (
+                              <span className="text-muted-foreground ml-2 text-xs">
+                                (already mapped)
+                              </span>
                             )}
-                          />
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
+                            <Check
+                              className={cn(
+                                'ml-auto h-4 w-4',
+                                selectedIncomeCategoryIds.includes(cat.id)
+                                  ? 'opacity-100'
+                                  : 'opacity-0'
+                              )}
+                            />
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </>
       )}
 
       <Separator />
 
       {/* Expense Settings — 3-mode radio (D-07) */}
-      <div className="space-y-3">
-        <p className="text-sm font-medium">Expense Settings</p>
+      <div className="space-y-2">
+        <Label asChild id="expense-settings-label">
+          <span>Expense Settings</span>
+        </Label>
         <RadioGroup
           value={expenseMode}
           onValueChange={(v) => setExpenseMode(v as ExpenseMode)}
           disabled={submitting}
+          aria-labelledby="expense-settings-label"
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="NONE" id="expense-none" />
@@ -347,11 +346,12 @@ export function NewWalletForm({
 
         {/* Expense category picker — shown only when CATEGORIES is selected */}
         {expenseMode === 'CATEGORIES' && (
-          <div className="mt-2 space-y-2">
-            <Label>Expense Categories</Label>
+          <div className="space-y-2">
+            <Label htmlFor="expense-categories-trigger">Expense Categories</Label>
             <Popover open={expensePickerOpen} onOpenChange={setExpensePickerOpen}>
               <PopoverTrigger asChild>
                 <Button
+                  id="expense-categories-trigger"
                   type="button"
                   variant="outline"
                   role="combobox"
@@ -361,11 +361,11 @@ export function NewWalletForm({
                 >
                   {selectedExpenseCategoryIds.length > 0
                     ? `${selectedExpenseCategoryIds.length} selected`
-                    : 'Search and select categories…'}
+                    : 'Select categories…'}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Search expense categories…" />
                   <CommandList>
@@ -414,22 +414,26 @@ export function NewWalletForm({
       </div>
 
       {/* Form-level error */}
-      {formError && <p className="text-destructive text-sm">{formError}</p>}
+      {formError && (
+        <p role="alert" className="text-destructive text-sm">
+          {formError}
+        </p>
+      )}
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <FormActions className="md:justify-between">
         <Button
           type="button"
           variant="outline"
           onClick={() => router.push('/wallets')}
           disabled={submitting}
         >
-          Discard Changes
+          Cancel
         </Button>
-        <Button type="submit" disabled={submitting} className="ml-auto">
+        <Button type="submit" disabled={submitting}>
           {submitting ? 'Creating…' : 'Create Wallet'}
         </Button>
-      </div>
+      </FormActions>
     </form>
   );
 }

@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { FormActions } from '@/components/FormActions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -136,7 +137,9 @@ export function RecordSheet({
           </div>
         </SheetHeader>
 
-        <div className="px-6 pt-4 pb-8">
+        {/* flex-1 lets the entry forms stretch so the mobile action bar can
+            anchor to the sheet bottom even when the form is short. */}
+        <div className="flex flex-1 flex-col px-6 pt-4 pb-8">
           {isLoading ? <SheetSkeleton /> : null}
 
           {loadFailed ? (
@@ -299,7 +302,7 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+    <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-5" noValidate>
       {/* Amount — the one field that matters most, sized accordingly */}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="record-income-amount">Amount (₱)</Label>
@@ -417,9 +420,11 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
         </div>
       ) : null}
 
-      <Button type="submit" disabled={isPending || !categoryId || amountCents <= 0}>
-        {isPending ? 'Recording…' : 'Record income'}
-      </Button>
+      <FormActions variant="sheet" className="md:justify-start">
+        <Button type="submit" disabled={isPending || !categoryId || amountCents <= 0}>
+          {isPending ? 'Recording…' : 'Record income'}
+        </Button>
+      </FormActions>
     </form>
   );
 }
@@ -462,7 +467,7 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+    <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-5" noValidate>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="record-expense-amount">Amount (₱)</Label>
         <Input
@@ -536,9 +541,11 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
         />
       </div>
 
-      <Button type="submit" disabled={isPending || !categoryId || amountCents <= 0}>
-        {isPending ? 'Recording…' : 'Record expense'}
-      </Button>
+      <FormActions variant="sheet" className="md:justify-start">
+        <Button type="submit" disabled={isPending || !categoryId || amountCents <= 0}>
+          {isPending ? 'Recording…' : 'Record expense'}
+        </Button>
+      </FormActions>
     </form>
   );
 }

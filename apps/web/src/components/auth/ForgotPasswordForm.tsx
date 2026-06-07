@@ -86,7 +86,7 @@ export function ForgotPasswordForm() {
           />
           {emailError ? <p className="text-sm text-destructive">{emailError}</p> : null}
         </div>
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" disabled={submitting} className="max-sm:h-11">
           {submitting ? 'Sending…' : 'Send reset link'}
         </Button>
       </form>

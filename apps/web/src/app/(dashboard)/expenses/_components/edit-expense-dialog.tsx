@@ -128,11 +128,12 @@ export function EditExpenseDialog({
                 description: expense.description,
               }}
               onSuccess={handleFormSuccess}
+              variant="dialog"
             />
             <div className="border-t pt-4">
               <Button
                 variant="outline"
-                className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground max-sm:h-11 max-sm:w-full"
                 onClick={handleDeleteClick}
                 type="button"
               >

@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { FormActions } from '@/components/FormActions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,6 +30,8 @@ interface IncomeFormProps {
   submitLabel?: string;
   /** Called when the user clicks Cancel (edit dialog). */
   onCancel?: () => void;
+  /** Where the form renders; controls the mobile action-bar treatment. */
+  variant?: 'page' | 'dialog';
 }
 
 /** today as YYYY-MM-DD in local time */
@@ -52,6 +55,7 @@ export function IncomeForm({
   initialValues,
   submitLabel = 'Add Income',
   onCancel,
+  variant = 'page',
 }: IncomeFormProps) {
   const [isPending, startTransition] = useTransition();
   // Pitfall 5: profitFirstAllocated defaults to true
@@ -262,7 +266,7 @@ export function IncomeForm({
         />
       </div>
 
-      <div className="flex justify-end gap-3">
+      <FormActions variant={variant === 'dialog' ? 'overlay' : 'page'}>
         {onCancel ? (
           <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
             Cancel
@@ -271,7 +275,7 @@ export function IncomeForm({
         <Button type="submit" disabled={isPending}>
           {isPending ? 'Saving…' : submitLabel}
         </Button>
-      </div>
+      </FormActions>
     </form>
   );
 }

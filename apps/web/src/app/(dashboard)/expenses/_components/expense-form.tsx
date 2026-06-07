@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { FormActions } from '@/components/FormActions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -42,6 +43,8 @@ interface ExpenseFormProps {
   initialValues?: InitialValues;
   /** Called after a successful submission (e.g. close dialog) */
   onSuccess?: () => void;
+  /** Where the form renders; controls the mobile action-bar treatment. */
+  variant?: 'page' | 'dialog';
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -64,7 +67,13 @@ function centsToDecimal(cents: number): string {
  *
  * Payment method is optional per D-09/D-10 — a blank option is always included.
  */
-export function ExpenseForm({ categories, action, initialValues, onSuccess }: ExpenseFormProps) {
+export function ExpenseForm({
+  categories,
+  action,
+  initialValues,
+  onSuccess,
+  variant = 'page',
+}: ExpenseFormProps) {
   const [isPending, startTransition] = useTransition();
 
   // Local categories copy so quick-add appears immediately without full page reload
@@ -250,15 +259,17 @@ export function ExpenseForm({ categories, action, initialValues, onSuccess }: Ex
         />
       </div>
 
-      <Button type="submit" disabled={isPending} className="self-start">
-        {isPending
-          ? initialValues
-            ? 'Saving…'
-            : 'Recording…'
-          : initialValues
-            ? 'Save Changes'
-            : 'Record Expense'}
-      </Button>
+      <FormActions variant={variant === 'dialog' ? 'overlay' : 'page'} className="md:justify-start">
+        <Button type="submit" disabled={isPending}>
+          {isPending
+            ? initialValues
+              ? 'Saving…'
+              : 'Recording…'
+            : initialValues
+              ? 'Save Changes'
+              : 'Record Expense'}
+        </Button>
+      </FormActions>
     </form>
   );
 }

@@ -107,7 +107,7 @@ export function RegisterForm() {
             <p className="text-sm text-destructive">{fieldErrors.password}</p>
           ) : null}
         </div>
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" disabled={submitting} className="max-sm:h-11">
           {submitting ? 'Creating account…' : 'Create account'}
         </Button>
       </form>

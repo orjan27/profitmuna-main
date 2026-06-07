@@ -60,7 +60,7 @@ export default async function NewWalletPage({
   const mappedExpenseCategoryIds = new Set(wallets.flatMap((w) => w.expenseCategoryIds ?? []));
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto max-w-lg px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold">Create Wallet</h1>
       <NewWalletForm
         pfAccounts={pfAccounts}

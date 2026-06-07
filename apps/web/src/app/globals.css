@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* Bind dark: to the theme class (set by next-themes) instead of the OS media
+   query, so component dark: styles follow the in-app toggle deterministically. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /*
    * Warm dark-gray monochrome ramp — the standard surface for all pages.
@@ -69,6 +73,47 @@
   }
 }
 
+/* Light theme — warm derived palette. next-themes sets class="light" on <html>.
+   The @theme block above remains the dark source of truth. Ramp direction
+   inverts: paper is the lightest surface; chrome and raised sit a step darker.
+   Same warm hues (90–100), low chroma — no pure #fff (The No Pure Extremes Rule). */
+.light {
+  --color-paper: oklch(0.975 0.004 95);
+  /* Chrome/navbar — a step darker than paper */
+  --color-paper-deep: oklch(0.945 0.004 90);
+  --color-ink: oklch(0.255 0.006 90);
+  --color-ink-soft: oklch(0.43 0.008 90);
+  --color-ink-faint: oklch(0.5 0.008 90);
+  --color-hairline: oklch(0.9 0.004 95);
+  --color-raised: oklch(0.955 0.004 95);
+
+  /* Money hues darkened for AA contrast on light paper */
+  --color-income: oklch(0.52 0.13 155);
+  --color-expense: oklch(0.5 0.18 25);
+
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-ink);
+  --color-card: oklch(0.965 0.004 95);
+  --color-card-foreground: var(--color-ink);
+  --color-popover: oklch(0.975 0.004 95);
+  --color-popover-foreground: var(--color-ink);
+  --color-primary: var(--color-ink);
+  --color-primary-foreground: var(--color-paper);
+  --color-secondary: var(--color-raised);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted: var(--color-raised);
+  --color-muted-foreground: var(--color-ink-soft);
+  --color-accent: var(--color-raised);
+  --color-accent-foreground: var(--color-ink);
+  --color-destructive: var(--color-expense);
+  --color-border: var(--color-hairline);
+  --color-input: var(--color-hairline);
+  --color-ring: oklch(0.55 0.02 90);
+
+  /* Native controls (scrollbars, pickers, selects) render light */
+  color-scheme: light;
+}
+
 html {
   /* Native controls (scrollbars, date pickers, selects) render dark */
   color-scheme: dark;
@@ -77,4 +122,14 @@ html {
 body {
   background-color: var(--color-paper);
   color: var(--color-ink);
+}
+
+/* Dialog and sheet action buttons on phones: DialogFooter/SheetFooter already
+   stack full-width below the sm breakpoint; this lifts them to a comfortable
+   44px touch height. Lives here because components/ui/* is shadcn-generated
+   and must not be hand-edited. */
+@media (max-width: 39.9rem) {
+  :is([data-slot='dialog-footer'], [data-slot='sheet-footer']) > button {
+    min-height: 2.75rem;
+  }
 }
