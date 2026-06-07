@@ -7,20 +7,23 @@ import { cn } from '@/lib/utils';
 import { BrandMark } from '@/components/BrandMark';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { UserMenu } from '@/components/UserMenu';
 import type { Notification } from '@/types/notifications';
+import type { UserProfile } from '@/types/user';
 
 interface NavItem {
   readonly label: string;
   readonly href: string;
 }
 
+// Settings is NOT a primary nav item — it lives in UserMenu on every
+// viewport, matching the account-menu convention (and keeping BottomNav at 5 tabs).
 const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Overview', href: '/overview' },
   { label: 'Income', href: '/income' },
   { label: 'Expenses', href: '/expenses' },
   { label: 'Profit First', href: '/profit-first' },
   { label: 'Wallets', href: '/wallets' },
-  { label: 'Settings', href: '/settings' },
 ] as const;
 
 interface DashboardNavProps {
@@ -28,6 +31,8 @@ interface DashboardNavProps {
   unreadCount?: number;
   /** SSR-fetched notifications list for the dropdown panel. */
   notifications?: Notification[];
+  /** SSR-fetched profile for the account menu; null when unavailable. */
+  user?: UserProfile | null;
 }
 
 /**
@@ -36,15 +41,17 @@ interface DashboardNavProps {
  * bar — navigation moves to BottomNav. Active state is carried by ink color
  * and weight, not pills or icons — the chrome stays out of the money's way.
  *
- * The bell (NOTIF-01) sits rightmost in the third column, after ThemeToggle,
- * with ml-auto. Unread count and list are fetched SSR in the layout and passed
- * down; client-side optimistic updates live in NotificationList.
+ * The third column carries ThemeToggle, the bell (NOTIF-01), and UserMenu
+ * (rightmost — Settings + logout). Unread count, notifications, and the user
+ * profile are fetched SSR in the layout and passed down; client-side
+ * optimistic updates live in NotificationList.
  *
  * Client Component: usePathname for active state.
  */
 export function DashboardNav({
   unreadCount = 0,
   notifications = [],
+  user = null,
 }: DashboardNavProps): React.JSX.Element {
   const pathname = usePathname();
 
@@ -86,12 +93,12 @@ export function DashboardNav({
           </ul>
         </nav>
 
-        {/* Right-side actions: theme toggle + notification bell (bell is ml-auto rightmost) */}
+        {/* Right-side actions: theme toggle + notification bell + account menu.
+            UserMenu is the Settings entry on mobile and the only logout control. */}
         <div className="col-start-3 flex items-center justify-self-end gap-1">
           <ThemeToggle />
-          <div className="ml-auto">
-            <NotificationBell unreadCount={unreadCount} notifications={notifications} />
-          </div>
+          <NotificationBell unreadCount={unreadCount} notifications={notifications} />
+          <UserMenu user={user} />
         </div>
       </div>
     </header>

@@ -30,6 +30,7 @@ import { apiFetch } from '@/server/api';
 import type { CurrencyCode } from '@/lib/format-currency';
 import type { UserSettings } from '@/types/settings';
 import type { Notification } from '@/types/notifications';
+import type { UserProfile } from '@/types/user';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Fetch user's display currency; fall back to PHP if unavailable (shell must never crash)
@@ -57,10 +58,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
     // Unauthenticated, network error, or notifications not available — empty defaults are safe
   }
 
+  // Fetch the user's profile for the account menu (avatar initials + name/email).
+  // Null on error — UserMenu falls back to a generic icon and still offers
+  // Settings + logout, which don't need the profile.
+  let user: UserProfile | null = null;
+  try {
+    const { data } = await apiFetch<{ data: UserProfile }>('/api/auth/me');
+    user = data;
+  } catch {
+    // Unauthenticated or endpoint unavailable — generic account icon is safe
+  }
+
   return (
     <RecordSheetProvider>
       <div className="min-h-screen bg-background">
-        <DashboardNav unreadCount={unreadCount} notifications={notifications} />
+        <DashboardNav unreadCount={unreadCount} notifications={notifications} user={user} />
         <main className="mx-auto w-full max-w-6xl px-4 pt-10 pb-24 max-md:pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:px-8">
           <CurrencyProvider currency={displayCurrency}>{children}</CurrencyProvider>
         </main>

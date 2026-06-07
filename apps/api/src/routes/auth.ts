@@ -24,7 +24,9 @@ import {
   forgotPassword,
   resetPassword,
   upsertGoogleUser,
+  getUserProfile,
 } from '@/services/auth-service';
+import { requireAuth } from '@/middleware/auth';
 import { createDb } from '@app/db';
 import { refreshTokens as refreshTokensTable } from '@app/db/schema';
 import { signAccessToken } from '@/lib/jwt';
@@ -143,6 +145,14 @@ authRouter.post('/refresh', async (c) => {
     });
   }
   return c.json({ data: { userId: result.userId } });
+});
+
+// GET /me — display profile (id, name, email) for the account menu in the
+// web shell. Behind requireAuth like every other user-scoped endpoint.
+authRouter.get('/me', requireAuth, async (c) => {
+  const userId = c.get('userId');
+  const profile = await getUserProfile(c.env.DB, userId);
+  return c.json({ data: profile });
 });
 
 // Logout is driven by the refresh_token cookie, NOT requireAuth (WR-04):
