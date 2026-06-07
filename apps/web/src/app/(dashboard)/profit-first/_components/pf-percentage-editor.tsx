@@ -134,8 +134,9 @@ export function PfPercentageEditor({ accounts, onCancel }: PfPercentageEditorPro
 
       <Separator />
 
-      {/* Total line + Save */}
-      <div className="flex items-center justify-between">
+      {/* Total line + Save — stacks on mobile with a full-width touch-height
+          Save; inline label-left / button-right at md+. */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <span
           className={cn('text-sm font-medium', isValid ? 'text-green-600' : 'text-destructive')}
         >
@@ -144,7 +145,7 @@ export function PfPercentageEditor({ accounts, onCancel }: PfPercentageEditorPro
         <Button
           onClick={handleSave}
           disabled={!isValid || submitting}
-          className={cn(!isValid && 'opacity-50 pointer-events-none')}
+          className={cn('max-md:h-11 max-md:w-full', !isValid && 'opacity-50 pointer-events-none')}
         >
           {submitting ? 'Saving…' : 'Save Changes'}
         </Button>

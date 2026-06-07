@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useQueryState, parseAsString } from 'nuqs';
 import { MoreHorizontal, Plus, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
@@ -45,6 +45,15 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
   const [currentPage, setCurrentPage] = useState(initialData.page);
   const [isLast, setIsLast] = useState(initialData.last);
   const [isPending, startTransition] = useTransition();
+
+  // Re-sync accumulator when the RSC parent re-fetches after router.refresh()
+  // (e.g. after a create via the Record sheet). useState ignores prop changes
+  // after initial mount, so an effect is needed to pick up the new initialData.
+  useEffect(() => {
+    setItems(initialData.content);
+    setCurrentPage(initialData.page);
+    setIsLast(initialData.last);
+  }, [initialData]);
 
   // Edit dialog state
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
@@ -156,7 +165,8 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button size="sm" onClick={() => openRecordSheet('income')}>
+            {/* Hidden on mobile: RecordFab is the record affordance there. */}
+            <Button size="sm" className="max-md:hidden" onClick={() => openRecordSheet('income')}>
               <Plus aria-hidden="true" />
               Record income
             </Button>

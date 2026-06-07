@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { FormActions } from '@/components/FormActions';
 import type { Income, IncomeCategory } from '@/types/income';
 import { IncomeForm } from './income-form';
 import { updateIncomeAction, deleteIncomeAction } from './income-actions';
@@ -22,6 +24,7 @@ interface EditIncomeDialogProps {
  * Delete shows a confirmation step before calling deleteIncomeAction.
  */
 export function EditIncomeDialog({ income, categories, open, onClose }: EditIncomeDialogProps) {
+  const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, startDeleteTransition] = useTransition();
 
@@ -35,6 +38,7 @@ export function EditIncomeDialog({ income, categories, open, onClose }: EditInco
       }
       toast.success('Income deleted.');
       onClose();
+      router.refresh();
     });
   }
 
@@ -45,6 +49,7 @@ export function EditIncomeDialog({ income, categories, open, onClose }: EditInco
     }
     toast.success('Income updated.');
     onClose();
+    router.refresh();
   }
 
   return (
@@ -54,7 +59,7 @@ export function EditIncomeDialog({ income, categories, open, onClose }: EditInco
         if (!isOpen) onClose();
       }}
     >
-      <DialogContent className="max-h-screen overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-screen overflow-x-hidden overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit Income</DialogTitle>
         </DialogHeader>
@@ -64,7 +69,7 @@ export function EditIncomeDialog({ income, categories, open, onClose }: EditInco
             <p className="text-sm text-muted-foreground">
               Are you sure you want to delete this income record? This action cannot be undone.
             </p>
-            <div className="flex justify-end gap-3">
+            <FormActions variant="overlay">
               <Button
                 variant="outline"
                 onClick={() => setConfirmDelete(false)}
@@ -75,7 +80,7 @@ export function EditIncomeDialog({ income, categories, open, onClose }: EditInco
               <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
                 {isDeleting ? 'Deleting…' : 'Delete'}
               </Button>
-            </div>
+            </FormActions>
           </div>
         ) : (
           <div className="space-y-4">
@@ -85,13 +90,14 @@ export function EditIncomeDialog({ income, categories, open, onClose }: EditInco
               initialValues={income}
               submitLabel="Save Changes"
               onCancel={onClose}
+              variant="dialog"
             />
             <div className="border-t pt-4">
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={() => setConfirmDelete(true)}
-                className="w-full"
+                className="w-full max-sm:h-11"
               >
                 Delete Income
               </Button>
