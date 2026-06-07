@@ -5,6 +5,7 @@ import { getSession } from '@/server/auth';
 import { apiFetch } from '@/server/api';
 import { formatCurrency } from '@/lib/format-currency';
 import { Button } from '@/components/ui/button';
+import { WalletFab } from '@/components/WalletFab';
 import type { WalletListItem, PfAccount } from '@/types/wallet';
 import { WalletRow } from './_components/WalletRow';
 
@@ -62,9 +63,10 @@ export default async function WalletsPage() {
           ) : null}
         </div>
         {/* One primary per view: the empty state's Create wallet CTA owns the
-            action when there are no wallets yet */}
+            action when there are no wallets yet. Hidden on mobile where
+            WalletFab (rendered below) provides the thumb-zone affordance. */}
         {wallets.length > 0 ? (
-          <Button size="sm" asChild>
+          <Button size="sm" asChild className="max-md:hidden">
             <Link href="/wallets/new">New wallet</Link>
           </Button>
         ) : null}
@@ -105,6 +107,9 @@ export default async function WalletsPage() {
           </Button>
         </div>
       )}
+
+      {/* Mobile FAB — mirrors RecordFab placement/size; self-hidden at md+ via md:hidden */}
+      {wallets.length > 0 ? <WalletFab /> : null}
     </div>
   );
 }
