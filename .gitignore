@@ -1,0 +1,67 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# build
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# env
+.env
+.env.local
+.env.*.local
+
+# debug
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# turbo
+.turbo/
+
+# cloudflare
+.wrangler/
+.dev.vars
+
+# scaffold
+.scaffold/
+
+# test
+coverage/
+playwright-report/
+test-results/
+.playwright-mcp/
+snap-*.yml
+
+# claude local state
+.claude/worktrees/
+.claude/settings.local.json
+
+# WSL / Windows download metadata
+*:Zone.Identifier
+
+# gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.properties
+
+# java
+*.class
+*.jar
+*.war
+hs_err_pid*
+
+# docker
+docker-compose.override.yml
