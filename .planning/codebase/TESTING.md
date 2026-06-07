@@ -5,15 +5,18 @@
 ## Test Framework
 
 **Runner:**
+
 - Vitest (`^3.0.0`) for all testing across workspace
 - Config: `apps/api/vitest.config.ts` (global setup)
 - Other workspaces inherit Vitest configuration
 
 **Assertion Library:**
+
 - Vitest built-in assertions via `expect()` (no additional library needed)
 - API: `expect(value).toBe()`, `expect(value).toEqual()`, `expect(value).toHaveProperty()`, etc.
 
 **Run Commands:**
+
 ```bash
 npm test                  # Run all tests across workspace
 npm test -- --watch      # Watch mode
@@ -22,6 +25,7 @@ turbo test               # Run tests in all workspaces
 ```
 
 **Individual workspace:**
+
 ```bash
 cd apps/api
 npm test                 # Run API tests only
@@ -30,15 +34,18 @@ npm test                 # Run API tests only
 ## Test File Organization
 
 **Location:**
+
 - Co-located with source code: test files live in `tests/` directory at the workspace root
 - For `apps/api`: tests in `apps/api/tests/`
 - Pattern: mirror source directory structure in tests (e.g., `tests/routes/users.test.ts` for `src/routes/users.ts`)
 
 **Naming:**
+
 - Suffix with `.test.ts` for any test file (e.g., `index.test.ts`, `users.test.ts`, `auth.test.ts`)
 - File name mirrors the module being tested (e.g., `format-date.test.ts` tests `lib/format-date.ts`)
 
 **Structure:**
+
 ```
 apps/api/
 ├── src/
@@ -58,6 +65,7 @@ apps/api/
 ## Test Structure
 
 **Suite Organization:**
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 import app from '../src/index';
@@ -80,18 +88,21 @@ describe('API routes', () => {
 ```
 
 **Key Patterns:**
+
 - Top-level `describe()` wraps the module/feature being tested
 - Each `it()` or `test()` covers one assertion concept
 - Arrange-Act-Assert structure: setup data, call function, assert result
 - Use descriptive test names that read like documentation: "GET /health returns ok"
 
 **Setup and Teardown:**
+
 - `beforeEach()`: run before each test (e.g., seed test data, create test fixtures)
 - `afterEach()`: run after each test (e.g., clean up database, reset mocks)
 - `beforeAll()`: run once before all tests in suite (e.g., start test server)
 - `afterAll()`: run once after all tests in suite (e.g., stop test server, close connections)
 
 **Example:**
+
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { db } from '@app/db';
@@ -125,6 +136,7 @@ describe('User service', () => {
 **Framework:** Vitest built-in `vi` module (same as Jest)
 
 **Patterns:**
+
 ```typescript
 import { describe, it, expect, vi } from 'vitest';
 
@@ -144,6 +156,7 @@ afterEach(() => {
 ```
 
 **Example:**
+
 ```typescript
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchUser } from '../services/user-service';
@@ -185,11 +198,13 @@ describe('User service', () => {
 ```
 
 **What to Mock:**
+
 - Third-party API calls (payment processors, external SaaS, AI APIs)
 - External service integrations
 - Time-dependent code (use `vi.useFakeTimers()`)
 
 **What NOT to Mock:**
+
 - Real database calls in integration tests
 - HTTP routes/endpoints (call the app directly via `app.request()`)
 - Internal functions called by the function being tested
@@ -201,6 +216,7 @@ describe('User service', () => {
 Create explicit test data inside each test or in shared fixtures. Do not rely on leftover state from other tests.
 
 **Example — inline fixture:**
+
 ```typescript
 it('creates user with valid email', async () => {
   const userData = {
@@ -214,6 +230,7 @@ it('creates user with valid email', async () => {
 ```
 
 **Example — factory function:**
+
 ```typescript
 function createTestUser(overrides = {}) {
   return {
@@ -231,6 +248,7 @@ it('creates user with custom name', async () => {
 ```
 
 **Location:**
+
 - Factories live in `tests/fixtures/` or co-located with test file as `fixtures.ts`
 - Share factories across related tests; avoid duplication
 
@@ -239,6 +257,7 @@ it('creates user with custom name', async () => {
 **Requirements:** No enforced coverage target (inherited from Vitest defaults)
 
 **View Coverage:**
+
 ```bash
 npm test -- --coverage
 ```
@@ -250,18 +269,21 @@ npm test -- --coverage
 ## Test Types
 
 **Unit Tests:**
+
 - Scope: Single function or service method
 - Approach: Isolate the unit, mock dependencies, test inputs/outputs
 - Location: `tests/lib/`, `tests/services/`
 - Example: testing a formatting utility, validation function, or service method
 
 **Integration Tests:**
+
 - Scope: Multiple components working together (e.g., API route calling a service calling the database)
 - Approach: Use real test database (D1), real HTTP boundaries; only mock external third-party services
 - Location: `tests/routes/` (for API endpoints), `tests/integration/`
 - Example: testing a complete API endpoint, database query + service combo
 
 **E2E Tests:**
+
 - Framework: Not currently set up (Playwright recommended for future addition)
 - Scope: User workflows end-to-end
 - Would test: login → create allocation → view dashboard (requires running app + browser)
@@ -269,6 +291,7 @@ npm test -- --coverage
 ## Common Patterns
 
 **Async Testing:**
+
 ```typescript
 // Good: use async/await
 it('fetches user data', async () => {
@@ -285,6 +308,7 @@ it('fetches user data', () => {
 ```
 
 **Error Testing:**
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 
@@ -307,6 +331,7 @@ it('returns error response for invalid request', async () => {
 ```
 
 **Testing with Hono:**
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 import app from '../src/index';
@@ -339,6 +364,7 @@ describe('User routes', () => {
 ## Best Practices
 
 **One Assertion Concept Per Test:**
+
 ```typescript
 // Good: focused test
 it('returns user with correct email', async () => {
@@ -357,12 +383,14 @@ it('returns user', async () => {
 ```
 
 **Deterministic Tests:**
+
 - No real network calls (except to test database)
 - No dependence on current time (use `vi.useFakeTimers()` or inject clock)
 - No hardcoded delays or `setTimeout`
 - Same test input always produces same output
 
 **Descriptive Test Names:**
+
 ```typescript
 // Good: reads like documentation
 it('returns 401 when user provides invalid credentials', async () => {
@@ -376,6 +404,7 @@ it('test login', async () => {
 ```
 
 **Do Not Use Snapshots:**
+
 ```typescript
 // Bad: snapshots drift with timestamps, IDs, sorting
 expect(apiResponse).toMatchSnapshot();
@@ -386,6 +415,7 @@ expect(apiResponse.status).toBe('ok');
 ```
 
 **Explicit Fixtures:**
+
 ```typescript
 // Bad: relies on shared state from other tests
 it('gets user', async () => {
@@ -404,6 +434,7 @@ it('gets user', async () => {
 ## Running Tests
 
 **Local Development:**
+
 ```bash
 # Watch mode (re-run on file change)
 npm test -- --watch
@@ -419,10 +450,11 @@ npm test -- --coverage
 ```
 
 **In CI/CD:**
+
 ```bash
 npm test  # Runs in CI mode (single run, no watch)
 ```
 
 ---
 
-*Testing analysis: 2026-06-05*
+_Testing analysis: 2026-06-05_

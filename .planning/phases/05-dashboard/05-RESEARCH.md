@@ -618,7 +618,7 @@ export function FeedRow({ tx, visible, mounted }: FeedRowProps) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED — answers encoded in gap plans 05-04..05-06)
 
 1. **Feed pagination: same endpoint or separate endpoint?**
    - What we know: The summary endpoint returns a first page of feed items; the user wants "Load more"

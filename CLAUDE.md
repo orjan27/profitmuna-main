@@ -26,58 +26,58 @@ Never add adjacent features "for completeness". If the user hasn't asked for it 
 
 ## Project Structure (STRICT)
 
-**STRICTLY follow the project structure below.** Do not create new top-level directories, rename existing ones, or reorganize files. Place new files only in the established locations. If unsure where something goes, check the structure first. If a genuine need for a new folder exists, update this section in `CLAUDE.md` *before* creating the folder.
+**STRICTLY follow the project structure below.** Do not create new top-level directories, rename existing ones, or reorganize files. Place new files only in the established locations. If unsure where something goes, check the structure first. If a genuine need for a new folder exists, update this section in `CLAUDE.md` _before_ creating the folder.
 
 A PreToolUse hook at `.claude/hooks/folder-structure-guard.js` enforces this against `.claude/allowed-paths.json`:
 
 - Writes matching `forbiddenGlobs` (e.g. `apps/*/src/utils/**`) are **hard-blocked**. These are known-bad patterns.
-- Writes outside `allowedGlobs` **prompt the user** to approve. If you get prompted, either (a) correct the path to one listed in "Project Structure (STRICT)", or (b) if a new folder is genuinely needed, ask the user, then update this section *and* `.claude/allowed-paths.json` before proceeding.
+- Writes outside `allowedGlobs` **prompt the user** to approve. If you get prompted, either (a) correct the path to one listed in "Project Structure (STRICT)", or (b) if a new folder is genuinely needed, ask the user, then update this section _and_ `.claude/allowed-paths.json` before proceeding.
 - Edits to existing files are always allowed.
 - **Root `.md` hard-block**: Only `CLAUDE.md`, `README.md`, `AGENTS.md`, `STANDARDS.md`, and `PLUGINS-TO-INSTALL.md` may exist at root. All other Markdown files must go in `docs/`. The exempt list is in `exemptRootMd` in `.claude/allowed-paths.json`.
 
 ### `apps/web/src/` (Next.js)
 
-| Folder | What goes here | What does NOT |
-|--------|----------------|----------------|
-| `app/` | Routes, layouts, route-scoped server components | Reusable UI, business logic |
-| `components/` | Shared UI primitives and composite components | Route-specific one-offs (keep in `app/`) |
-| `components/ui/` | shadcn/ui generated primitives | Hand-edited code — regenerate via `/generate-component` |
-| `lib/` | Framework-agnostic utilities (e.g. `utils.ts`, formatters) | React hooks, server-only code |
-| `hooks/` | React hooks — files named `useX.ts` | Non-hook utilities |
-| `server/` | Server-only modules: server actions, DB calls via `@app/db`, secrets | Anything imported from client components |
-| `types/` | Shared TypeScript types/interfaces | Runtime code |
-| `styles/` | Global CSS beyond `app/globals.css` | Component-scoped styles (co-locate) |
+| Folder           | What goes here                                                       | What does NOT                                           |
+| ---------------- | -------------------------------------------------------------------- | ------------------------------------------------------- |
+| `app/`           | Routes, layouts, route-scoped server components                      | Reusable UI, business logic                             |
+| `components/`    | Shared UI primitives and composite components                        | Route-specific one-offs (keep in `app/`)                |
+| `components/ui/` | shadcn/ui generated primitives                                       | Hand-edited code — regenerate via `/generate-component` |
+| `lib/`           | Framework-agnostic utilities (e.g. `utils.ts`, formatters)           | React hooks, server-only code                           |
+| `hooks/`         | React hooks — files named `useX.ts`                                  | Non-hook utilities                                      |
+| `server/`        | Server-only modules: server actions, DB calls via `@app/db`, secrets | Anything imported from client components                |
+| `types/`         | Shared TypeScript types/interfaces                                   | Runtime code                                            |
+| `styles/`        | Global CSS beyond `app/globals.css`                                  | Component-scoped styles (co-locate)                     |
 
 ### `apps/api/src/` (Hono)
 
-| Folder | What goes here | What does NOT |
-|--------|----------------|----------------|
-| `routes/` | Route handlers grouped by resource (`routes/users.ts`) | Business logic |
-| `middleware/` | Hono middleware (auth, logging, CORS) | Route handlers |
-| `services/` | Business logic; DB access via `@app/db` | HTTP concerns, `c.req` / `c.json` |
-| `schemas/` | Zod schemas for request/response validation | Runtime helpers |
-| `lib/` | Pure utilities — no framework dependency | Framework-coupled code |
-| `types/` | Shared TypeScript types | Runtime code |
+| Folder        | What goes here                                         | What does NOT                     |
+| ------------- | ------------------------------------------------------ | --------------------------------- |
+| `routes/`     | Route handlers grouped by resource (`routes/users.ts`) | Business logic                    |
+| `middleware/` | Hono middleware (auth, logging, CORS)                  | Route handlers                    |
+| `services/`   | Business logic; DB access via `@app/db`                | HTTP concerns, `c.req` / `c.json` |
+| `schemas/`    | Zod schemas for request/response validation            | Runtime helpers                   |
+| `lib/`        | Pure utilities — no framework dependency               | Framework-coupled code            |
+| `types/`      | Shared TypeScript types                                | Runtime code                      |
 
 ### `packages/db/src/`
 
-| File / Folder | What goes here |
-|---------------|-----------------|
-| `schema.ts` | Drizzle schema — single source of truth |
-| `index.ts` | Public exports: `db` client, query helpers |
-| `queries/` | Reusable query helpers once they outgrow `index.ts` |
+| File / Folder | What goes here                                      |
+| ------------- | --------------------------------------------------- |
+| `schema.ts`   | Drizzle schema — single source of truth             |
+| `index.ts`    | Public exports: `db` client, query helpers          |
+| `queries/`    | Reusable query helpers once they outgrow `index.ts` |
 
 ## Forbidden Patterns
 
-| Forbidden | Why | Use instead |
-|-----------|-----|-------------|
-| New top-level directory at repo root | Structure drift; breaks tooling | Update "Project Structure (STRICT)" in `CLAUDE.md` first, then add |
-| `*.md` at project root (non-exempt) | Root clutter; docs belong together | Move to `docs/`. Only CLAUDE.md, README.md, AGENTS.md, STANDARDS.md, PLUGINS-TO-INSTALL.md stay at root |
-| `apps/*/src/utils/` | Duplicates `lib/` | Put framework-agnostic utilities in `lib/` |
-| `apps/*/src/helpers/` | Duplicates `lib/` | Put helpers in `lib/` |
-| `apps/*/src/common/` | Duplicates `lib/` and `types/` | Split into `lib/` (utilities) and `types/` (shared types) |
-| Business logic in `routes/` | Routes should be thin | Move to `services/` |
-| HTTP concerns (`c.req`, `c.json`) in `services/` | Services are framework-agnostic | Keep in `routes/` |
+| Forbidden                                        | Why                                | Use instead                                                                                             |
+| ------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| New top-level directory at repo root             | Structure drift; breaks tooling    | Update "Project Structure (STRICT)" in `CLAUDE.md` first, then add                                      |
+| `*.md` at project root (non-exempt)              | Root clutter; docs belong together | Move to `docs/`. Only CLAUDE.md, README.md, AGENTS.md, STANDARDS.md, PLUGINS-TO-INSTALL.md stay at root |
+| `apps/*/src/utils/`                              | Duplicates `lib/`                  | Put framework-agnostic utilities in `lib/`                                                              |
+| `apps/*/src/helpers/`                            | Duplicates `lib/`                  | Put helpers in `lib/`                                                                                   |
+| `apps/*/src/common/`                             | Duplicates `lib/` and `types/`     | Split into `lib/` (utilities) and `types/` (shared types)                                               |
+| Business logic in `routes/`                      | Routes should be thin              | Move to `services/`                                                                                     |
+| HTTP concerns (`c.req`, `c.json`) in `services/` | Services are framework-agnostic    | Keep in `routes/`                                                                                       |
 
 | `import '../../../...'` beyond one `../` | Path churn on refactor | Use `@/*` or `@app/db` aliases |
 | Hand edits to `components/ui/*` | shadcn regenerates these | Re-run `/generate-component` |
@@ -87,8 +87,8 @@ A PreToolUse hook at `.claude/hooks/folder-structure-guard.js` enforces this aga
 
 Use aliases instead of deep relative paths. Going up more than one `../` is a code-review blocker.
 
-| Alias | Resolves to | Where |
-|-------|-------------|-------|
+| Alias | Resolves to                 | Where                                 |
+| ----- | --------------------------- | ------------------------------------- |
 | `@/*` | `./src/*` (current package) | `apps/web`, `apps/api`, `packages/db` |
 
 | `@app/db` | `packages/db/src/index.ts` | anywhere in the workspace |
@@ -406,13 +406,13 @@ A personal finance app that automatically applies Profit First percentage alloca
 
 ## Component Responsibilities
 
-| Component | Responsibility | File |
-|-----------|----------------|------|
-| Web Frontend | Server-side rendering, page routing, UI components, client state | `apps/web/src/app/` |
-| Web Utils | Shared utilities (class merging, formatters) | `apps/web/src/lib/` |
-| API Server | HTTP routing, request validation, CORS, business logic, auth, DB queries | `apps/api/src/index.ts` |
-| DB Schema | Table definitions, type exports, Drizzle config | `packages/db/src/schema.ts` |
-| DB Client | Query builder factory, Drizzle instance creation | `packages/db/src/index.ts` |
+| Component    | Responsibility                                                           | File                        |
+| ------------ | ------------------------------------------------------------------------ | --------------------------- |
+| Web Frontend | Server-side rendering, page routing, UI components, client state         | `apps/web/src/app/`         |
+| Web Utils    | Shared utilities (class merging, formatters)                             | `apps/web/src/lib/`         |
+| API Server   | HTTP routing, request validation, CORS, business logic, auth, DB queries | `apps/api/src/index.ts`     |
+| DB Schema    | Table definitions, type exports, Drizzle config                          | `packages/db/src/schema.ts` |
+| DB Client    | Query builder factory, Drizzle instance creation                         | `packages/db/src/index.ts`  |
 
 ## Pattern Overview
 
@@ -496,7 +496,7 @@ A personal finance app that automatically applies Profit First percentage alloca
 
 ### Fetching from Frontend Directly to Database
 
-- Keep DB imports only in `apps/api/src/` 
+- Keep DB imports only in `apps/api/src/`
 - Fetch from Next.js to Hono via `fetch('http://localhost:8793/api/...')` (dev) or `fetch('https://api.example.com/api/...')` (prod)
 - Let the API layer handle validation and persistence
 
@@ -527,10 +527,11 @@ A personal finance app that automatically applies Profit First percentage alloca
 
 ## Project Skills
 
-| Skill | Description | Path |
-|-------|-------------|------|
-| hono-best-practices | "Build ultra-fast web APIs and full-stack apps with Hono — runs on Cloudflare Workers, Deno, Bun, Node.js, and any WinterCG-compatible runtime." | `.claude/skills/hono-best-practices/SKILL.md` |
-| nextjs-best-practices | Next.js App Router principles. Server Components, data fetching, routing patterns. | `.claude/skills/nextjs-best-practices/SKILL.md` |
+| Skill                 | Description                                                                                                                                      | Path                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| hono-best-practices   | "Build ultra-fast web APIs and full-stack apps with Hono — runs on Cloudflare Workers, Deno, Bun, Node.js, and any WinterCG-compatible runtime." | `.claude/skills/hono-best-practices/SKILL.md`   |
+| nextjs-best-practices | Next.js App Router principles. Server Components, data fetching, routing patterns.                                                               | `.claude/skills/nextjs-best-practices/SKILL.md` |
+
 <!-- GSD:skills-end -->
 
 <!-- GSD:workflow-start source:GSD defaults -->
@@ -546,6 +547,7 @@ Use these entry points:
 - `/gsd:execute-phase` for planned phase work
 
 Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+
 <!-- GSD:workflow-end -->
 
 <!-- GSD:profile-start -->
@@ -554,4 +556,5 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 
 > Profile not yet configured. Run `/gsd:profile-user` to generate your developer profile.
 > This section is managed by `generate-claude-profile` -- do not edit manually.
+
 <!-- GSD:profile-end -->

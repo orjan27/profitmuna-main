@@ -68,14 +68,14 @@ metrics:
 
 ## Tasks Completed
 
-| Task | Name | Commit | Files |
-|------|------|--------|-------|
-| 1a (RED) | WAL-01 + WAL-03 failing tests | `0ec2576` | `apps/api/tests/wallets.test.ts` |
-| 1a (GREEN) | Wallet service CRUD + balance + route handlers | `136a0d7` | `apps/api/src/services/wallet-service.ts`, `apps/api/src/routes/wallets.ts` |
-| 1a fix | Schema .partial() Zod v4 bug | `ca1c723` | `apps/api/src/schemas/wallets.ts` |
-| 1b (GREEN) | WAL-02 mapping conflict tests + fix | `0119aac` | `apps/api/tests/wallets.test.ts` |
-| 2 | Create-wallet form | `cc8e29b` | `wallet-actions.ts`, `new/page.tsx`, `NewWalletForm.tsx`, `command.tsx`, `popover.tsx`, `radio-group.tsx` |
-| 3 | Wallet list page + WalletCard | `5bd707e` | `wallets/page.tsx`, `WalletCard.tsx` |
+| Task       | Name                                           | Commit    | Files                                                                                                     |
+| ---------- | ---------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------- |
+| 1a (RED)   | WAL-01 + WAL-03 failing tests                  | `0ec2576` | `apps/api/tests/wallets.test.ts`                                                                          |
+| 1a (GREEN) | Wallet service CRUD + balance + route handlers | `136a0d7` | `apps/api/src/services/wallet-service.ts`, `apps/api/src/routes/wallets.ts`                               |
+| 1a fix     | Schema .partial() Zod v4 bug                   | `ca1c723` | `apps/api/src/schemas/wallets.ts`                                                                         |
+| 1b (GREEN) | WAL-02 mapping conflict tests + fix            | `0119aac` | `apps/api/tests/wallets.test.ts`                                                                          |
+| 2          | Create-wallet form                             | `cc8e29b` | `wallet-actions.ts`, `new/page.tsx`, `NewWalletForm.tsx`, `command.tsx`, `popover.tsx`, `radio-group.tsx` |
+| 3          | Wallet list page + WalletCard                  | `5bd707e` | `wallets/page.tsx`, `WalletCard.tsx`                                                                      |
 
 ---
 
@@ -94,6 +94,7 @@ metrics:
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Bug] Zod v4 .partial() on refined schema**
+
 - **Found during:** Full test suite run after Task 1a (auth.test.ts + index.test.ts failed)
 - **Issue:** `createWalletSchema.partial()` throws "`.partial()` cannot be used on object schemas containing refinements" in Zod v4
 - **Fix:** Extracted `walletBaseSchema` (no refine) as the base; `createWalletSchema = walletBaseSchema.refine(...)` and `updateWalletSchema = walletBaseSchema.partial()`
@@ -101,6 +102,7 @@ metrics:
 - **Commit:** `ca1c723`
 
 **2. [Rule 1 - Bug] NewWalletForm import path and type errors**
+
 - **Found during:** Task 2 typecheck
 - **Issue:** Relative import `../../../_actions/wallet-actions` was wrong (3 levels from `new/_components/`); `color` state typed as const literal; Checkbox `readOnly` prop doesn't exist in shadcn
 - **Fix:** Corrected import to `../../_actions/wallet-actions`; typed `color` as `string`; replaced `readOnly` with `onCheckedChange`
@@ -124,13 +126,13 @@ Task 1b WAL-02 tests were added as it.todo first (RED), but the mapping helpers 
 
 All planned mitigations from the threat register applied:
 
-| Threat ID | Mitigation | Status |
-|-----------|------------|--------|
-| T-04-06 | `eq(wallets.userId, userId)` on all queries in wallet-service.ts | Applied — 13 occurrences |
-| T-04-07 | setIncomeCategoryMappings/setExpenseMappings validate category ownership (userId) before insert | Applied — 403 on foreign category |
-| T-04-08 | Service 409 checks for PF link, income/expense category conflicts | Applied |
-| T-04-09 | Pre-check rejects second autoDeductAllExpenses=true wallet with 409 | Applied |
-| T-04-10 | Zod createWalletSchema/updateWalletSchema whitelist at route entry | Applied |
+| Threat ID | Mitigation                                                                                      | Status                            |
+| --------- | ----------------------------------------------------------------------------------------------- | --------------------------------- |
+| T-04-06   | `eq(wallets.userId, userId)` on all queries in wallet-service.ts                                | Applied — 13 occurrences          |
+| T-04-07   | setIncomeCategoryMappings/setExpenseMappings validate category ownership (userId) before insert | Applied — 403 on foreign category |
+| T-04-08   | Service 409 checks for PF link, income/expense category conflicts                               | Applied                           |
+| T-04-09   | Pre-check rejects second autoDeductAllExpenses=true wallet with 409                             | Applied                           |
+| T-04-10   | Zod createWalletSchema/updateWalletSchema whitelist at route entry                              | Applied                           |
 
 No new threat surface beyond what was planned.
 
@@ -145,10 +147,10 @@ Files verified present:
 - apps/api/src/schemas/wallets.ts — FOUND
 - apps/api/tests/wallets.test.ts — FOUND
 - apps/web/src/app/(dashboard)/wallets/page.tsx — FOUND
-- apps/web/src/app/(dashboard)/wallets/_components/WalletCard.tsx — FOUND
+- apps/web/src/app/(dashboard)/wallets/\_components/WalletCard.tsx — FOUND
 - apps/web/src/app/(dashboard)/wallets/new/page.tsx — FOUND
-- apps/web/src/app/(dashboard)/wallets/new/_components/NewWalletForm.tsx — FOUND
-- apps/web/src/app/(dashboard)/wallets/_actions/wallet-actions.ts — FOUND
+- apps/web/src/app/(dashboard)/wallets/new/\_components/NewWalletForm.tsx — FOUND
+- apps/web/src/app/(dashboard)/wallets/\_actions/wallet-actions.ts — FOUND
 
 Commits verified:
 
