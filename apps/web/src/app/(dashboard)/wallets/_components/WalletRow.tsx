@@ -75,7 +75,7 @@ export function WalletRow({ wallet }: WalletRowProps) {
         >
           {wallet.name}
         </Link>
-        <p className="mt-0.5 text-xs text-ink-faint">{sourceLabel(wallet.sourceType)}</p>
+        <p className="mt-0.5 text-xs text-ink-faint">{sourceLabel(wallet.profitFirstAccountId)}</p>
       </div>
 
       <Link

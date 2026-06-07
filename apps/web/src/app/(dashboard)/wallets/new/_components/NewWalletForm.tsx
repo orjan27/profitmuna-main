@@ -70,15 +70,18 @@ export function NewWalletForm({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
+  // Sentinel value for the "no allocation" (standalone) option — shadcn Select cannot hold an empty value
+  const STANDALONE = '__standalone__';
+
   // Form state
   const [name, setName] = useState('');
-  // D-04: a quick-create link arriving with ?pfAccountId implies a Profit First wallet
-  const [sourceType, setSourceType] = useState<'PROFIT_FIRST' | 'BLANK'>(
-    prefilledPfAccountId ? 'PROFIT_FIRST' : 'BLANK'
+  // Allocation account drives PF-ness: a chosen account = PF wallet, STANDALONE sentinel = standalone.
+  // D-04: a quick-create link arriving with ?pfAccountId pre-selects that account.
+  const [pfAccountId, setPfAccountId] = useState<string>(
+    prefilledPfAccountId ? String(prefilledPfAccountId) : STANDALONE
   );
-  const [pfAccountId, setPfAccountId] = useState<string | undefined>(
-    prefilledPfAccountId ? String(prefilledPfAccountId) : undefined
-  );
+  // Non-sentinel selection means the wallet is funded by a Profit First allocation
+  const isPf = pfAccountId !== STANDALONE;
   const [color, setColor] = useState<string>(COLOR_SWATCHES[0]);
   const [selectedIncomeCategoryIds, setSelectedIncomeCategoryIds] = useState<number[]>([]);
   const [expenseMode, setExpenseMode] = useState<ExpenseMode>('NONE');
@@ -112,10 +115,6 @@ export function NewWalletForm({
       setFormError('Wallet Name is required.');
       return;
     }
-    if (sourceType === 'PROFIT_FIRST' && !pfAccountId) {
-      setFormError('Select a Profit First allocation account.');
-      return;
-    }
     if (expenseMode === 'CATEGORIES' && selectedExpenseCategoryIds.length === 0) {
       setFormError('Select at least one expense category.');
       return;
@@ -140,10 +139,9 @@ export function NewWalletForm({
     try {
       const result = await createWalletAction({
         name: name.trim(),
-        sourceType,
-        profitFirstAccountId: sourceType === 'PROFIT_FIRST' ? Number(pfAccountId) : null,
+        profitFirstAccountId: isPf ? Number(pfAccountId) : null,
         color,
-        incomeCategoryIds: sourceType !== 'PROFIT_FIRST' ? selectedIncomeCategoryIds : undefined,
+        incomeCategoryIds: !isPf ? selectedIncomeCategoryIds : undefined,
         expenseMode: expenseModeInput,
       });
 
@@ -186,69 +184,47 @@ export function NewWalletForm({
         />
       </div>
 
-      {/* Wallet Type */}
+      {/* Allocation Account — optional; blank (Standalone) means no Profit First funding */}
       <div className="space-y-2">
-        <Label>Wallet Type</Label>
+        <Label>Allocation Account</Label>
         <Select
-          value={sourceType}
+          value={pfAccountId}
           onValueChange={(v) => {
-            setSourceType(v as 'PROFIT_FIRST' | 'BLANK');
-            setPfAccountId(undefined);
-            setSelectedIncomeCategoryIds([]);
+            setPfAccountId(v);
+            // Income-category mappings are not valid for PF-funded wallets (D-08) — clear on switch to PF
+            if (v !== STANDALONE) setSelectedIncomeCategoryIds([]);
           }}
           disabled={submitting}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Select wallet type" />
+            <SelectValue placeholder="Select allocation account" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="PROFIT_FIRST">
+            <SelectItem value={STANDALONE}>
               <div>
-                <div className="font-medium">Profit First</div>
-                <div className="text-muted-foreground text-xs">
-                  Funded by your Profit First allocation percentage.
-                </div>
-              </div>
-            </SelectItem>
-            <SelectItem value="BLANK">
-              <div>
-                <div className="font-medium">Standalone</div>
+                <div className="font-medium">Standalone (no allocation)</div>
                 <div className="text-muted-foreground text-xs">
                   Manually managed wallet with no automatic allocation.
                 </div>
               </div>
             </SelectItem>
+            {pfAccounts.map((account) => {
+              const isLinked = linkedPfAccountIds.has(account.id);
+              return (
+                <SelectItem
+                  key={account.id}
+                  value={String(account.id)}
+                  disabled={isLinked}
+                  className={cn(isLinked && 'cursor-not-allowed opacity-50')}
+                >
+                  {account.name}
+                  {isLinked && ' (already linked)'}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
-
-      {/* Allocation Account — shown only for PROFIT_FIRST */}
-      {sourceType === 'PROFIT_FIRST' && (
-        <div className="space-y-2">
-          <Label>Allocation Account</Label>
-          <Select value={pfAccountId} onValueChange={setPfAccountId} disabled={submitting}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select allocation account" />
-            </SelectTrigger>
-            <SelectContent>
-              {pfAccounts.map((account) => {
-                const isLinked = linkedPfAccountIds.has(account.id);
-                return (
-                  <SelectItem
-                    key={account.id}
-                    value={String(account.id)}
-                    disabled={isLinked}
-                    className={cn(isLinked && 'cursor-not-allowed opacity-50')}
-                  >
-                    {account.name}
-                    {isLinked && ' (already linked)'}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
 
       {/* Color Picker */}
       <div className="space-y-2">
@@ -273,8 +249,8 @@ export function NewWalletForm({
 
       <Separator />
 
-      {/* Income Categories — hidden for PROFIT_FIRST (D-08) */}
-      {sourceType !== 'PROFIT_FIRST' && (
+      {/* Income Categories — hidden for PF-funded wallets (D-08) */}
+      {!isPf && (
         <div className="space-y-2">
           <div>
             <p className="text-sm font-medium">Income Categories</p>

@@ -1,14 +1,12 @@
 // types/ is runtime-free — only type definitions (CLAUDE.md: types/ for shared TypeScript types)
 // Use interface for extensible shapes; type for unions/aliases
 
-export type WalletSourceType = 'PROFIT_FIRST' | 'BLANK';
 export type WalletTransactionType = 'DEPOSIT' | 'WITHDRAWAL';
 export type ProfitFirstAccountType = 'PROFIT' | 'OWNERS_PAY' | 'TAX' | 'OPEX' | 'CUSTOM';
 
 export interface WalletListItem {
   id: number;
   name: string;
-  sourceType: WalletSourceType;
   color: string;
   sortOrder: number;
   /** Derived balance in cents — never stored */
@@ -55,7 +53,6 @@ export interface WalletDetailResponse {
 
 export interface CreateWalletInput {
   name: string;
-  sourceType: WalletSourceType;
   profitFirstAccountId?: number | null;
   color?: string;
   sortOrder?: number;

@@ -365,7 +365,7 @@ export function WalletDetail({
 
   // Blocking hints mirror the server's assertCanInsertTransaction exactly —
   // mapping PRESENCE blocks, not amounts (a mapped category with zero spend still blocks).
-  const isPfWallet = wallet.sourceType === 'PROFIT_FIRST';
+  const isPfWallet = wallet.profitFirstAccountId != null;
   const depositBlocked = isPfWallet || wallet.incomeCategoryIds.length > 0;
   const depositBlockReason = isPfWallet ? BLOCKING_COPY.pf_deposit : BLOCKING_COPY.income_mapped;
 
@@ -386,7 +386,7 @@ export function WalletDetail({
             ← Back
           </Link>
           <h1 className="text-xl font-semibold">{wallet.name}</h1>
-          <Badge variant="secondary">{sourceLabel(wallet.sourceType)}</Badge>
+          <Badge variant="secondary">{sourceLabel(wallet.profitFirstAccountId)}</Badge>
         </div>
         <div className="flex items-center gap-2">
           {/* D-05: inline edit on the detail page — no separate /edit route */}

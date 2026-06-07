@@ -61,7 +61,7 @@ interface EditWalletDialogProps {
 
 /**
  * Dialog for editing a wallet's mutable fields: name, color, income category
- * mappings (hidden for PROFIT_FIRST per D-08), and expense settings (D-07).
+ * mappings (hidden for PF-linked wallets per D-08), and expense settings (D-07).
  * Wallet type and PF account link are immutable after creation.
  */
 export function EditWalletDialog({
@@ -77,7 +77,7 @@ export function EditWalletDialog({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
-  const isPfWallet = wallet.sourceType === 'PROFIT_FIRST';
+  const isPfWallet = wallet.profitFirstAccountId != null;
 
   // Form state — prefilled from the wallet's current values
   const [name, setName] = useState(wallet.name);
@@ -219,7 +219,7 @@ export function EditWalletDialog({
 
           <Separator />
 
-          {/* Income Categories — hidden for PROFIT_FIRST (D-08) */}
+          {/* Income Categories — hidden for PF-linked wallets (D-08) */}
           {!isPfWallet && (
             <div className="space-y-2">
               <div>

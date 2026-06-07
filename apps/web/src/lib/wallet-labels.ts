@@ -1,19 +1,19 @@
 // Pure utility — no React imports, no framework coupling (CLAUDE.md: lib/ for framework-agnostic utils)
-import type { WalletSourceType, ProfitFirstAccountType } from '@/types/wallet';
+import type { ProfitFirstAccountType } from '@/types/wallet';
 
 /**
  * Returns the appropriate label for a withdrawal from a wallet.
- * For PROFIT_FIRST wallets, maps the account type to a descriptive action name.
+ * For PF-linked wallets, maps the account type to a descriptive action name.
  *
- * @param sourceType - The wallet's source type
- * @param accountType - The linked PF account type (only relevant for PROFIT_FIRST)
+ * @param profitFirstAccountId - The wallet's PF link (non-null = PF wallet, null = standalone)
+ * @param accountType - The linked PF account type (only relevant for PF wallets)
  * @returns Human-readable withdrawal label
  */
 export function withdrawalLabel(
-  sourceType: WalletSourceType,
+  profitFirstAccountId: number | null,
   accountType: ProfitFirstAccountType | null
 ): string {
-  if (sourceType === 'PROFIT_FIRST') {
+  if (profitFirstAccountId != null) {
     switch (accountType) {
       case 'PROFIT':
         return 'Profit Distribution';
@@ -31,11 +31,11 @@ export function withdrawalLabel(
 }
 
 /**
- * Returns a human-readable label for the wallet source type.
+ * Returns a human-readable label for the wallet's funding source.
  *
- * @param sourceType - The wallet's source type
+ * @param profitFirstAccountId - The wallet's PF link (non-null = PF wallet, null = standalone)
  * @returns Display label string
  */
-export function sourceLabel(sourceType: WalletSourceType): string {
-  return sourceType === 'PROFIT_FIRST' ? 'Profit First' : 'Standalone';
+export function sourceLabel(profitFirstAccountId: number | null): string {
+  return profitFirstAccountId != null ? 'Profit First' : 'Standalone';
 }
