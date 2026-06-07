@@ -1,0 +1,58 @@
+{
+  "autoMemoryEnabled": true,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=process.env.TOOL_INPUT_FILE_PATH||'';const ext=['.ts','.tsx','.js','.jsx','.json','.css','.md'];if(ext.some(e=>p.endsWith(e))){process.exit(0)}else{process.exit(0)}\" && npx prettier --write \"$TOOL_INPUT_FILE_PATH\" 2>/dev/null || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/dependency-audit.js"
+          }
+        ],
+        "description": "Audit npm dependencies for known vulnerabilities after package.json changes"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/sensitive-file-guard.js"
+          }
+        ],
+        "description": "Block access to sensitive files (.env, .pem, .key, credentials)"
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/folder-structure-guard.js"
+          }
+        ],
+        "description": "Enforce CLAUDE.md 'Project Structure (STRICT)' via .claude/allowed-paths.json"
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/security-pattern-guard.js"
+          }
+        ],
+        "description": "Detect dangerous security anti-patterns (eval, SQL injection, hardcoded secrets, XSS)"
+      }
+    ]
+  }
+}
