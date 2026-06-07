@@ -1,75 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { endOfMonth, endOfYear, format, startOfMonth, startOfYear, subMonths } from 'date-fns';
-import { TZDate } from '@date-fns/tz';
 import { parseAsString, useQueryState } from 'nuqs';
 
 import { cn } from '@/lib/utils';
-
-// ── Manila timezone ──────────────────────────────────────────────────────────
-
-const APP_TIMEZONE = 'Asia/Manila';
-
-function nowManila(): TZDate {
-  return new TZDate(new Date(), APP_TIMEZONE);
-}
-
-function fmt(date: Date | TZDate): string {
-  return format(date, 'yyyy-MM-dd');
-}
-
-// ── Date presets ─────────────────────────────────────────────────────────────
-
-const DATE_PRESETS = [
-  {
-    label: 'This Month',
-    getRange: () => ({
-      from: fmt(startOfMonth(nowManila())),
-      to: fmt(endOfMonth(nowManila())),
-    }),
-  },
-  {
-    label: 'Last Month',
-    getRange: () => ({
-      from: fmt(startOfMonth(subMonths(nowManila(), 1))),
-      to: fmt(endOfMonth(subMonths(nowManila(), 1))),
-    }),
-  },
-  {
-    label: 'Last 3 Months',
-    getRange: () => ({
-      from: fmt(startOfMonth(subMonths(nowManila(), 2))),
-      to: fmt(endOfMonth(nowManila())),
-    }),
-  },
-  {
-    label: 'This Year',
-    getRange: () => ({
-      from: fmt(startOfYear(nowManila())),
-      to: fmt(endOfYear(nowManila())),
-    }),
-  },
-  {
-    label: 'All Time',
-    getRange: () => ({ from: undefined, to: undefined }),
-  },
-] as const;
-
-/**
- * URL sentinel for the All Time preset (D-07/D-08 wrinkle): an EMPTY URL means
- * "apply the This Month default", so All Time can't be expressed by clearing
- * the params — it would snap back to the default. `?from=all` marks the
- * explicit all-time choice; page.tsx translates it to an unbounded range.
- */
-export const ALL_TIME_SENTINEL = 'all';
-
-/** Default overview period: This Month in Asia/Manila (D-08). */
-export function getDefaultOverviewRange(): { from: string; to: string } {
-  return DATE_PRESETS[0].getRange();
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
+import { ALL_TIME_SENTINEL, DATE_PRESETS } from '@/lib/overview-date-presets';
 
 /**
  * Date-range preset selector for the Overview page.
@@ -79,7 +14,8 @@ export function getDefaultOverviewRange(): { from: string; to: string } {
  * Quiet text affordances match the adopted monochrome idiom — no boxes.
  *
  * NOTE: nuqs hooks may only be called in client components (Pitfall 2).
- * page.tsx reads searchParams directly.
+ * page.tsx reads searchParams directly; the preset/range definitions live in
+ * @/lib/overview-date-presets so the RSC can compute the default range too.
  */
 export function OverviewFilters(): React.JSX.Element {
   const router = useRouter();

@@ -4,8 +4,8 @@ import { TZDate } from '@date-fns/tz';
 import { getSession } from '@/server/auth';
 import { apiFetch } from '@/server/api';
 import type { DashboardSummary } from '@/types/dashboard';
+import { ALL_TIME_SENTINEL, getDefaultOverviewRange } from '@/lib/overview-date-presets';
 import { OverviewContent } from './_components/overview-content';
-import { ALL_TIME_SENTINEL, getDefaultOverviewRange } from './_components/overview-filters';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
