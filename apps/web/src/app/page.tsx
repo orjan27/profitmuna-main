@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
+import { getSession } from '@/server/auth';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -29,7 +31,12 @@ const STEPS = [
   },
 ] as const;
 
-export default function Home() {
+export default async function Home() {
+  // D-10: signed-in users land on their dashboard, not the marketing page.
+  // `/` stays a PUBLIC_ROUTE in middleware.ts — the guard lives here only.
+  const session = await getSession();
+  if (session) redirect('/overview');
+
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
