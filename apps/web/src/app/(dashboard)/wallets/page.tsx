@@ -49,17 +49,25 @@ export default async function WalletsPage() {
         <div>
           <h1 className="text-[20px] leading-tight font-semibold">Wallets</h1>
           {wallets.length > 0 ? (
-            <p className="mt-1 text-sm text-ink-faint">
-              <span className="font-medium text-ink-soft tabular-nums">
+            <>
+              {/* Same display scale as the Overview hero — money reads at one
+                  size across pages */}
+              <p className="mt-3 text-[34px] leading-none font-semibold tracking-tight tabular-nums">
                 {formatCurrency(totalBalanceCents)}
-              </span>{' '}
-              across {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
-            </p>
+              </p>
+              <p className="mt-1.5 text-sm text-ink-faint">
+                across {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}
+              </p>
+            </>
           ) : null}
         </div>
-        <Button size="sm" asChild>
-          <Link href="/wallets/new">New wallet</Link>
-        </Button>
+        {/* One primary per view: the empty state's Create wallet CTA owns the
+            action when there are no wallets yet */}
+        {wallets.length > 0 ? (
+          <Button size="sm" asChild>
+            <Link href="/wallets/new">New wallet</Link>
+          </Button>
+        ) : null}
       </div>
 
       {wallets.length > 0 ? (

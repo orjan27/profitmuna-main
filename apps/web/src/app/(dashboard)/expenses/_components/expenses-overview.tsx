@@ -2,9 +2,15 @@
 
 import { useState, useTransition, useCallback } from 'react';
 import { useQueryState } from 'nuqs';
-import { Plus, SlidersHorizontal } from 'lucide-react';
+import { MoreHorizontal, Plus, SlidersHorizontal } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
@@ -64,6 +70,8 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
   const activeFilterCount = [from, to].filter(Boolean).length;
   // Collapsed unless a shared/refreshed URL already carries a filter
   const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0);
+  // Manage categories lives in the header's overflow menu (controlled dialog)
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   // Fetch a page with current filter and return the result
   async function fetchPage(
@@ -116,6 +124,10 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
     .reduce((sum, e) => sum + e.amount, 0);
   const activeCount = expenses.filter((e) => e.deletedAt === null).length;
 
+  // One primary action per view: a truly empty ledger (no records, no filters)
+  // leaves the empty state's CTA as the only action on the page.
+  const showHeaderControls = expenses.length > 0 || activeFilterCount > 0;
+
   function handleFromChange(e: React.ChangeEvent<HTMLInputElement>) {
     void applyFilter(e.target.value, to);
   }
@@ -131,35 +143,64 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
         <div>
           <h1 className="text-[20px] leading-tight font-semibold">Expenses</h1>
           {activeCount > 0 ? (
-            <p className="mt-1 text-sm text-ink-faint">
-              <span className="font-medium text-ink-soft tabular-nums">
+            <>
+              {/* Same display scale as the Overview hero — money reads at one
+                  size across pages */}
+              <p className="mt-3 text-[34px] leading-none font-semibold tracking-tight tabular-nums">
                 {formatCurrency(activeTotal)}
-              </span>{' '}
-              spent across {activeCount} record{activeCount !== 1 ? 's' : ''} in view
-            </p>
+              </p>
+              <p className="mt-1.5 text-sm text-ink-faint">
+                spent across {activeCount} record{activeCount !== 1 ? 's' : ''} in view
+              </p>
+            </>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5">
-          <ManageCategoriesDialog categories={categories} />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setFiltersOpen((v) => !v)}
-            aria-expanded={filtersOpen}
-            className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
-          >
-            <SlidersHorizontal aria-hidden="true" />
-            Filter
-            {activeFilterCount > 0 ? (
-              <span className="tabular-nums">· {activeFilterCount}</span>
-            ) : null}
-          </Button>
-          <Button size="sm" onClick={() => openRecordSheet('expense')}>
-            <Plus aria-hidden="true" />
-            Record expense
-          </Button>
-        </div>
+        {showHeaderControls ? (
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-expanded={filtersOpen}
+              className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
+            >
+              <SlidersHorizontal aria-hidden="true" />
+              Filter
+              {activeFilterCount > 0 ? (
+                <span className="tabular-nums">· {activeFilterCount}</span>
+              ) : null}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="More actions"
+                  className="text-ink-soft"
+                >
+                  <MoreHorizontal aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setCategoriesOpen(true)}>
+                  Manage categories
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" onClick={() => openRecordSheet('expense')}>
+              <Plus aria-hidden="true" />
+              Record expense
+            </Button>
+          </div>
+        ) : null}
       </div>
+
+      {/* Manage categories dialog — opened from the overflow menu */}
+      <ManageCategoriesDialog
+        categories={categories}
+        open={categoriesOpen}
+        onOpenChange={setCategoriesOpen}
+      />
 
       {/* Date-range filter (D-07 — no free-text search for expenses) */}
       {filtersOpen ? (
@@ -202,7 +243,12 @@ export function ExpensesOverview({ initialData, categories }: ExpensesOverviewPr
       ) : null}
 
       {/* Expense ledger */}
-      <ExpenseList expenses={expenses} categories={categories} onMutated={handleMutated} />
+      <ExpenseList
+        expenses={expenses}
+        filtered={activeFilterCount > 0}
+        categories={categories}
+        onMutated={handleMutated}
+      />
 
       {/* Load more (D-06 — append-on-demand, not pagination) */}
       {!isLast && (

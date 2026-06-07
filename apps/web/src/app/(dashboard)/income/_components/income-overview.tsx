@@ -2,10 +2,16 @@
 
 import { useState, useTransition } from 'react';
 import { useQueryState, parseAsString } from 'nuqs';
-import { Plus, SlidersHorizontal } from 'lucide-react';
+import { MoreHorizontal, Plus, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import type { Income, IncomeCategory } from '@/types/income';
 import { formatCurrency } from '@/lib/format-currency';
@@ -55,6 +61,13 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
   // Filters stay collapsed until asked for — but a shared/refreshed URL with
   // filters applied opens them so the state is visible.
   const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0);
+  // Manage categories lives in the header's overflow menu (controlled dialog)
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+
+  // One primary action per view: when the ledger is truly empty (no records,
+  // no filters narrowing things), the empty state's CTA is the only action —
+  // header controls would be three buttons doing the same job.
+  const showHeaderControls = items.length > 0 || activeFilterCount > 0;
 
   /** Total value of all loaded income items (display only — not a server aggregate). */
   const loadedTotal = items.reduce((sum, i) => sum + i.amount, 0);
@@ -99,35 +112,64 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
         <div>
           <h1 className="text-[20px] leading-tight font-semibold">Income</h1>
           {items.length > 0 ? (
-            <p className="mt-1 text-sm text-ink-faint">
-              <span className="font-medium text-ink-soft tabular-nums">
+            <>
+              {/* Same display scale as the Overview hero — money reads at one
+                  size across pages */}
+              <p className="mt-3 text-[34px] leading-none font-semibold tracking-tight tabular-nums">
                 {formatCurrency(loadedTotal)}
-              </span>{' '}
-              across {items.length} record{items.length !== 1 ? 's' : ''} in view
-            </p>
+              </p>
+              <p className="mt-1.5 text-sm text-ink-faint">
+                across {items.length} record{items.length !== 1 ? 's' : ''} in view
+              </p>
+            </>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5">
-          <ManageCategoriesDialog categories={categories} />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setFiltersOpen((v) => !v)}
-            aria-expanded={filtersOpen}
-            className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
-          >
-            <SlidersHorizontal aria-hidden="true" />
-            Filter
-            {activeFilterCount > 0 ? (
-              <span className="tabular-nums">· {activeFilterCount}</span>
-            ) : null}
-          </Button>
-          <Button size="sm" onClick={() => openRecordSheet('income')}>
-            <Plus aria-hidden="true" />
-            Record income
-          </Button>
-        </div>
+        {showHeaderControls ? (
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setFiltersOpen((v) => !v)}
+              aria-expanded={filtersOpen}
+              className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
+            >
+              <SlidersHorizontal aria-hidden="true" />
+              Filter
+              {activeFilterCount > 0 ? (
+                <span className="tabular-nums">· {activeFilterCount}</span>
+              ) : null}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="More actions"
+                  className="text-ink-soft"
+                >
+                  <MoreHorizontal aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setCategoriesOpen(true)}>
+                  Manage categories
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" onClick={() => openRecordSheet('income')}>
+              <Plus aria-hidden="true" />
+              Record income
+            </Button>
+          </div>
+        ) : null}
       </div>
+
+      {/* Manage categories dialog — opened from the overflow menu */}
+      <ManageCategoriesDialog
+        categories={categories}
+        open={categoriesOpen}
+        onOpenChange={setCategoriesOpen}
+      />
 
       {/* Filters (URL-persisted, debounced search) — collapsed by default */}
       {filtersOpen ? <IncomeFilters onFilterChange={handleFilterChange} /> : null}
@@ -135,6 +177,7 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
       {/* Income ledger */}
       <IncomeList
         items={items}
+        filtered={activeFilterCount > 0}
         onEditRow={(income) => setEditingIncome(income)}
         onReceiveRow={(income) => setReceivingIncome(income)}
       />

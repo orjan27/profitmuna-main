@@ -75,15 +75,18 @@ export function RecordSheet({
   const [data, setData] = useState<RecordSheetData | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  // Bumped by "Try again" to re-trigger the load effect explicitly.
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
-    // loadFailed must gate the retry — without it a failed fetch re-triggers
-    // this effect immediately (isLoading flips back to false), clearing the
-    // error state and looping forever. "Try again" resets loadFailed to opt
-    // back in explicitly.
-    if (!open || data || isLoading || loadFailed) return;
+    // isLoading/loadFailed must NOT be dependencies here: setIsLoading(true)
+    // below would re-run the effect, whose cleanup flips `cancelled` for the
+    // fetch it just started — the result is discarded and the skeleton never
+    // resolves. The effect re-runs only on open/data/loadAttempt changes.
+    if (!open || data) return;
     let cancelled = false;
     setIsLoading(true);
+    setLoadFailed(false);
     getRecordSheetData()
       .then((result) => {
         if (!cancelled) setData(result);
@@ -97,7 +100,7 @@ export function RecordSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, data, isLoading, loadFailed]);
+  }, [open, data, loadAttempt]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -143,7 +146,7 @@ export function RecordSheet({
                 variant="outline"
                 size="sm"
                 className="mt-4"
-                onClick={() => setLoadFailed(false)}
+                onClick={() => setLoadAttempt((n) => n + 1)}
               >
                 Try again
               </Button>

@@ -11,6 +11,8 @@ import { useRecordSheet } from '@/components/RecordSheetProvider';
 
 interface IncomeListProps {
   items: Income[];
+  /** True when URL filters are narrowing the list — changes the empty state. */
+  filtered: boolean;
   onEditRow: (income: Income) => void;
   onReceiveRow: (income: Income) => void;
 }
@@ -42,10 +44,20 @@ function groupByDate(items: Income[]): DateGroup[] {
  * "Pending" label and an inline Receive action (INC-05 / D-14).
  * Clicking a row opens the edit dialog.
  */
-export function IncomeList({ items, onEditRow, onReceiveRow }: IncomeListProps) {
+export function IncomeList({ items, filtered, onEditRow, onReceiveRow }: IncomeListProps) {
   const { openRecordSheet } = useRecordSheet();
 
   if (items.length === 0) {
+    // Filtered-empty is not first-run: the records exist, the filters hide
+    // them. Say so instead of the teach copy, and offer no competing CTA —
+    // the filter row sits right above.
+    if (filtered) {
+      return (
+        <div className="py-16 text-center">
+          <p className="text-sm text-ink-soft">No income matches your filters.</p>
+        </div>
+      );
+    }
     return (
       <div className="py-20 text-center">
         <p className="text-base font-medium">Nothing recorded yet</p>

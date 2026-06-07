@@ -2,12 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { BrandMark } from '@/components/BrandMark';
-import { useRecordSheet } from '@/components/RecordSheetProvider';
 
 interface NavItem {
   readonly label: string;
@@ -23,26 +20,33 @@ const NAV_ITEMS: readonly NavItem[] = [
 ] as const;
 
 /**
- * Shared top bar for all authenticated pages: brand lockup, five quiet text
- * links, and the global Record action. Active state is carried by ink color
- * and weight, not pills or icons — the chrome stays out of the money's way.
+ * Shared top bar for all authenticated pages: brand lockup and five quiet
+ * text links. Active state is carried by ink color and weight, not pills or
+ * icons — the chrome stays out of the money's way.
  *
- * Client Component: usePathname for active state, useRecordSheet for the
- * Record action. Sits on the deeper chrome gray (paper-deep) so the content
- * surface reads as the page.
+ * Record actions live in page content (one labeled primary per page), not in
+ * the chrome — one primary action per view.
+ *
+ * Client Component: usePathname for active state. Sits on the deeper chrome
+ * gray (paper-deep) so the content surface reads as the page.
  */
 export function DashboardNav(): React.JSX.Element {
   const pathname = usePathname();
-  const { openRecordSheet } = useRecordSheet();
 
   return (
     <header className="sticky top-0 z-10 border-b border-hairline bg-paper-deep/90 backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-4 px-4 md:gap-7 md:px-8">
-        <Link href="/overview" aria-label="Profitmuna overview" className="shrink-0">
+      {/* Three-zone grid: brand | centered links | empty balance column.
+          Equal 1fr side columns keep the menu truly centered in the bar. */}
+      <div className="mx-auto grid h-14 w-full max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-4 md:px-8">
+        <Link
+          href="/overview"
+          aria-label="Profitmuna overview"
+          className="shrink-0 justify-self-start"
+        >
           <BrandMark wordmarkClassName="max-sm:sr-only" />
         </Link>
 
-        <nav className="min-w-0 flex-1" aria-label="Primary">
+        <nav className="min-w-0" aria-label="Primary">
           <ul className="-mx-2 flex items-center gap-0.5 overflow-x-auto px-2">
             {NAV_ITEMS.map(({ label, href }) => {
               const isActive = pathname === href || pathname.startsWith(href + '/');
@@ -65,11 +69,6 @@ export function DashboardNav(): React.JSX.Element {
             })}
           </ul>
         </nav>
-
-        <Button size="sm" className="shrink-0" onClick={() => openRecordSheet('income')}>
-          <Plus aria-hidden="true" />
-          <span className="max-sm:sr-only">Record</span>
-        </Button>
       </div>
     </header>
   );

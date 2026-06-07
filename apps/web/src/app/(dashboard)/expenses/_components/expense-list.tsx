@@ -22,6 +22,8 @@ interface ExpenseCategory {
 
 interface ExpenseListProps {
   expenses: ExpenseRow[];
+  /** True when URL filters are narrowing the list — changes the empty state. */
+  filtered: boolean;
   categories: ExpenseCategory[];
   /** Called after any mutation so parent can refresh state */
   onMutated: () => void;
@@ -162,13 +164,23 @@ function ActiveExpenseRow({ expense, categories, onMutated }: ActiveRowProps) {
  * dialog (EXP-03); soft-deleted rows surface below with a restore affordance
  * (EXP-04).
  */
-export function ExpenseList({ expenses, categories, onMutated }: ExpenseListProps) {
+export function ExpenseList({ expenses, filtered, categories, onMutated }: ExpenseListProps) {
   const { openRecordSheet } = useRecordSheet();
 
   const activeExpenses = expenses.filter((e) => e.deletedAt === null);
   const deletedExpenses = expenses.filter((e) => e.deletedAt !== null);
 
   if (activeExpenses.length === 0 && deletedExpenses.length === 0) {
+    // Filtered-empty is not first-run: the records exist, the filters hide
+    // them. Say so instead of the teach copy, and offer no competing CTA —
+    // the filter row sits right above.
+    if (filtered) {
+      return (
+        <div className="py-16 text-center">
+          <p className="text-sm text-ink-soft">No expenses match your filters.</p>
+        </div>
+      );
+    }
     return (
       <div className="py-20 text-center">
         <p className="text-base font-medium">No expenses recorded yet</p>

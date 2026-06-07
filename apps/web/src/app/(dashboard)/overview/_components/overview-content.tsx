@@ -73,36 +73,45 @@ export function OverviewContent({
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col">
-      {/* Hero: where the money stands */}
-      <header>
-        <p className="text-sm text-ink-faint">{greeting}</p>
-        <div className="mt-3 flex items-center gap-2">
-          <MaskedAmount
-            cents={totalBalanceCents}
-            visible={visible}
-            mounted={mounted}
-            className={cn(
-              'text-[34px] leading-none font-semibold tracking-tight tabular-nums',
-              totalBalanceCents < 0 && 'text-expense'
+      {/* Hero: where the money stands. The page's one primary action sits
+          beside it — recording income is the app's core job, and the nav
+          carries no record button (one primary per view). */}
+      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+        <div>
+          <p className="text-sm text-ink-faint">{greeting}</p>
+          <div className="mt-3 flex items-center gap-2">
+            <MaskedAmount
+              cents={totalBalanceCents}
+              visible={visible}
+              mounted={mounted}
+              className={cn(
+                'text-[34px] leading-none font-semibold tracking-tight tabular-nums',
+                totalBalanceCents < 0 && 'text-expense'
+              )}
+            />
+            <AmountToggle visible={visible} toggle={toggle} />
+          </div>
+          <p className="mt-1.5 text-sm text-ink-faint">
+            {hasWallets ? (
+              'across all wallets'
+            ) : (
+              <>
+                no wallets yet ·{' '}
+                <Link
+                  href="/wallets"
+                  className="underline-offset-4 transition-colors hover:text-ink hover:underline"
+                >
+                  set them up
+                </Link>
+              </>
             )}
-          />
-          <AmountToggle visible={visible} toggle={toggle} />
+          </p>
         </div>
-        <p className="mt-1.5 text-sm text-ink-faint">
-          {hasWallets ? (
-            'across all wallets'
-          ) : (
-            <>
-              no wallets yet ·{' '}
-              <Link
-                href="/wallets"
-                className="underline-offset-4 transition-colors hover:text-ink hover:underline"
-              >
-                set them up
-              </Link>
-            </>
-          )}
-        </p>
+
+        <Button className="shrink-0" onClick={() => openRecordSheet('income')}>
+          <Plus aria-hidden="true" />
+          Record income
+        </Button>
       </header>
 
       {/* The split at a glance */}
@@ -194,18 +203,9 @@ export function OverviewContent({
             ))}
           </ul>
         ) : (
-          <div className="py-12 text-center">
-            <p className="text-sm text-ink-soft">Nothing recorded yet.</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4"
-              onClick={() => openRecordSheet('income')}
-            >
-              <Plus aria-hidden="true" />
-              Record income
-            </Button>
-          </div>
+          // No CTA here: the hero's Record income button is the page's one
+          // primary action, right above.
+          <p className="py-12 text-center text-sm text-ink-soft">Nothing recorded yet.</p>
         )}
       </section>
     </div>
