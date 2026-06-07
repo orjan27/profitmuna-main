@@ -2,7 +2,7 @@ import { eq, and, desc, isNull, gte, lte } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 
 import { createDb } from '@app/db';
-import { expenses, expenseCategories } from '@app/db/schema';
+import { expenses, expenseCategories, wallets } from '@app/db/schema';
 
 type Db = ReturnType<typeof createDb>;
 
@@ -13,7 +13,8 @@ interface ExpenseRow {
   amount: number;
   description: string | null;
   expenseDate: string;
-  paymentMethod: string | null;
+  walletId: number | null;
+  walletName: string | null;
   deletedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -27,7 +28,8 @@ interface ExpenseResponse {
   amount: number;
   description: string | null;
   expenseDate: string;
-  paymentMethod: string | null;
+  walletId: number | null;
+  walletName: string | null;
   deletedAt: string | null;
   createdAt: string | null;
 }
@@ -44,7 +46,7 @@ interface CreateExpenseInput {
   amount: number;
   description?: string | null;
   expenseDate: string;
-  paymentMethod?: string | null;
+  walletId: number;
 }
 
 interface UpdateExpenseInput {
@@ -52,7 +54,7 @@ interface UpdateExpenseInput {
   amount?: number;
   description?: string | null;
   expenseDate?: string;
-  paymentMethod?: string | null;
+  walletId?: number;
 }
 
 interface ListParams {
@@ -70,7 +72,8 @@ function toResponse(row: ExpenseRow): ExpenseResponse {
     amount: row.amount,
     description: row.description,
     expenseDate: row.expenseDate,
-    paymentMethod: row.paymentMethod,
+    walletId: row.walletId,
+    walletName: row.walletName,
     deletedAt: row.deletedAt,
     createdAt: row.createdAt,
   };
@@ -90,6 +93,23 @@ async function resolveCategoryName(db: Db, categoryId: number, userId: number): 
   }
 
   return category.name;
+}
+
+/**
+ * Validates that walletId is owned by userId and not soft-deleted.
+ * Returns the wallet name to denormalize onto the expense. Mirrors resolveCategoryName.
+ * Throws HTTPException 400 invalid_wallet if not found, not owned, or soft-deleted.
+ */
+async function resolveWalletName(db: Db, walletId: number, userId: number): Promise<string> {
+  const wallet = await db.query.wallets.findFirst({
+    where: and(eq(wallets.id, walletId), eq(wallets.userId, userId), isNull(wallets.deletedAt)),
+  });
+
+  if (!wallet) {
+    throw new HTTPException(400, { message: 'invalid_wallet' });
+  }
+
+  return wallet.name;
 }
 
 /**
@@ -138,6 +158,7 @@ export function createExpenseService(db: Db) {
     /** Creates an expense for a user. amount is integer cents from the web layer. */
     async create(userId: number, input: CreateExpenseInput): Promise<ExpenseResponse> {
       const categoryName = await resolveCategoryName(db, input.categoryId, userId);
+      const walletName = await resolveWalletName(db, input.walletId, userId);
 
       const [row] = await db
         .insert(expenses)
@@ -147,7 +168,8 @@ export function createExpenseService(db: Db) {
           amount: input.amount,
           description: input.description ?? null,
           expenseDate: input.expenseDate,
-          paymentMethod: input.paymentMethod ?? null,
+          walletId: input.walletId,
+          walletName,
           userId,
           deletedAt: null,
         })
@@ -190,6 +212,11 @@ export function createExpenseService(db: Db) {
         categoryName = await resolveCategoryName(db, input.categoryId, userId);
       }
 
+      let walletName = existing.walletName;
+      if (input.walletId !== undefined) {
+        walletName = await resolveWalletName(db, input.walletId, userId);
+      }
+
       const [updated] = await db
         .update(expenses)
         .set({
@@ -197,7 +224,7 @@ export function createExpenseService(db: Db) {
           ...(input.amount !== undefined && { amount: input.amount }),
           ...(input.description !== undefined && { description: input.description }),
           ...(input.expenseDate !== undefined && { expenseDate: input.expenseDate }),
-          ...(input.paymentMethod !== undefined && { paymentMethod: input.paymentMethod }),
+          ...(input.walletId !== undefined && { walletId: input.walletId, walletName }),
         })
         .where(and(eq(expenses.id, id), eq(expenses.userId, userId)))
         .returning();

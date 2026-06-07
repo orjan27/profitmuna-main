@@ -6,7 +6,6 @@ import {
   expenses,
   wallets,
   walletIncomeCategoryMappings,
-  walletExpenseCategoryMappings,
   walletTransactions,
   profitFirstAccounts,
 } from '@app/db/schema';
@@ -157,13 +156,15 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
       walletRows,
       pfAccountRows,
       incomeMappings,
-      expenseMappings,
       totalReceivedIncomeRows,
       incomeByCategoryRows,
-      expenseByCategoryRows,
+      expenseByWalletRows,
       txRows,
     ] = await Promise.all([
-      db.select().from(wallets).where(eq(wallets.userId, userId)),
+      db
+        .select()
+        .from(wallets)
+        .where(and(eq(wallets.userId, userId), isNull(wallets.deletedAt))),
       db.select().from(profitFirstAccounts).where(eq(profitFirstAccounts.userId, userId)),
       db
         .select({
@@ -172,13 +173,6 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
         })
         .from(walletIncomeCategoryMappings)
         .where(eq(walletIncomeCategoryMappings.userId, userId)),
-      db
-        .select({
-          walletId: walletExpenseCategoryMappings.walletId,
-          catId: walletExpenseCategoryMappings.expenseCategoryId,
-        })
-        .from(walletExpenseCategoryMappings)
-        .where(eq(walletExpenseCategoryMappings.userId, userId)),
       // Received + allocated income in range — feeds the PF allocation share
       db
         .select({ total: sql<number>`COALESCE(SUM(${incomes.amount}), 0)` })
@@ -206,10 +200,10 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
           )
         )
         .groupBy(incomes.categoryId),
-      // Non-deleted expenses per category in range — feeds mappedExpenses
+      // Non-deleted expenses per wallet in range — feeds mappedExpenses (deduct by walletId)
       db
         .select({
-          categoryId: expenses.categoryId,
+          walletId: expenses.walletId,
           total: sql<number>`COALESCE(SUM(${expenses.amount}), 0)`,
         })
         .from(expenses)
@@ -217,10 +211,11 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
           and(
             eq(expenses.userId, userId),
             isNull(expenses.deletedAt),
+            sql`${expenses.walletId} IS NOT NULL`,
             ...dateConditions(expenses.expenseDate, dateRange)
           )
         )
-        .groupBy(expenses.categoryId),
+        .groupBy(expenses.walletId),
       // Non-deleted manual transactions per wallet+type in range
       db
         .select({
@@ -245,26 +240,17 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
     const incomeByCategory = new Map(
       incomeByCategoryRows.map((r) => [r.categoryId, Number(r.total ?? 0)])
     );
-    const expenseByCategory = new Map(
-      expenseByCategoryRows.map((r) => [r.categoryId, Number(r.total ?? 0)])
-    );
-    const totalExpensesInRange = Array.from(expenseByCategory.values()).reduce((s, v) => s + v, 0);
+    const expenseByWallet = new Map<number, number>();
+    for (const row of expenseByWalletRows) {
+      if (row.walletId != null) expenseByWallet.set(row.walletId, Number(row.total ?? 0));
+    }
 
-    const mappingsByWallet = new Map<
-      number,
-      { incomeCategoryIds: number[]; expenseCategoryIds: number[] }
-    >();
+    const mappingsByWallet = new Map<number, { incomeCategoryIds: number[] }>();
     for (const row of incomeMappings) {
       if (!mappingsByWallet.has(row.walletId)) {
-        mappingsByWallet.set(row.walletId, { incomeCategoryIds: [], expenseCategoryIds: [] });
+        mappingsByWallet.set(row.walletId, { incomeCategoryIds: [] });
       }
       mappingsByWallet.get(row.walletId)!.incomeCategoryIds.push(row.catId);
-    }
-    for (const row of expenseMappings) {
-      if (!mappingsByWallet.has(row.walletId)) {
-        mappingsByWallet.set(row.walletId, { incomeCategoryIds: [], expenseCategoryIds: [] });
-      }
-      mappingsByWallet.get(row.walletId)!.expenseCategoryIds.push(row.catId);
     }
 
     const txByWallet = new Map<number, { deposits: number; withdrawals: number }>();
@@ -283,7 +269,6 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
     return walletRows.reduce((sum, wallet) => {
       const mappings = mappingsByWallet.get(wallet.id) ?? {
         incomeCategoryIds: [],
-        expenseCategoryIds: [],
       };
       const tx = txByWallet.get(wallet.id) ?? { deposits: 0, withdrawals: 0 };
 
@@ -301,12 +286,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
         0
       );
 
-      const mappedExpenses = wallet.autoDeductAllExpenses
-        ? totalExpensesInRange
-        : mappings.expenseCategoryIds.reduce(
-            (acc, catId) => acc + (expenseByCategory.get(catId) ?? 0),
-            0
-          );
+      const mappedExpenses = expenseByWallet.get(wallet.id) ?? 0;
 
       return (
         sum +

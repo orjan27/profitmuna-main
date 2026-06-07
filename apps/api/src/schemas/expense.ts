@@ -1,15 +1,13 @@
 import { z } from 'zod';
 
-/** The 5 accepted payment method values (D-10). */
-export const PAYMENT_METHOD_VALUES = ['cash', 'gcash', 'bank_transfer', 'maya', 'check'] as const;
-
 /** Schema for creating an expense. amount is integer cents from the web layer. */
 export const createExpenseSchema = z.object({
   categoryId: z.number().int().positive(),
   amount: z.number().int().positive(),
   description: z.string().max(500).optional().nullable(),
   expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expenseDate must be YYYY-MM-DD'),
-  paymentMethod: z.enum(PAYMENT_METHOD_VALUES).optional().nullable(),
+  // Wallet this expense is paid from — required for new expenses ("Paid with").
+  walletId: z.number().int().positive(),
 });
 
 /** Partial schema for updating an expense (all fields optional). */

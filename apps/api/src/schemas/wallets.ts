@@ -2,12 +2,6 @@ import { z } from 'zod';
 
 // Named exports only — matches auth.ts convention
 
-export const expenseModeSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('NONE') }),
-  z.object({ kind: z.literal('ALL') }),
-  z.object({ kind: z.literal('CATEGORIES'), ids: z.array(z.number().int().positive()).min(1) }),
-]);
-
 // Base object — .partial() works on update since it is unrefined (Zod v4 disallows .partial() on refined schemas)
 const walletBaseSchema = z.object({
   name: z.string().min(1).max(80),
@@ -19,7 +13,6 @@ const walletBaseSchema = z.object({
     .optional(),
   sortOrder: z.number().int().optional(),
   incomeCategoryIds: z.array(z.number().int().positive()).optional(),
-  expenseMode: expenseModeSchema.optional(),
 });
 
 export const createWalletSchema = walletBaseSchema;

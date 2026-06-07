@@ -57,6 +57,7 @@ function seedExpense(
     categoryName: string;
     amount: number;
     expenseDate: string;
+    walletId?: number | null;
     deletedAt?: string | null;
   }
 ) {
@@ -67,6 +68,8 @@ function seedExpense(
       categoryName: input.categoryName,
       amount: input.amount,
       expenseDate: input.expenseDate,
+      walletId: input.walletId ?? null,
+      walletName: null,
       deletedAt: input.deletedAt ?? null,
       userId: input.userId,
     })
@@ -81,7 +84,6 @@ function seedWallet(
     userId: number;
     name: string;
     profitFirstAccountId?: number | null;
-    autoDeductAllExpenses?: boolean;
   }
 ) {
   const [row] = db
@@ -90,7 +92,6 @@ function seedWallet(
       userId: input.userId,
       name: input.name,
       profitFirstAccountId: input.profitFirstAccountId ?? null,
-      autoDeductAllExpenses: input.autoDeductAllExpenses ?? false,
       color: '#0ea5e9',
     })
     .returning()
@@ -373,6 +374,49 @@ describe('dashboard service — getSummary', () => {
     expect(june.totalWalletBalanceCents).toBe(5_000 + 5_000 - 2_000);
 
     // July range excludes all of it — proves the balance is period-scoped, not all-time
+    const july = await svc.getSummary(user.id, { from: '2026-07-01', to: '2026-07-31' });
+    expect(july.totalWalletBalanceCents).toBe(0);
+  });
+
+  it('deducts wallet-assigned expenses from totalWalletBalanceCents by walletId, period-scoped', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'wexp@dash.test', name: 'Wallet Expense User' });
+    const expCat = seedExpenseCategory(db, user.id, 'Rent');
+    const wallet = seedWallet(db, { userId: user.id, name: 'Cash' });
+
+    // Deposit 10,000 then assign a 4,000 expense to this wallet — both in June
+    seedWalletTx(db, {
+      userId: user.id,
+      walletId: wallet.id,
+      type: 'DEPOSIT',
+      amount: 10_000,
+      transactionDate: '2026-06-05',
+    });
+    seedExpense(db, {
+      userId: user.id,
+      categoryId: expCat.id,
+      categoryName: expCat.name,
+      amount: 4_000,
+      expenseDate: '2026-06-10',
+      walletId: wallet.id,
+    });
+    // A legacy NULL-wallet expense must NOT affect any wallet balance
+    seedExpense(db, {
+      userId: user.id,
+      categoryId: expCat.id,
+      categoryName: expCat.name,
+      amount: 9_999,
+      expenseDate: '2026-06-11',
+      walletId: null,
+    });
+
+    const svc = createDashboardService(dbD1);
+
+    // June: deposits(10,000) - walletExpense(4,000) = 6,000
+    const june = await svc.getSummary(user.id, { from: '2026-06-01', to: '2026-06-30' });
+    expect(june.totalWalletBalanceCents).toBe(6_000);
+
+    // July: nothing in range
     const july = await svc.getSummary(user.id, { from: '2026-07-01', to: '2026-07-31' });
     expect(july.totalWalletBalanceCents).toBe(0);
   });

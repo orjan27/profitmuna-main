@@ -266,6 +266,16 @@ describe('POST /api/auth/register', () => {
 
     // verification + welcome emails scheduled via waitUntil
     expect(sendMock).toHaveBeenCalledTimes(2);
+
+    // An undeletable Default wallet is seeded at registration
+    const wallets = db
+      .select()
+      .from(schema.wallets)
+      .where(eq(schema.wallets.userId, rows[0].id))
+      .all();
+    const defaultWallet = wallets.find((w) => w.isDefault);
+    expect(defaultWallet).toBeDefined();
+    expect(defaultWallet?.name).toBe('Default');
   });
 
   it('throttles a rapid repeat of the same email and creates no second row (CR-02)', async () => {
@@ -1504,6 +1514,12 @@ describe('auth-service: upsertGoogleUser', () => {
     expect(userRows[0].emailVerified).toBe(true);
     expect(userRows[0].passwordHash).toBeNull();
     expect(userRows[0].id).toBe(userId);
+
+    // Brand-new Google users also get the undeletable Default wallet
+    const wallets = db.select().from(schema.wallets).where(eq(schema.wallets.userId, userId)).all();
+    const defaultWallet = wallets.find((w) => w.isDefault);
+    expect(defaultWallet).toBeDefined();
+    expect(defaultWallet?.name).toBe('Default');
   });
 
   it('links googleId to an existing password account when the email matches (no duplicate row)', async () => {

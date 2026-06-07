@@ -10,6 +10,7 @@ import {
 } from '@app/db/schema';
 
 import { seedProfitFirstAccounts } from '@/services/profit-first-service';
+import { seedDefaultWallet } from '@/services/wallet-service';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash } from '@/lib/token';
 import { signAccessToken } from '@/lib/jwt';
@@ -159,6 +160,7 @@ export async function register(
   const user = inserted[0];
 
   await seedProfitFirstAccounts(db, user.id);
+  await seedDefaultWallet(db, user.id);
 
   const verifyUrl = await issueVerifyToken(db, user.id, appBaseUrl);
   return { verifyUrl, email: user.email, name: user.name };
@@ -587,6 +589,7 @@ export async function upsertGoogleUser(
     .returning();
   // Seed Profit First defaults for new Google users only (Pitfall 4 — branches 1/2 are returning users)
   await seedProfitFirstAccounts(db, inserted[0].id);
+  await seedDefaultWallet(db, inserted[0].id);
   return inserted[0].id;
 }
 

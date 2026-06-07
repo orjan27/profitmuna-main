@@ -5,10 +5,8 @@ import { createDb } from '@app/db';
 import {
   wallets,
   walletIncomeCategoryMappings,
-  walletExpenseCategoryMappings,
   walletTransactions,
   incomeCategories,
-  expenseCategories,
   profitFirstAccounts,
   incomes,
   expenses,
@@ -18,16 +16,34 @@ import type { z } from 'zod';
 import type {
   createWalletSchema,
   updateWalletSchema,
-  expenseModeSchema,
   walletTransactionSchema,
   updateWalletTransactionSchema,
 } from '@/schemas/wallets';
 
 type CreateWalletInput = z.infer<typeof createWalletSchema>;
 type UpdateWalletInput = z.infer<typeof updateWalletSchema>;
-type ExpenseMode = z.infer<typeof expenseModeSchema>;
 type CreateTransactionInput = z.infer<typeof walletTransactionSchema>;
 type UpdateTransactionInput = z.infer<typeof updateWalletTransactionSchema>;
+
+/** Default wallet attributes (locked): undeletable per-user wallet seeded at registration. */
+const DEFAULT_WALLET = {
+  name: 'Default',
+  isDefault: true,
+  color: '#10b981',
+  sortOrder: 0,
+  profitFirstAccountId: null,
+} as const;
+
+/**
+ * Seeds the undeletable "Default" wallet for a newly created user.
+ * Mirrors seedProfitFirstAccounts; call after it in register + Google new-user branch.
+ */
+export async function seedDefaultWallet(
+  db: ReturnType<typeof createDb>,
+  userId: number
+): Promise<void> {
+  await db.insert(wallets).values({ ...DEFAULT_WALLET, userId });
+}
 
 /** Balance formula (locked): pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals */
 function computeBalanceCents({
@@ -48,27 +64,22 @@ function computeBalanceCents({
 }
 
 /**
- * Blocking guard: prevents manual transactions that would double-count automatically sourced money.
+ * Blocking guard: prevents manual DEPOSITs that would double-count automatically sourced money.
  * DEPOSIT blocked when wallet is PF-linked or has income category mappings.
- * WITHDRAWAL blocked when wallet has expense mappings or autoDeductAllExpenses=true.
- * Port of RESEARCH Pattern 3 verbatim.
+ * WITHDRAWALs are now allowed on all wallets (expense deduction moved onto expenses).
  */
 function assertCanInsertTransaction(
   type: 'DEPOSIT' | 'WITHDRAWAL',
   wallet: typeof wallets.$inferSelect,
-  mappings: { incomeCategories: number[]; expenseCategories: number[] }
+  mappings: { incomeCategories: number[] }
 ): void {
   const incomeAuto = mappings.incomeCategories.length > 0;
-  const expenseAuto = wallet.autoDeductAllExpenses || mappings.expenseCategories.length > 0;
   const hasPf = !!wallet.profitFirstAccountId;
 
   if (type === 'DEPOSIT') {
     if (hasPf) throw new HTTPException(400, { message: 'manual_deposit_blocked_pf_wallet' });
     if (incomeAuto)
       throw new HTTPException(400, { message: 'manual_deposit_blocked_income_mapped' });
-  } else {
-    if (expenseAuto)
-      throw new HTTPException(400, { message: 'manual_withdrawal_blocked_expense_mapped' });
   }
 }
 
@@ -155,48 +166,31 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
   }
 
   /**
-   * Returns income and expense category mappings grouped by walletId.
+   * Returns income category mappings grouped by walletId (income-only now).
    */
   async function getMappingsByWallet(userId: number): Promise<
     Map<
       number,
       {
         incomeCategoryIds: number[];
-        expenseCategoryIds: number[];
       }
     >
   > {
-    const [incomeMappings, expenseMappings] = await Promise.all([
-      db
-        .select({
-          walletId: walletIncomeCategoryMappings.walletId,
-          catId: walletIncomeCategoryMappings.incomeCategoryId,
-        })
-        .from(walletIncomeCategoryMappings)
-        .where(eq(walletIncomeCategoryMappings.userId, userId)),
-      db
-        .select({
-          walletId: walletExpenseCategoryMappings.walletId,
-          catId: walletExpenseCategoryMappings.expenseCategoryId,
-        })
-        .from(walletExpenseCategoryMappings)
-        .where(eq(walletExpenseCategoryMappings.userId, userId)),
-    ]);
+    const incomeMappings = await db
+      .select({
+        walletId: walletIncomeCategoryMappings.walletId,
+        catId: walletIncomeCategoryMappings.incomeCategoryId,
+      })
+      .from(walletIncomeCategoryMappings)
+      .where(eq(walletIncomeCategoryMappings.userId, userId));
 
-    const result = new Map<number, { incomeCategoryIds: number[]; expenseCategoryIds: number[] }>();
+    const result = new Map<number, { incomeCategoryIds: number[] }>();
 
     for (const row of incomeMappings) {
       if (!result.has(row.walletId)) {
-        result.set(row.walletId, { incomeCategoryIds: [], expenseCategoryIds: [] });
+        result.set(row.walletId, { incomeCategoryIds: [] });
       }
       result.get(row.walletId)!.incomeCategoryIds.push(row.catId);
-    }
-
-    for (const row of expenseMappings) {
-      if (!result.has(row.walletId)) {
-        result.set(row.walletId, { incomeCategoryIds: [], expenseCategoryIds: [] });
-      }
-      result.get(row.walletId)!.expenseCategoryIds.push(row.catId);
     }
 
     return result;
@@ -223,21 +217,28 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
   }
 
   /**
-   * Returns sum of non-deleted expense amounts by expense category id.
+   * Returns sum of non-deleted expense amounts grouped by walletId.
+   * Only expenses with a wallet assigned (wallet_id NOT NULL) contribute.
    */
-  async function getExpensesByCategoryCents(userId: number): Promise<Map<number, number>> {
+  async function getExpensesByWalletCents(userId: number): Promise<Map<number, number>> {
     const rows = await db
       .select({
-        categoryId: expenses.categoryId,
+        walletId: expenses.walletId,
         total: sql<number>`COALESCE(SUM(${expenses.amount}), 0)`,
       })
       .from(expenses)
-      .where(and(eq(expenses.userId, userId), isNull(expenses.deletedAt)))
-      .groupBy(expenses.categoryId);
+      .where(
+        and(
+          eq(expenses.userId, userId),
+          isNull(expenses.deletedAt),
+          sql`${expenses.walletId} IS NOT NULL`
+        )
+      )
+      .groupBy(expenses.walletId);
 
     const result = new Map<number, number>();
     for (const row of rows) {
-      result.set(row.categoryId, Number(row.total ?? 0));
+      if (row.walletId != null) result.set(row.walletId, Number(row.total ?? 0));
     }
     return result;
   }
@@ -319,104 +320,6 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
     await (db as any).batch([deleteStmt, insertStmt]); // intentional: D1 batch cast
   }
 
-  /**
-   * Sets expense mappings for a wallet based on the 3-mode discriminated union.
-   * Validates category ownership and cross-wallet conflicts before writing.
-   */
-  async function setExpenseMappings(
-    walletId: number,
-    userId: number,
-    mode: ExpenseMode
-  ): Promise<void> {
-    if (mode.kind === 'NONE') {
-      // Clear all expense mappings and unset autoDeductAllExpenses
-      await db
-        .delete(walletExpenseCategoryMappings)
-        .where(
-          and(
-            eq(walletExpenseCategoryMappings.walletId, walletId),
-            eq(walletExpenseCategoryMappings.userId, userId)
-          )
-        );
-      await db
-        .update(wallets)
-        .set({ autoDeductAllExpenses: false })
-        .where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
-      return;
-    }
-
-    if (mode.kind === 'ALL') {
-      // Pitfall 1: check no other wallet already has autoDeductAllExpenses=true
-      const existing = await db
-        .select({ id: wallets.id })
-        .from(wallets)
-        .where(and(eq(wallets.userId, userId), eq(wallets.autoDeductAllExpenses, true)));
-      const conflict = existing.find((w) => w.id !== walletId);
-      if (conflict) {
-        throw new HTTPException(409, { message: 'auto_deduct_all_already_set' });
-      }
-      // Clear specific mappings and set flag
-      await db
-        .delete(walletExpenseCategoryMappings)
-        .where(
-          and(
-            eq(walletExpenseCategoryMappings.walletId, walletId),
-            eq(walletExpenseCategoryMappings.userId, userId)
-          )
-        );
-      await db
-        .update(wallets)
-        .set({ autoDeductAllExpenses: true })
-        .where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
-      return;
-    }
-
-    // mode.kind === 'CATEGORIES'
-    const ids = mode.ids;
-
-    // T-04-07: validate each category belongs to userId
-    const ownedCats = await db
-      .select({ id: expenseCategories.id })
-      .from(expenseCategories)
-      .where(and(eq(expenseCategories.userId, userId)));
-    const ownedIds = new Set(ownedCats.map((c) => c.id));
-    for (const id of ids) {
-      if (!ownedIds.has(id)) {
-        throw new HTTPException(403, { message: 'forbidden' });
-      }
-    }
-
-    // Conflict check: any category mapped to a different wallet?
-    for (const id of ids) {
-      const conflictRows = await db
-        .select({ existingWalletId: walletExpenseCategoryMappings.walletId })
-        .from(walletExpenseCategoryMappings)
-        .where(eq(walletExpenseCategoryMappings.expenseCategoryId, id));
-      if (conflictRows.length > 0 && conflictRows[0].existingWalletId !== walletId) {
-        throw new HTTPException(409, { message: 'expense_category_already_mapped' });
-      }
-    }
-
-    // Atomic clear-and-replace (RESEARCH Pattern 2 / Pitfall 7)
-    const deleteStmt = db
-      .delete(walletExpenseCategoryMappings)
-      .where(
-        and(
-          eq(walletExpenseCategoryMappings.walletId, walletId),
-          eq(walletExpenseCategoryMappings.userId, userId)
-        )
-      );
-    const insertStmt = db
-      .insert(walletExpenseCategoryMappings)
-      .values(ids.map((cid) => ({ walletId, expenseCategoryId: cid, userId })));
-    // intentional: Drizzle 0.45.2 D1 adapter doesn't type .batch() on the return of createDb
-    await (db as any).batch([deleteStmt, insertStmt]); // intentional: D1 batch cast
-    await db
-      .update(wallets)
-      .set({ autoDeductAllExpenses: false })
-      .where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
-  }
-
   return {
     /**
      * Lists all wallets for the user with computed balanceCents, transactionCount, and mappingCount.
@@ -429,19 +332,19 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         txImpactByWallet,
         mappingsByWallet,
         incomeByCategory,
-        expenseByCategory,
+        expenseByWallet,
         pfAccountRows,
       ] = await Promise.all([
         db
           .select()
           .from(wallets)
-          .where(eq(wallets.userId, userId))
+          .where(and(eq(wallets.userId, userId), isNull(wallets.deletedAt)))
           .orderBy(asc(wallets.sortOrder), asc(wallets.id)),
         getTotalReceivedIncomeCents(userId),
         getPerWalletTransactionImpact(userId),
         getMappingsByWallet(userId),
         getReceivedIncomeByCategoryCents(userId),
-        getExpensesByCategoryCents(userId),
+        getExpensesByWalletCents(userId),
         db.select().from(profitFirstAccounts).where(eq(profitFirstAccounts.userId, userId)),
       ]);
 
@@ -450,7 +353,6 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       return walletRows.map((wallet) => {
         const mappings = mappingsByWallet.get(wallet.id) ?? {
           incomeCategoryIds: [],
-          expenseCategoryIds: [],
         };
         const txImpact = txImpactByWallet.get(wallet.id) ?? {
           deposits: 0,
@@ -473,17 +375,8 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           0
         );
 
-        // mappedExpenses: sum of non-deleted expenses for mapped expense categories
-        // When autoDeductAllExpenses=true, ALL non-deleted expenses for the user are deducted
-        let mappedExpenses = 0;
-        if (wallet.autoDeductAllExpenses) {
-          mappedExpenses = Array.from(expenseByCategory.values()).reduce((s, v) => s + v, 0);
-        } else {
-          mappedExpenses = mappings.expenseCategoryIds.reduce(
-            (sum, catId) => sum + (expenseByCategory.get(catId) ?? 0),
-            0
-          );
-        }
+        // mappedExpenses: sum of non-deleted expenses assigned to this wallet
+        const mappedExpenses = expenseByWallet.get(wallet.id) ?? 0;
 
         const balanceCents = computeBalanceCents({
           pfAllocation,
@@ -493,7 +386,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           withdrawals: txImpact.withdrawals,
         });
 
-        const mappingCount = mappings.incomeCategoryIds.length + mappings.expenseCategoryIds.length;
+        const mappingCount = mappings.incomeCategoryIds.length;
 
         return {
           ...wallet,
@@ -502,7 +395,6 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           mappingCount,
           // D-06: pickers disable categories already mapped to another wallet
           incomeCategoryIds: mappings.incomeCategoryIds,
-          expenseCategoryIds: mappings.expenseCategoryIds,
         };
       });
     },
@@ -540,7 +432,6 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           profitFirstAccountId: input.profitFirstAccountId ?? null,
           color: input.color ?? '#10b981',
           sortOrder,
-          autoDeductAllExpenses: false,
         })
         .returning();
 
@@ -553,11 +444,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           input.incomeCategoryIds
         );
       }
-      if (input.expenseMode) {
-        await setExpenseMappings(created.id, userId, input.expenseMode);
-      }
 
-      // Re-fetch so that any autoDeductAllExpenses updates from setExpenseMappings are reflected
       const [fresh] = await db
         .select()
         .from(wallets)
@@ -599,9 +486,6 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           input.incomeCategoryIds
         );
       }
-      if (input.expenseMode) {
-        await setExpenseMappings(walletId, userId, input.expenseMode);
-      }
 
       const [updated] = await db
         .select()
@@ -611,15 +495,21 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
     },
 
     /**
-     * Hard-deletes a wallet (cascades to mappings + transactions via FK).
-     * Returns impact counts from before the delete (D-16).
+     * Soft-deletes a wallet (sets deletedAt). The Default wallet cannot be deleted (409).
+     * On delete: hard-deletes its income-category mappings and nulls profitFirstAccountId so
+     * both can re-link to other wallets. Past expenses keep pointing at this wallet (denormalized
+     * wallet_name renders without a join). Returns impact counts from before the delete (D-16).
      */
     async remove(walletId: number, userId: number) {
       const rows = await db
         .select()
         .from(wallets)
         .where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
-      if (!rows[0]) throw new HTTPException(404, { message: 'not_found' });
+      const wallet = rows[0];
+      if (!wallet) throw new HTTPException(404, { message: 'not_found' });
+      if (wallet.isDefault) {
+        throw new HTTPException(409, { message: 'cannot_delete_default_wallet' });
+      }
 
       // Count non-deleted transactions before delete
       const txCountRows = await db
@@ -630,28 +520,34 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         );
       const transactionCount = Number(txCountRows[0]?.count ?? 0);
 
-      // Count income + expense mappings
-      const [incMappingRows, expMappingRows] = await Promise.all([
-        db
-          .select({ count: sql<number>`COUNT(*)` })
-          .from(walletIncomeCategoryMappings)
-          .where(eq(walletIncomeCategoryMappings.walletId, walletId)),
-        db
-          .select({ count: sql<number>`COUNT(*)` })
-          .from(walletExpenseCategoryMappings)
-          .where(eq(walletExpenseCategoryMappings.walletId, walletId)),
-      ]);
-      const mappingCount =
-        Number(incMappingRows[0]?.count ?? 0) + Number(expMappingRows[0]?.count ?? 0);
+      // Count income mappings (income-only now)
+      const incMappingRows = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(walletIncomeCategoryMappings)
+        .where(eq(walletIncomeCategoryMappings.walletId, walletId));
+      const mappingCount = Number(incMappingRows[0]?.count ?? 0);
 
-      // Hard-delete wallet (cascade FKs remove mappings + transactions)
-      await db.delete(wallets).where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
+      // Hard-delete income mappings + null the PF link so both re-link freely (NULLs are
+      // distinct in SQLite unique indexes — no clash with the soft-deleted wallet row).
+      await db
+        .delete(walletIncomeCategoryMappings)
+        .where(
+          and(
+            eq(walletIncomeCategoryMappings.walletId, walletId),
+            eq(walletIncomeCategoryMappings.userId, userId)
+          )
+        );
+
+      // Soft-delete the wallet and free its PF link
+      await db
+        .update(wallets)
+        .set({ deletedAt: new Date().toISOString(), profitFirstAccountId: null })
+        .where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
 
       return { id: walletId, transactionCount, mappingCount };
     },
 
     setIncomeCategoryMappings,
-    setExpenseMappings,
 
     /**
      * Returns wallet detail, balance breakdown, and paginated merged transaction history.
@@ -669,30 +565,18 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       const wallet = rows[0];
       if (!wallet) throw new HTTPException(404, { message: 'not_found' });
 
-      // Load mappings for this wallet
-      const [incomeMappings, expenseMappings] = await Promise.all([
-        db
-          .select({ catId: walletIncomeCategoryMappings.incomeCategoryId })
-          .from(walletIncomeCategoryMappings)
-          .where(
-            and(
-              eq(walletIncomeCategoryMappings.walletId, walletId),
-              eq(walletIncomeCategoryMappings.userId, userId)
-            )
-          ),
-        db
-          .select({ catId: walletExpenseCategoryMappings.expenseCategoryId })
-          .from(walletExpenseCategoryMappings)
-          .where(
-            and(
-              eq(walletExpenseCategoryMappings.walletId, walletId),
-              eq(walletExpenseCategoryMappings.userId, userId)
-            )
-          ),
-      ]);
+      // Load income mappings for this wallet (income-only now)
+      const incomeMappings = await db
+        .select({ catId: walletIncomeCategoryMappings.incomeCategoryId })
+        .from(walletIncomeCategoryMappings)
+        .where(
+          and(
+            eq(walletIncomeCategoryMappings.walletId, walletId),
+            eq(walletIncomeCategoryMappings.userId, userId)
+          )
+        );
 
       const incomeCatIds = incomeMappings.map((r) => r.catId);
-      const expenseCatIds = expenseMappings.map((r) => r.catId);
 
       // ── Breakdown (balance components) ────────────────────────────────────
       // These queries EXCLUDE soft-deleted transactions (Pitfall 4)
@@ -726,18 +610,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         );
       }
 
-      // mappedExpensesCents: sum of non-deleted expenses for mapped categories
-      let mappedExpensesCents = 0;
-      if (wallet.autoDeductAllExpenses) {
-        const expenseByCategory = await getExpensesByCategoryCents(userId);
-        mappedExpensesCents = Array.from(expenseByCategory.values()).reduce((s, v) => s + v, 0);
-      } else if (expenseCatIds.length > 0) {
-        const expenseByCategory = await getExpensesByCategoryCents(userId);
-        mappedExpensesCents = expenseCatIds.reduce(
-          (sum, catId) => sum + (expenseByCategory.get(catId) ?? 0),
-          0
-        );
-      }
+      // mappedExpensesCents: sum of non-deleted expenses assigned to this wallet
+      const expenseByWallet = await getExpensesByWalletCents(userId);
+      const mappedExpensesCents = expenseByWallet.get(walletId) ?? 0;
 
       // depositsCents + withdrawalsCents: non-deleted manual transactions for this wallet
       const txSumRows = await db
@@ -808,7 +683,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         }
       }
 
-      // Auto-expense entries: non-deleted expenses mapped to this wallet's expense categories
+      // Auto-expense entries: non-deleted expenses assigned to this wallet (by walletId)
       const expenseEntries: Array<{
         id: number;
         type: 'EXPENSE_AUTO';
@@ -819,44 +694,33 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         source: 'expense';
       }> = [];
 
-      const expenseCatIdsForHistory = wallet.autoDeductAllExpenses
-        ? (
-            await db
-              .select({ id: expenseCategories.id })
-              .from(expenseCategories)
-              .where(eq(expenseCategories.userId, userId))
-          ).map((r) => r.id)
-        : expenseCatIds;
-
-      if (expenseCatIdsForHistory.length > 0) {
-        const expenseRows = await db
-          .select({
-            id: expenses.id,
-            amount: expenses.amount,
-            description: expenses.description,
-            transactionDate: expenses.expenseDate,
-          })
-          .from(expenses)
-          .where(
-            and(
-              eq(expenses.userId, userId),
-              inArray(expenses.categoryId, expenseCatIdsForHistory),
-              isNull(expenses.deletedAt)
-            )
+      const expenseRows = await db
+        .select({
+          id: expenses.id,
+          amount: expenses.amount,
+          description: expenses.description,
+          transactionDate: expenses.expenseDate,
+        })
+        .from(expenses)
+        .where(
+          and(
+            eq(expenses.userId, userId),
+            eq(expenses.walletId, walletId),
+            isNull(expenses.deletedAt)
           )
-          .orderBy(desc(expenses.expenseDate), desc(expenses.id))
-          .limit(fetchLimit);
-        for (const row of expenseRows) {
-          expenseEntries.push({
-            id: row.id,
-            type: 'EXPENSE_AUTO',
-            amount: row.amount,
-            description: row.description ?? null,
-            transactionDate: row.transactionDate,
-            deletedAt: null,
-            source: 'expense',
-          });
-        }
+        )
+        .orderBy(desc(expenses.expenseDate), desc(expenses.id))
+        .limit(fetchLimit);
+      for (const row of expenseRows) {
+        expenseEntries.push({
+          id: row.id,
+          type: 'EXPENSE_AUTO',
+          amount: row.amount,
+          description: row.description ?? null,
+          transactionDate: row.transactionDate,
+          deletedAt: null,
+          source: 'expense',
+        });
       }
 
       // Manual transactions: ALL (including soft-deleted) for this wallet (D-09)
@@ -900,23 +764,19 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         countPromises.push(Promise.resolve(0));
       }
 
-      if (expenseCatIdsForHistory.length > 0) {
-        countPromises.push(
-          db
-            .select({ count: sql<number>`COUNT(*)` })
-            .from(expenses)
-            .where(
-              and(
-                eq(expenses.userId, userId),
-                inArray(expenses.categoryId, expenseCatIdsForHistory),
-                isNull(expenses.deletedAt)
-              )
+      countPromises.push(
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(expenses)
+          .where(
+            and(
+              eq(expenses.userId, userId),
+              eq(expenses.walletId, walletId),
+              isNull(expenses.deletedAt)
             )
-            .then((r) => Number(r[0]?.count ?? 0))
-        );
-      } else {
-        countPromises.push(Promise.resolve(0));
-      }
+          )
+          .then((r) => Number(r[0]?.count ?? 0))
+      );
 
       // Manual: ALL transactions including soft-deleted (D-09)
       countPromises.push(
@@ -957,10 +817,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           ...wallet,
           balanceCents,
           transactionCount: manualRows.filter((r) => !r.deletedAt).length,
-          mappingCount: incomeCatIds.length + expenseCatIds.length,
+          mappingCount: incomeCatIds.length,
           // Exact mapping presence — the UI blocked-state hints mirror assertCanInsertTransaction
           incomeCategoryIds: incomeCatIds,
-          expenseCategoryIds: expenseCatIds,
         },
         breakdown: {
           pfAllocationCents,
@@ -988,32 +847,20 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       const wallet = walletRows[0];
       if (!wallet) throw new HTTPException(404, { message: 'not_found' });
 
-      // Load mappings for blocking guard
-      const [incomeMappings, expenseMappings] = await Promise.all([
-        db
-          .select({ catId: walletIncomeCategoryMappings.incomeCategoryId })
-          .from(walletIncomeCategoryMappings)
-          .where(
-            and(
-              eq(walletIncomeCategoryMappings.walletId, walletId),
-              eq(walletIncomeCategoryMappings.userId, userId)
-            )
-          ),
-        db
-          .select({ catId: walletExpenseCategoryMappings.expenseCategoryId })
-          .from(walletExpenseCategoryMappings)
-          .where(
-            and(
-              eq(walletExpenseCategoryMappings.walletId, walletId),
-              eq(walletExpenseCategoryMappings.userId, userId)
-            )
-          ),
-      ]);
+      // Load income mappings for the DEPOSIT blocking guard (income-only now)
+      const incomeMappings = await db
+        .select({ catId: walletIncomeCategoryMappings.incomeCategoryId })
+        .from(walletIncomeCategoryMappings)
+        .where(
+          and(
+            eq(walletIncomeCategoryMappings.walletId, walletId),
+            eq(walletIncomeCategoryMappings.userId, userId)
+          )
+        );
 
       // Run blocking guard (T-04-12, T-04-13)
       assertCanInsertTransaction(input.type, wallet, {
         incomeCategories: incomeMappings.map((r) => r.catId),
-        expenseCategories: expenseMappings.map((r) => r.catId),
       });
 
       const amountCents = Math.round(input.amount);
