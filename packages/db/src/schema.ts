@@ -194,8 +194,8 @@ export const wallets = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    sourceType: text('source_type', { enum: ['PROFIT_FIRST', 'BLANK'] }).notNull(),
-    // Nullable — only set for PROFIT_FIRST wallets; no cascade so delete-guard can block (D-01)
+    // Nullable — non-null = PF wallet (auto-funded by its allocation); null = standalone.
+    // Sole PF discriminator; no cascade so delete-guard can block (D-01)
     profitFirstAccountId: integer('profit_first_account_id').references(
       () => profitFirstAccounts.id
     ),

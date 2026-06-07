@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -59,61 +59,68 @@ export function RegisterForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Create your account</CardTitle>
-        <CardDescription>Start allocating your income the Profit First way.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="register-email">Email</Label>
-            <Input
-              id="register-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            {fieldErrors.email ? (
-              <p className="text-sm text-destructive">{fieldErrors.email}</p>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="register-name">Name</Label>
-            <Input
-              id="register-name"
-              type="text"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-            {fieldErrors.name ? (
-              <p className="text-sm text-destructive">{fieldErrors.name}</p>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="register-password">Password</Label>
-            <Input
-              id="register-password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-            {fieldErrors.password ? (
-              <p className="text-sm text-destructive">{fieldErrors.password}</p>
-            ) : null}
-          </div>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Creating account…' : 'Create account'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="w-full max-w-sm">
+      <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
+      <p className="mt-1 text-sm text-ink-soft">
+        Start allocating your income the Profit First way.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5" noValidate>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="register-email">Email</Label>
+          <Input
+            id="register-email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          {fieldErrors.email ? (
+            <p className="text-sm text-destructive">{fieldErrors.email}</p>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="register-name">Name</Label>
+          <Input
+            id="register-name"
+            type="text"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          {fieldErrors.name ? <p className="text-sm text-destructive">{fieldErrors.name}</p> : null}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="register-password">Password</Label>
+          <Input
+            id="register-password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+          />
+          {fieldErrors.password ? (
+            <p className="text-sm text-destructive">{fieldErrors.password}</p>
+          ) : null}
+        </div>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Create account'}
+        </Button>
+      </form>
+
+      <p className="mt-8 text-sm text-ink-faint">
+        Already have an account?{' '}
+        <Link
+          href="/login"
+          className="text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline"
+        >
+          Sign in
+        </Link>
+      </p>
+    </div>
   );
 }

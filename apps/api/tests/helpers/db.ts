@@ -121,7 +121,6 @@ CREATE TABLE wallets (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  source_type TEXT NOT NULL,
   profit_first_account_id INTEGER REFERENCES profit_first_accounts(id),
   auto_deduct_all_expenses INTEGER NOT NULL DEFAULT 0,
   color TEXT NOT NULL,

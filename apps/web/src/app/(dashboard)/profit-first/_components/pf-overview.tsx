@@ -5,9 +5,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { MoreVertical } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +22,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { MaskedAmount } from '@/components/amount-visibility';
-import { formatCurrency } from '@/lib/format-currency';
 import { deleteAccountAction } from '@/server/profit-first-actions';
 import { PfAccountForm } from './pf-account-form';
 
@@ -46,77 +42,53 @@ export interface PfAccount {
 
 interface PfOverviewProps {
   accounts: PfAccount[];
-  totalIncome: number;
   visible: boolean;
   mounted: boolean;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const ACCOUNT_TYPE_LABELS: Record<Exclude<PfAccount['accountType'], 'CUSTOM'>, string> = {
-  PROFIT: 'Profit',
-  OWNERS_PAY: 'Owner Pay',
-  TAX: 'Tax',
-  OPEX: 'Operating Expenses',
-};
-
 /**
- * Account cards grid for the Profit First summary page.
+ * Account ledger for the Profit First summary page.
  *
- * Renders a 2-column grid on md+, 1-column on mobile. Each card shows:
- * - 4px left border in the account color hex
- * - Account name (Heading), type badge for non-CUSTOM accounts
- * - Target percentage
- * - Derived balance (masked or formatted) in Display slot
- * - Progress bar (value = targetPercentage, 0–100)
- * - Total received income line
- * - Per-account dropdown (⋮) with Edit/Delete — wired in this file (Plan 04 Task 2)
+ * Hairline-separated rows instead of cards: color dot + name, target percent,
+ * allocated amount (masked-aware, tabular), and a per-row Edit/Delete menu.
+ * Structure comes from whitespace and type scale, not boxes (The Calm
+ * Envelope: whitespace is the layout).
  *
  * T-03-06: account.name is always rendered as text content (never
  * dangerouslySetInnerHTML) to prevent stored XSS.
  */
-export function PfOverview({ accounts, totalIncome, visible, mounted }: PfOverviewProps) {
+export function PfOverview({ accounts, visible, mounted }: PfOverviewProps) {
   if (accounts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-lg font-semibold text-foreground">No allocation accounts yet</p>
+      <div className="py-16 text-center">
+        <p className="text-lg font-semibold">No allocation accounts yet</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your default accounts will appear here. If you don&apos;t see them, contact support.
+          Your default accounts are created when you sign up. Try refreshing the page.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+    <ul className="divide-y divide-border">
       {accounts.map((account) => (
-        <AccountCard
-          key={account.id}
-          account={account}
-          totalIncome={totalIncome}
-          visible={visible}
-          mounted={mounted}
-        />
+        <AccountRow key={account.id} account={account} visible={visible} mounted={mounted} />
       ))}
-    </div>
+    </ul>
   );
 }
 
-// ── Account card ──────────────────────────────────────────────────────────────
+// ── Account row ───────────────────────────────────────────────────────────────
 
-interface AccountCardProps {
+interface AccountRowProps {
   account: PfAccount;
-  totalIncome: number;
   visible: boolean;
   mounted: boolean;
 }
 
-function AccountCard({ account, totalIncome, visible, mounted }: AccountCardProps) {
+function AccountRow({ account, visible, mounted }: AccountRowProps) {
   const router = useRouter();
   const isDefault = account.accountType !== 'CUSTOM';
-  const typeLabel = isDefault
-    ? ACCOUNT_TYPE_LABELS[account.accountType as Exclude<PfAccount['accountType'], 'CUSTOM'>]
-    : null;
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -141,92 +113,65 @@ function AccountCard({ account, totalIncome, visible, mounted }: AccountCardProp
   }
 
   return (
-    <>
-      <Card
-        className="relative overflow-hidden shadow-sm rounded-xl transition-shadow hover:shadow-md"
-        style={{ borderLeft: `4px solid ${account.color}` }}
-      >
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* T-03-06: text content only, no dangerouslySetInnerHTML */}
-              <CardTitle className="text-[20px] font-semibold leading-tight">
-                {account.name}
-              </CardTitle>
-              {typeLabel !== null && (
-                <Badge variant="secondary" className="text-xs">
-                  {typeLabel}
-                </Badge>
-              )}
-            </div>
+    <li className="flex items-center gap-3 py-4">
+      {/* Identity dot — same hue as this account's bar segment */}
+      <span
+        aria-hidden="true"
+        className="h-2.5 w-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: account.color }}
+      />
 
-            {/* Per-account dropdown — Edit/Delete handlers wired here (Plan 04 Task 2) */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Account options"
-                  className="h-8 w-8 shrink-0"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {/* Edit — available for all account types */}
-                <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit</DropdownMenuItem>
+      {/* T-03-06: text content only, no dangerouslySetInnerHTML */}
+      <span className="truncate text-[15px] font-medium">{account.name}</span>
+      <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+        {account.targetPercentage}%
+      </span>
 
-                {/* Delete — disabled with tooltip for non-CUSTOM accounts (D-05, T-03-07) */}
-                {isDefault ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      {/* Wrapper span needed: disabled button swallows pointer events for tooltip */}
-                      <span className="block">
-                        <DropdownMenuItem disabled className="opacity-50 cursor-not-allowed">
-                          Delete
-                        </DropdownMenuItem>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">Default accounts cannot be deleted.</TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={() => setDeleteOpen(true)}
-                  >
+      <MaskedAmount
+        cents={account.computedBalance}
+        visible={visible}
+        mounted={mounted}
+        className="ml-auto shrink-0 text-[15px] font-medium tabular-nums"
+      />
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Options for ${account.name}`}
+            className="h-8 w-8 shrink-0 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {/* Edit — available for all account types */}
+          <DropdownMenuItem onClick={() => setEditOpen(true)}>Edit</DropdownMenuItem>
+
+          {/* Delete — disabled with tooltip for non-CUSTOM accounts (D-05, T-03-07) */}
+          {isDefault ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* Wrapper span needed: disabled button swallows pointer events for tooltip */}
+                <span className="block">
+                  <DropdownMenuItem disabled className="cursor-not-allowed opacity-50">
                     Delete
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <p className="text-sm text-muted-foreground">Target: {account.targetPercentage}%</p>
-        </CardHeader>
-
-        <CardContent className="flex flex-col gap-3">
-          {/* Allocated balance — Display slot (28px semibold) */}
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-              Allocated balance
-            </p>
-            <MaskedAmount
-              cents={account.computedBalance}
-              visible={visible}
-              mounted={mounted}
-              className="text-[28px] font-semibold leading-none tabular-nums"
-            />
-          </div>
-
-          {/* Progress bar — value is percent (0–100) */}
-          <Progress value={account.targetPercentage} className="h-2" />
-
-          {/* Total received income line */}
-          <p className="text-xs text-muted-foreground">
-            of {formatCurrency(totalIncome)} total received income
-          </p>
-        </CardContent>
-      </Card>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="left">Default accounts cannot be deleted.</TooltipContent>
+            </Tooltip>
+          ) : (
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => setDeleteOpen(true)}
+            >
+              Delete
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Edit dialog */}
       <PfAccountForm open={editOpen} onOpenChange={setEditOpen} account={account} />
@@ -251,6 +196,6 @@ function AccountCard({ account, totalIncome, visible, mounted }: AccountCardProp
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </li>
   );
 }

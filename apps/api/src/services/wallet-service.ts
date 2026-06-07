@@ -1,5 +1,5 @@
 import { HTTPException } from 'hono/http-exception';
-import { eq, and, isNull, sql, asc } from 'drizzle-orm';
+import { eq, and, isNull, sql, asc, desc, inArray } from 'drizzle-orm';
 
 import { createDb } from '@app/db';
 import {
@@ -49,7 +49,7 @@ function computeBalanceCents({
 
 /**
  * Blocking guard: prevents manual transactions that would double-count automatically sourced money.
- * DEPOSIT blocked when wallet is PROFIT_FIRST or has income category mappings.
+ * DEPOSIT blocked when wallet is PF-linked or has income category mappings.
  * WITHDRAWAL blocked when wallet has expense mappings or autoDeductAllExpenses=true.
  * Port of RESEARCH Pattern 3 verbatim.
  */
@@ -245,16 +245,16 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
   /**
    * Sets income category mappings for a wallet atomically (clear-and-replace).
    * Validates category ownership and cross-wallet conflicts before writing.
-   * Skips entirely if the wallet is PROFIT_FIRST (D-08).
+   * Skips entirely if the wallet is PF-linked (D-08).
    */
   async function setIncomeCategoryMappings(
     walletId: number,
     userId: number,
-    sourceType: string,
+    profitFirstAccountId: number | null,
     ids: number[]
   ): Promise<void> {
-    // D-08: PF wallets skip income-category mapping
-    if (sourceType === 'PROFIT_FIRST') return;
+    // D-08: PF-linked wallets skip income-category mapping
+    if (profitFirstAccountId != null) return;
     if (ids.length === 0) {
       // Just clear existing mappings
       await db
@@ -458,9 +458,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           activeCount: 0,
         };
 
-        // pfAllocation: only for PROFIT_FIRST wallets
+        // pfAllocation: only for PF-linked wallets
         let pfAllocation = 0;
-        if (wallet.sourceType === 'PROFIT_FIRST' && wallet.profitFirstAccountId != null) {
+        if (wallet.profitFirstAccountId != null) {
           const pfAccount = pfAccountMap.get(wallet.profitFirstAccountId);
           if (pfAccount) {
             pfAllocation = Math.round((totalReceivedIncome * pfAccount.targetPercentage) / 10000);
@@ -500,6 +500,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           balanceCents,
           transactionCount: txImpact.activeCount,
           mappingCount,
+          // D-06: pickers disable categories already mapped to another wallet
+          incomeCategoryIds: mappings.incomeCategoryIds,
+          expenseCategoryIds: mappings.expenseCategoryIds,
         };
       });
     },
@@ -512,7 +515,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
      */
     async create(userId: number, input: CreateWalletInput) {
       // Validate PF link uniqueness (WAL-01)
-      if (input.sourceType === 'PROFIT_FIRST' && input.profitFirstAccountId != null) {
+      if (input.profitFirstAccountId != null) {
         const alreadyLinked = await hasWalletForPfAccount(userId, input.profitFirstAccountId);
         if (alreadyLinked) {
           throw new HTTPException(409, { message: 'wallet_pf_account_already_linked' });
@@ -534,7 +537,6 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         .values({
           userId,
           name: input.name,
-          sourceType: input.sourceType,
           profitFirstAccountId: input.profitFirstAccountId ?? null,
           color: input.color ?? '#10b981',
           sortOrder,
@@ -547,7 +549,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         await setIncomeCategoryMappings(
           created.id,
           userId,
-          created.sourceType,
+          created.profitFirstAccountId,
           input.incomeCategoryIds
         );
       }
@@ -593,7 +595,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         await setIncomeCategoryMappings(
           walletId,
           userId,
-          wallet.sourceType,
+          wallet.profitFirstAccountId,
           input.incomeCategoryIds
         );
       }
@@ -695,9 +697,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       // ── Breakdown (balance components) ────────────────────────────────────
       // These queries EXCLUDE soft-deleted transactions (Pitfall 4)
 
-      // pfAllocation: only for PROFIT_FIRST wallets
+      // pfAllocation: only for PF-linked wallets
       let pfAllocationCents = 0;
-      if (wallet.sourceType === 'PROFIT_FIRST' && wallet.profitFirstAccountId != null) {
+      if (wallet.profitFirstAccountId != null) {
         const pfRows = await db
           .select()
           .from(profitFirstAccounts)
@@ -776,34 +778,33 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       }> = [];
 
       if (incomeCatIds.length > 0) {
-        for (const catId of incomeCatIds) {
-          const rows = await db
-            .select({
-              id: incomes.id,
-              amount: incomes.amount,
-              description: incomes.description,
-              transactionDate: incomes.incomeDate,
-            })
-            .from(incomes)
-            .where(
-              and(
-                eq(incomes.userId, userId),
-                eq(incomes.categoryId, catId),
-                eq(incomes.moneyStatus, 'RECEIVED')
-              )
+        const incomeRows = await db
+          .select({
+            id: incomes.id,
+            amount: incomes.amount,
+            description: incomes.description,
+            transactionDate: incomes.incomeDate,
+          })
+          .from(incomes)
+          .where(
+            and(
+              eq(incomes.userId, userId),
+              inArray(incomes.categoryId, incomeCatIds),
+              eq(incomes.moneyStatus, 'RECEIVED')
             )
-            .limit(fetchLimit);
-          for (const row of rows) {
-            incomeEntries.push({
-              id: row.id,
-              type: 'INCOME_AUTO',
-              amount: row.amount,
-              description: row.description ?? null,
-              transactionDate: row.transactionDate,
-              deletedAt: null,
-              source: 'income',
-            });
-          }
+          )
+          .orderBy(desc(incomes.incomeDate), desc(incomes.id))
+          .limit(fetchLimit);
+        for (const row of incomeRows) {
+          incomeEntries.push({
+            id: row.id,
+            type: 'INCOME_AUTO',
+            amount: row.amount,
+            description: row.description ?? null,
+            transactionDate: row.transactionDate,
+            deletedAt: null,
+            source: 'income',
+          });
         }
       }
 
@@ -828,34 +829,33 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         : expenseCatIds;
 
       if (expenseCatIdsForHistory.length > 0) {
-        for (const catId of expenseCatIdsForHistory) {
-          const rows = await db
-            .select({
-              id: expenses.id,
-              amount: expenses.amount,
-              description: expenses.description,
-              transactionDate: expenses.expenseDate,
-            })
-            .from(expenses)
-            .where(
-              and(
-                eq(expenses.userId, userId),
-                eq(expenses.categoryId, catId),
-                isNull(expenses.deletedAt)
-              )
+        const expenseRows = await db
+          .select({
+            id: expenses.id,
+            amount: expenses.amount,
+            description: expenses.description,
+            transactionDate: expenses.expenseDate,
+          })
+          .from(expenses)
+          .where(
+            and(
+              eq(expenses.userId, userId),
+              inArray(expenses.categoryId, expenseCatIdsForHistory),
+              isNull(expenses.deletedAt)
             )
-            .limit(fetchLimit);
-          for (const row of rows) {
-            expenseEntries.push({
-              id: row.id,
-              type: 'EXPENSE_AUTO',
-              amount: row.amount,
-              description: row.description ?? null,
-              transactionDate: row.transactionDate,
-              deletedAt: null,
-              source: 'expense',
-            });
-          }
+          )
+          .orderBy(desc(expenses.expenseDate), desc(expenses.id))
+          .limit(fetchLimit);
+        for (const row of expenseRows) {
+          expenseEntries.push({
+            id: row.id,
+            type: 'EXPENSE_AUTO',
+            amount: row.amount,
+            description: row.description ?? null,
+            transactionDate: row.transactionDate,
+            deletedAt: null,
+            source: 'expense',
+          });
         }
       }
 
@@ -866,6 +866,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         .where(
           and(eq(walletTransactions.walletId, walletId), eq(walletTransactions.userId, userId))
         )
+        .orderBy(desc(walletTransactions.transactionDate), desc(walletTransactions.id))
         .limit(fetchLimit);
 
       const manualEntries = manualRows.map((row) => ({
@@ -878,6 +879,59 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         source: 'manual' as const,
       }));
 
+      // COUNT(*) per source — independent of the windowed fetch so totalPages is never understated
+      const countPromises: Promise<number>[] = [];
+
+      if (incomeCatIds.length > 0) {
+        countPromises.push(
+          db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(incomes)
+            .where(
+              and(
+                eq(incomes.userId, userId),
+                inArray(incomes.categoryId, incomeCatIds),
+                eq(incomes.moneyStatus, 'RECEIVED')
+              )
+            )
+            .then((r) => Number(r[0]?.count ?? 0))
+        );
+      } else {
+        countPromises.push(Promise.resolve(0));
+      }
+
+      if (expenseCatIdsForHistory.length > 0) {
+        countPromises.push(
+          db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(expenses)
+            .where(
+              and(
+                eq(expenses.userId, userId),
+                inArray(expenses.categoryId, expenseCatIdsForHistory),
+                isNull(expenses.deletedAt)
+              )
+            )
+            .then((r) => Number(r[0]?.count ?? 0))
+        );
+      } else {
+        countPromises.push(Promise.resolve(0));
+      }
+
+      // Manual: ALL transactions including soft-deleted (D-09)
+      countPromises.push(
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(walletTransactions)
+          .where(
+            and(eq(walletTransactions.walletId, walletId), eq(walletTransactions.userId, userId))
+          )
+          .then((r) => Number(r[0]?.count ?? 0))
+      );
+
+      const [incomeCount, expenseCount, manualCount] = await Promise.all(countPromises);
+      const total = (incomeCount ?? 0) + (expenseCount ?? 0) + (manualCount ?? 0);
+
       // Merge + sort by transactionDate DESC, then id DESC (RESEARCH Pattern 5)
       const merged = [...incomeEntries, ...expenseEntries, ...manualEntries];
       merged.sort((a, b) => {
@@ -886,7 +940,6 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         return b.id - a.id;
       });
 
-      const total = merged.length;
       const totalPages = Math.ceil(total / size) || 1;
       const content = merged.slice(page * size, (page + 1) * size);
 
@@ -905,6 +958,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           balanceCents,
           transactionCount: manualRows.filter((r) => !r.deletedAt).length,
           mappingCount: incomeCatIds.length + expenseCatIds.length,
+          // Exact mapping presence — the UI blocked-state hints mirror assertCanInsertTransaction
+          incomeCategoryIds: incomeCatIds,
+          expenseCategoryIds: expenseCatIds,
         },
         breakdown: {
           pfAllocationCents,

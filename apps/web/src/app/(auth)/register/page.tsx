@@ -1,10 +1,14 @@
+import Link from 'next/link';
+
+import { BrandMark } from '@/components/BrandMark';
 import { RegisterForm } from '@/components/auth/RegisterForm';
 
-// No UI-SPEC contract exists for this phase (user chose --skip-ui),
-// so styling uses shadcn + STANDARDS defaults.
 export default function RegisterPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6">
+    <main className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
+      <Link href="/" aria-label="Profitmuna home" className="mb-10">
+        <BrandMark markClassName="h-12" />
+      </Link>
       <RegisterForm />
     </main>
   );

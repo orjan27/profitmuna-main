@@ -1,3 +1,6 @@
+import Link from 'next/link';
+
+import { BrandMark } from '@/components/BrandMark';
 import { VerifyEmailStatus } from './VerifyEmailStatus';
 
 interface VerifyEmailPageProps {
@@ -8,7 +11,10 @@ interface VerifyEmailPageProps {
 export default async function VerifyEmailPage({ searchParams }: VerifyEmailPageProps) {
   const { token } = await searchParams;
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-6">
+    <main className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
+      <Link href="/" aria-label="Profitmuna home" className="mb-10">
+        <BrandMark markClassName="h-12" />
+      </Link>
       <VerifyEmailStatus token={token} />
     </main>
   );

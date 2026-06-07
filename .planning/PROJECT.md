@@ -97,4 +97,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-_Last updated: 2026-06-06 — Phase 3 (Profit First Allocation) complete: account seeding, CRUD, server-enforced percentage editing, allocation summary with date/category filters; 8 browser UAT items tracked in 03-HUMAN-UAT.md_
+_Last updated: 2026-06-06 — Phase 4 (Wallets) complete: PROFIT_FIRST/BLANK wallets, category mapping with conflict blocking, computed balances, manual transactions with soft-delete/restore, paginated history; 5/5 browser UAT items passed in 04-HUMAN-UAT.md_

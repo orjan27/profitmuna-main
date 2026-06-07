@@ -40,7 +40,13 @@ import {
   restoreTransactionAction,
   deleteWalletAction,
 } from '../../_actions/wallet-actions';
-import type { WalletDetailResponse, WalletTransaction } from '@/types/wallet';
+import { EditWalletDialog } from './EditWalletDialog';
+import type {
+  WalletDetailResponse,
+  WalletTransaction,
+  IncomeCategory,
+  ExpenseCategory,
+} from '@/types/wallet';
 
 // ── Copywriting Contract ──────────────────────────────────────────────────────
 const BLOCKING_COPY = {
@@ -81,6 +87,14 @@ function todayIso(): string {
 
 interface WalletDetailProps {
   detail: WalletDetailResponse;
+  incomeCategories: IncomeCategory[];
+  expenseCategories: ExpenseCategory[];
+  /** D-06: category ids already mapped to a DIFFERENT wallet */
+  mappedIncomeCategoryIds: Set<number>;
+  mappedExpenseCategoryIds: Set<number>;
+  otherWalletHasAutoDeductAll: boolean;
+  /** When true (via ?edit=1), the edit dialog opens on first render */
+  initialEditOpen: boolean;
 }
 
 // ── Add/Edit Transaction Dialog ───────────────────────────────────────────────
@@ -287,12 +301,25 @@ function DeleteTxDialog({ tx, walletId, onClose }: DeleteTxDialogProps) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function WalletDetail({ detail }: WalletDetailProps) {
+export function WalletDetail({
+  detail,
+  incomeCategories,
+  expenseCategories,
+  mappedIncomeCategoryIds,
+  mappedExpenseCategoryIds,
+  otherWalletHasAutoDeductAll,
+  initialEditOpen,
+}: WalletDetailProps) {
   const router = useRouter();
   const { wallet, breakdown, transactions, pagination } = detail;
 
-  // Pagination state via nuqs URL param (D-10)
-  const [page, setPage] = useQueryState('page', parseAsInteger.withDefault(0));
+  // Pagination state via nuqs URL param (D-10).
+  // shallow: false — the RSC page reads `page` from searchParams, so the URL
+  // change must round-trip through the server to fetch the new page of rows.
+  const [page, setPage] = useQueryState(
+    'page',
+    parseAsInteger.withDefault(0).withOptions({ shallow: false })
+  );
 
   // Dialog state
   const [txDialogMode, setTxDialogMode] = useState<
@@ -300,6 +327,9 @@ export function WalletDetail({ detail }: WalletDetailProps) {
   >(null);
   const [editTx, setEditTx] = useState<WalletTransaction | null>(null);
   const [deleteTx, setDeleteTx] = useState<WalletTransaction | null>(null);
+
+  // Edit wallet dialog state — ?edit=1 (from the list's Edit action) opens it on load
+  const [editWalletOpen, setEditWalletOpen] = useState(initialEditOpen);
 
   // Delete wallet dialog state
   const [deleteWalletOpen, setDeleteWalletOpen] = useState(false);
@@ -333,34 +363,14 @@ export function WalletDetail({ detail }: WalletDetailProps) {
     });
   }
 
-  // Blocking logic derived from wallet shape
-  const isDepositBlocked = !!wallet.profitFirstAccountId || wallet.mappingCount > 0;
-  // For deposit blocking, we check PF or income-mapped. For withdrawal, expense-mapped.
-  // We use the wallet detail data to derive these:
-  const isPfWallet = wallet.sourceType === 'PROFIT_FIRST';
-  const hasIncomeMappings =
-    breakdown.mappedIncomeCents > 0 || (isPfWallet ? false : wallet.mappingCount > 0);
-
-  // Deposit is blocked if PF wallet OR has income-category mappings
-  // Withdrawal is blocked if has expense-category mappings or autoDeductAllExpenses
-  // Since we don't have the raw mapping lists in WalletDetailResponse, we infer:
-  // - PF wallet → deposit blocked
-  // - mappedIncomeCents > 0 → deposit blocked (income is flowing in automatically)
-  // - mappedExpensesCents > 0 → withdrawal blocked (expenses auto-deducted)
-  // Note: these are conservative — may block when no mapping exists but income/expense happened to be 0
-  // The server enforces the real guard; UI disables as a hint.
-  const depositBlocked = isPfWallet || breakdown.mappedIncomeCents > 0;
+  // Blocking hints mirror the server's assertCanInsertTransaction exactly —
+  // mapping PRESENCE blocks, not amounts (a mapped category with zero spend still blocks).
+  const isPfWallet = wallet.profitFirstAccountId != null;
+  const depositBlocked = isPfWallet || wallet.incomeCategoryIds.length > 0;
   const depositBlockReason = isPfWallet ? BLOCKING_COPY.pf_deposit : BLOCKING_COPY.income_mapped;
 
-  // We can't fully know expense auto status from breakdown alone without extra fields.
-  // Use mappedExpensesCents as a proxy — if any expense was auto-deducted, block withdrawal.
-  // A more reliable approach: the server will enforce it anyway.
-  const withdrawalBlocked = breakdown.mappedExpensesCents > 0;
+  const withdrawalBlocked = wallet.autoDeductAllExpenses || wallet.expenseCategoryIds.length > 0;
   const withdrawalBlockReason = BLOCKING_COPY.expense_mapped;
-
-  // Suppress unused variable warning for hasIncomeMappings
-  void hasIncomeMappings;
-  void isDepositBlocked;
 
   const [breakdownOpen, setBreakdownOpen] = useState(false);
 
@@ -376,11 +386,13 @@ export function WalletDetail({ detail }: WalletDetailProps) {
             ← Back
           </Link>
           <h1 className="text-xl font-semibold">{wallet.name}</h1>
-          <Badge variant="secondary">{sourceLabel(wallet.sourceType)}</Badge>
+          <Badge variant="secondary">{sourceLabel(wallet.profitFirstAccountId)}</Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/wallets/${wallet.id}/edit`}>Edit</Link>
+          {/* D-05: inline edit on the detail page — no separate /edit route */}
+          <Button variant="outline" size="sm" onClick={() => setEditWalletOpen(true)}>
+            <Pencil className="h-3.5 w-3.5 mr-1" />
+            Edit
           </Button>
           <Button variant="destructive" size="sm" onClick={() => setDeleteWalletOpen(true)}>
             Delete
@@ -619,6 +631,20 @@ export function WalletDetail({ detail }: WalletDetailProps) {
 
       {/* Delete Transaction Dialog */}
       <DeleteTxDialog tx={deleteTx} walletId={wallet.id} onClose={() => setDeleteTx(null)} />
+
+      {/* Edit Wallet Dialog — mounted only while open so state prefills fresh each time */}
+      {editWalletOpen && (
+        <EditWalletDialog
+          open={editWalletOpen}
+          onClose={() => setEditWalletOpen(false)}
+          wallet={wallet}
+          incomeCategories={incomeCategories}
+          expenseCategories={expenseCategories}
+          mappedIncomeCategoryIds={mappedIncomeCategoryIds}
+          mappedExpenseCategoryIds={mappedExpenseCategoryIds}
+          otherWalletHasAutoDeductAll={otherWalletHasAutoDeductAll}
+        />
+      )}
 
       {/* Delete Wallet Dialog */}
       <Dialog open={deleteWalletOpen} onOpenChange={setDeleteWalletOpen}>

@@ -30,6 +30,14 @@ const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 /** Refresh token lifetime in milliseconds (7 days) */
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Grace window for concurrent refresh rotation (10 seconds).
+ * Next.js middleware can fire several near-simultaneous refresh calls
+ * (Link prefetch); the losers present a just-rotated token. Within this
+ * window, reuse of a token that HAS a rotated successor is treated as a
+ * benign race (fresh access JWT, no rotation) rather than theft.
+ */
+const REFRESH_GRACE_MS = 10_000;
 
 const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24h (D-10)
 /** Reset password token lifetime in milliseconds (1 hour, D-10) */
@@ -310,7 +318,8 @@ export async function login(
 
 export type RefreshResult = {
   accessToken: string;
-  refreshToken: string;
+  /** Undefined on the concurrent-refresh grace path — keep the existing refresh cookie. */
+  refreshToken?: string;
   userId: number;
 };
 
@@ -318,7 +327,11 @@ export type RefreshResult = {
  * Rotates a refresh token (RESEARCH Pattern 7 / D-11).
  *
  * - Looks up the hashed token; missing → 401
- * - Revoked token → revokes ALL tokens for the user (theft detection) → 401 refresh_reuse_detected
+ * - Revoked token WITH a rotated successor, reused within REFRESH_GRACE_MS →
+ *   benign concurrent refresh (middleware race): returns a fresh access JWT
+ *   with refreshToken undefined; no rotation, no chain-revoke
+ * - Revoked token otherwise → revokes ALL tokens for the user (theft detection)
+ *   → 401 refresh_reuse_detected
  * - Expired token → 401
  * - Valid token → revoke old row, insert new row (rotatedFrom = old id), sign new access JWT
  *
@@ -342,8 +355,23 @@ export async function refreshTokens(
     throw new HTTPException(401, { message: 'invalid_refresh_token' });
   }
 
-  // Reuse detection: already-revoked token signals theft — revoke all for user
+  // Reuse detection: already-revoked token usually signals theft. Exception:
+  // a token revoked by ROTATION (it has a successor) and reused within the
+  // grace window is a benign concurrent refresh — sign a fresh access JWT and
+  // keep the caller's refresh cookie untouched (we cannot return the
+  // successor's raw value; only its hash is stored).
   if (stored.revokedAt !== null) {
+    const successorRows = await db
+      .select()
+      .from(refreshTokensTable)
+      .where(eq(refreshTokensTable.rotatedFrom, stored.id));
+    const withinGrace = Date.now() - new Date(stored.revokedAt).getTime() < REFRESH_GRACE_MS;
+
+    if (successorRows.length > 0 && withinGrace) {
+      const accessToken = await signAccessToken(stored.userId, jwtAccessSecret);
+      return { accessToken, userId: stored.userId };
+    }
+
     await db
       .update(refreshTokensTable)
       .set({ revokedAt: new Date().toISOString() })

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/auth';
-import { apiFetch } from '@/server/api';
+import { apiFetch, ApiError } from '@/server/api';
 import { ExpensesOverview } from './_components/expenses-overview';
 
 interface ExpenseCategory {
@@ -52,19 +52,23 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   if (params.from) qs.set('from', params.from);
   if (params.to) qs.set('to', params.to);
 
-  const [expensesData, categoriesData] = await Promise.all([
-    apiFetch<PaginatedExpenses>(`/api/expenses?${qs.toString()}`),
-    apiFetch<{ data: ExpenseCategory[] }>('/api/expense-categories'),
-  ]);
+  let expensesData: PaginatedExpenses;
+  let categoriesData: { data: ExpenseCategory[] };
+  try {
+    [expensesData, categoriesData] = await Promise.all([
+      apiFetch<PaginatedExpenses>(`/api/expenses?${qs.toString()}`),
+      apiFetch<{ data: ExpenseCategory[] }>('/api/expense-categories'),
+    ]);
+  } catch (err) {
+    // A decodable-but-rejected token passes getSession but 401s at the API
+    // (expired session after a failed silent refresh). Send the user to
+    // login instead of crashing the page.
+    if (err instanceof ApiError && err.status === 401) redirect('/login');
+    throw err;
+  }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-[20px] font-semibold leading-tight">Expenses</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Record and manage your business expenses.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-3xl">
       <ExpensesOverview initialData={expensesData} categories={categoriesData.data} />
     </div>
   );

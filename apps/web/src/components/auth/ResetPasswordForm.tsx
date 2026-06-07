@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -62,47 +61,46 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Set a new password</CardTitle>
-        <CardDescription>Choose a strong password of at least 8 characters.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="reset-password">New password</Label>
-            <Input
-              id="reset-password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-            {fieldErrors.password ? (
-              <p className="text-sm text-destructive">{fieldErrors.password}</p>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="reset-confirm">Confirm new password</Label>
-            <Input
-              id="reset-confirm"
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-            />
-            {fieldErrors.confirm ? (
-              <p className="text-sm text-destructive">{fieldErrors.confirm}</p>
-            ) : null}
-          </div>
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Saving…' : 'Set new password'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <div className="w-full max-w-sm">
+      <h1 className="text-xl font-semibold tracking-tight">Set a new password</h1>
+      <p className="mt-1 text-sm text-ink-soft">
+        Choose a strong password of at least 8 characters.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5" noValidate>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="reset-password">New password</Label>
+          <Input
+            id="reset-password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+          />
+          {fieldErrors.password ? (
+            <p className="text-sm text-destructive">{fieldErrors.password}</p>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="reset-confirm">Confirm new password</Label>
+          <Input
+            id="reset-confirm"
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+          />
+          {fieldErrors.confirm ? (
+            <p className="text-sm text-destructive">{fieldErrors.confirm}</p>
+          ) : null}
+        </div>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? 'Saving…' : 'Set new password'}
+        </Button>
+      </form>
+    </div>
   );
 }

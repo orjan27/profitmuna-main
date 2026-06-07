@@ -87,21 +87,16 @@ export default async function ProfitFirstPage({
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Page header */}
-      <div>
-        <h1 className="text-[20px] font-semibold leading-tight">Profit First</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configure allocation percentages and track your income distribution.
-        </p>
-      </div>
+    <div className="mx-auto flex max-w-3xl flex-col gap-7">
+      {/* Page header — the hero number below carries the page, the title stays quiet */}
+      <h1 className="text-[20px] font-semibold leading-tight">Profit First</h1>
 
       {/* Filter bar — client component (nuqs hooks — Pitfall 5) */}
       <PfFilters categoryOptions={categoryOptions} />
 
       {/*
-       * PfContent: client component that owns amount-visibility state
-       * and renders AmountToggle + PfOverview with server-fetched data.
+       * PfContent: client component that owns amount-visibility state and
+       * renders hero total → allocation bar → ledger with server-fetched data.
        */}
       <PfContent accounts={accounts} totalIncome={totalIncome} />
     </div>

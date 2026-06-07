@@ -2,28 +2,32 @@
 
 @theme {
   /*
-   * Warm monochrome ramp. The surface is white, warm gray, near-black.
-   * Color means money: income/expense hues appear only on monetary
-   * amounts and allocation states, always paired with a sign or label.
+   * Warm dark-gray monochrome ramp — the standard surface for all pages.
+   * Page gray is oklch(0.268 0.004 100) = #262624; chrome/panels sit one
+   * step deeper, raised surfaces one step lighter. Color means money:
+   * income/expense hues appear only on monetary amounts and allocation
+   * states, always paired with a sign or label.
    * No pure #000 or #fff anywhere (The No Pure Extremes Rule).
    */
-  --color-paper: oklch(0.982 0.004 80);
-  --color-ink: oklch(0.21 0.007 75);
-  --color-ink-soft: oklch(0.45 0.006 75);
-  --color-ink-faint: oklch(0.52 0.006 75);
-  --color-hairline: oklch(0.9 0.004 80);
-  --color-raised: oklch(0.96 0.005 80);
+  --color-paper: oklch(0.268 0.004 100);
+  /* Deeper layer for shell chrome (sidebar/panels — Phase 5 dashboard shell) */
+  --color-paper-deep: oklch(0.237 0.004 90);
+  --color-ink: oklch(0.952 0.005 90);
+  --color-ink-soft: oklch(0.76 0.008 90);
+  --color-ink-faint: oklch(0.68 0.008 90);
+  --color-hairline: oklch(0.36 0.005 100);
+  --color-raised: oklch(0.315 0.005 100);
 
-  /* Semantic: money only */
-  --color-income: oklch(0.48 0.11 155);
-  --color-expense: oklch(0.51 0.14 27);
+  /* Semantic: money only — lifted for contrast on the dark surface */
+  --color-income: oklch(0.72 0.13 155);
+  --color-expense: oklch(0.68 0.18 25);
 
   /* shadcn/ui token mapping onto the monochrome ramp */
   --color-background: var(--color-paper);
   --color-foreground: var(--color-ink);
-  --color-card: oklch(0.99 0.003 85);
+  --color-card: oklch(0.3 0.005 100);
   --color-card-foreground: var(--color-ink);
-  --color-popover: oklch(0.99 0.003 85);
+  --color-popover: oklch(0.315 0.005 100);
   --color-popover-foreground: var(--color-ink);
   --color-primary: var(--color-ink);
   --color-primary-foreground: var(--color-paper);
@@ -36,7 +40,7 @@
   --color-destructive: var(--color-expense);
   --color-border: var(--color-hairline);
   --color-input: var(--color-hairline);
-  --color-ring: oklch(0.65 0.006 75);
+  --color-ring: oklch(0.55 0.006 90);
 
   --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
 
@@ -63,6 +67,11 @@
       transform: scaleX(1);
     }
   }
+}
+
+html {
+  /* Native controls (scrollbars, date pickers, selects) render dark */
+  color-scheme: dark;
 }
 
 body {

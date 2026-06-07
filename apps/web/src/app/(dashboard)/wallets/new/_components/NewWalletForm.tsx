@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { toast } from 'sonner';
 import { Check, ChevronsUpDown } from 'lucide-react';
 
@@ -52,6 +53,9 @@ interface NewWalletFormProps {
   incomeCategories: IncomeCategory[];
   expenseCategories: ExpenseCategory[];
   prefilledPfAccountId?: number;
+  /** D-06: categories already mapped to another wallet appear disabled in the pickers */
+  mappedIncomeCategoryIds: Set<number>;
+  mappedExpenseCategoryIds: Set<number>;
 }
 
 export function NewWalletForm({
@@ -60,16 +64,24 @@ export function NewWalletForm({
   incomeCategories,
   expenseCategories,
   prefilledPfAccountId,
+  mappedIncomeCategoryIds,
+  mappedExpenseCategoryIds,
 }: NewWalletFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
+  // Sentinel value for the "no allocation" (standalone) option — shadcn Select cannot hold an empty value
+  const STANDALONE = '__standalone__';
+
   // Form state
   const [name, setName] = useState('');
-  const [sourceType, setSourceType] = useState<'PROFIT_FIRST' | 'BLANK'>('BLANK');
-  const [pfAccountId, setPfAccountId] = useState<string | undefined>(
-    prefilledPfAccountId ? String(prefilledPfAccountId) : undefined
+  // Allocation account drives PF-ness: a chosen account = PF wallet, STANDALONE sentinel = standalone.
+  // D-04: a quick-create link arriving with ?pfAccountId pre-selects that account.
+  const [pfAccountId, setPfAccountId] = useState<string>(
+    prefilledPfAccountId ? String(prefilledPfAccountId) : STANDALONE
   );
+  // Non-sentinel selection means the wallet is funded by a Profit First allocation
+  const isPf = pfAccountId !== STANDALONE;
   const [color, setColor] = useState<string>(COLOR_SWATCHES[0]);
   const [selectedIncomeCategoryIds, setSelectedIncomeCategoryIds] = useState<number[]>([]);
   const [expenseMode, setExpenseMode] = useState<ExpenseMode>('NONE');
@@ -103,10 +115,6 @@ export function NewWalletForm({
       setFormError('Wallet Name is required.');
       return;
     }
-    if (sourceType === 'PROFIT_FIRST' && !pfAccountId) {
-      setFormError('Select a Profit First allocation account.');
-      return;
-    }
     if (expenseMode === 'CATEGORIES' && selectedExpenseCategoryIds.length === 0) {
       setFormError('Select at least one expense category.');
       return;
@@ -131,11 +139,9 @@ export function NewWalletForm({
     try {
       const result = await createWalletAction({
         name: name.trim(),
-        sourceType,
-        profitFirstAccountId: sourceType === 'PROFIT_FIRST' ? Number(pfAccountId) : null,
+        profitFirstAccountId: isPf ? Number(pfAccountId) : null,
         color,
-        incomeCategoryIds:
-          sourceType !== 'PROFIT_FIRST' ? selectedIncomeCategoryIds : undefined,
+        incomeCategoryIds: !isPf ? selectedIncomeCategoryIds : undefined,
         expenseMode: expenseModeInput,
       });
 
@@ -153,9 +159,11 @@ export function NewWalletForm({
           setFormError('Something went wrong. Please try again.');
         }
       }
-    } catch {
-      // redirect() throws — this is expected on success
-      toast.success('Wallet created.');
+    } catch (err) {
+      // redirect() throws a special error — re-throw so Next.js can handle the navigation
+      if (isRedirectError(err)) throw err;
+      // Real failures surface an error toast instead of a false success
+      toast.error('Could not create wallet. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -176,69 +184,47 @@ export function NewWalletForm({
         />
       </div>
 
-      {/* Wallet Type */}
+      {/* Allocation Account — optional; blank (Standalone) means no Profit First funding */}
       <div className="space-y-2">
-        <Label>Wallet Type</Label>
+        <Label>Allocation Account</Label>
         <Select
-          value={sourceType}
+          value={pfAccountId}
           onValueChange={(v) => {
-            setSourceType(v as 'PROFIT_FIRST' | 'BLANK');
-            setPfAccountId(undefined);
-            setSelectedIncomeCategoryIds([]);
+            setPfAccountId(v);
+            // Income-category mappings are not valid for PF-funded wallets (D-08) — clear on switch to PF
+            if (v !== STANDALONE) setSelectedIncomeCategoryIds([]);
           }}
           disabled={submitting}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Select wallet type" />
+            <SelectValue placeholder="Select allocation account" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="PROFIT_FIRST">
+            <SelectItem value={STANDALONE}>
               <div>
-                <div className="font-medium">Profit First</div>
-                <div className="text-muted-foreground text-xs">
-                  Funded by your Profit First allocation percentage.
-                </div>
-              </div>
-            </SelectItem>
-            <SelectItem value="BLANK">
-              <div>
-                <div className="font-medium">Standalone</div>
+                <div className="font-medium">Standalone (no allocation)</div>
                 <div className="text-muted-foreground text-xs">
                   Manually managed wallet with no automatic allocation.
                 </div>
               </div>
             </SelectItem>
+            {pfAccounts.map((account) => {
+              const isLinked = linkedPfAccountIds.has(account.id);
+              return (
+                <SelectItem
+                  key={account.id}
+                  value={String(account.id)}
+                  disabled={isLinked}
+                  className={cn(isLinked && 'cursor-not-allowed opacity-50')}
+                >
+                  {account.name}
+                  {isLinked && ' (already linked)'}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
-
-      {/* Allocation Account — shown only for PROFIT_FIRST */}
-      {sourceType === 'PROFIT_FIRST' && (
-        <div className="space-y-2">
-          <Label>Allocation Account</Label>
-          <Select value={pfAccountId} onValueChange={setPfAccountId} disabled={submitting}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select allocation account" />
-            </SelectTrigger>
-            <SelectContent>
-              {pfAccounts.map((account) => {
-                const isLinked = linkedPfAccountIds.has(account.id);
-                return (
-                  <SelectItem
-                    key={account.id}
-                    value={String(account.id)}
-                    disabled={isLinked}
-                    className={cn(isLinked && 'cursor-not-allowed opacity-50')}
-                  >
-                    {account.name}
-                    {isLinked && ' (already linked)'}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
 
       {/* Color Picker */}
       <div className="space-y-2">
@@ -263,8 +249,8 @@ export function NewWalletForm({
 
       <Separator />
 
-      {/* Income Categories — hidden for PROFIT_FIRST (D-08) */}
-      {sourceType !== 'PROFIT_FIRST' && (
+      {/* Income Categories — hidden for PF-funded wallets (D-08) */}
+      {!isPf && (
         <div className="space-y-2">
           <div>
             <p className="text-sm font-medium">Income Categories</p>
@@ -294,28 +280,39 @@ export function NewWalletForm({
                 <CommandList>
                   <CommandEmpty>No categories found.</CommandEmpty>
                   <CommandGroup>
-                    {incomeCategories.map((cat) => (
-                      <CommandItem
-                        key={cat.id}
-                        value={cat.name}
-                        onSelect={() => toggleIncomeCategory(cat.id)}
-                      >
-                        <Checkbox
-                          checked={selectedIncomeCategoryIds.includes(cat.id)}
-                          className="mr-2"
-                          onCheckedChange={() => toggleIncomeCategory(cat.id)}
-                        />
-                        {cat.name}
-                        <Check
-                          className={cn(
-                            'ml-auto h-4 w-4',
-                            selectedIncomeCategoryIds.includes(cat.id)
-                              ? 'opacity-100'
-                              : 'opacity-0'
+                    {incomeCategories.map((cat) => {
+                      // D-06: already mapped to another wallet — disabled, server enforces 409
+                      const isMapped = mappedIncomeCategoryIds.has(cat.id);
+                      return (
+                        <CommandItem
+                          key={cat.id}
+                          value={cat.name}
+                          disabled={isMapped}
+                          onSelect={() => toggleIncomeCategory(cat.id)}
+                        >
+                          <Checkbox
+                            checked={selectedIncomeCategoryIds.includes(cat.id)}
+                            disabled={isMapped}
+                            className="mr-2"
+                            onCheckedChange={() => toggleIncomeCategory(cat.id)}
+                          />
+                          {cat.name}
+                          {isMapped && (
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              (already mapped)
+                            </span>
                           )}
-                        />
-                      </CommandItem>
-                    ))}
+                          <Check
+                            className={cn(
+                              'ml-auto h-4 w-4',
+                              selectedIncomeCategoryIds.includes(cat.id)
+                                ? 'opacity-100'
+                                : 'opacity-0'
+                            )}
+                          />
+                        </CommandItem>
+                      );
+                    })}
                   </CommandGroup>
                 </CommandList>
               </Command>
@@ -374,28 +371,39 @@ export function NewWalletForm({
                   <CommandList>
                     <CommandEmpty>No categories found.</CommandEmpty>
                     <CommandGroup>
-                      {expenseCategories.map((cat) => (
-                        <CommandItem
-                          key={cat.id}
-                          value={cat.name}
-                          onSelect={() => toggleExpenseCategory(cat.id)}
-                        >
-                          <Checkbox
-                            checked={selectedExpenseCategoryIds.includes(cat.id)}
-                            className="mr-2"
-                            onCheckedChange={() => toggleExpenseCategory(cat.id)}
-                          />
-                          {cat.name}
-                          <Check
-                            className={cn(
-                              'ml-auto h-4 w-4',
-                              selectedExpenseCategoryIds.includes(cat.id)
-                                ? 'opacity-100'
-                                : 'opacity-0'
+                      {expenseCategories.map((cat) => {
+                        // D-06: already mapped to another wallet — disabled, server enforces 409
+                        const isMapped = mappedExpenseCategoryIds.has(cat.id);
+                        return (
+                          <CommandItem
+                            key={cat.id}
+                            value={cat.name}
+                            disabled={isMapped}
+                            onSelect={() => toggleExpenseCategory(cat.id)}
+                          >
+                            <Checkbox
+                              checked={selectedExpenseCategoryIds.includes(cat.id)}
+                              disabled={isMapped}
+                              className="mr-2"
+                              onCheckedChange={() => toggleExpenseCategory(cat.id)}
+                            />
+                            {cat.name}
+                            {isMapped && (
+                              <span className="text-muted-foreground ml-2 text-xs">
+                                (already mapped)
+                              </span>
                             )}
-                          />
-                        </CommandItem>
-                      ))}
+                            <Check
+                              className={cn(
+                                'ml-auto h-4 w-4',
+                                selectedExpenseCategoryIds.includes(cat.id)
+                                  ? 'opacity-100'
+                                  : 'opacity-0'
+                              )}
+                            />
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   </CommandList>
                 </Command>

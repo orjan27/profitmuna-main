@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 6 UI-SPEC approved
-last_updated: '2026-06-06T14:00:46.511Z'
+stopped_at: Phase 5 complete — verified 10/10 and merged to master
+last_updated: '2026-06-07T06:00:00.000Z'
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 23
-  completed_plans: 17
-  percent: 67
+  completed_phases: 5
+  total_plans: 28
+  completed_plans: 21
+  percent: 75
 ---
 
 # State: Profitmuna
@@ -25,18 +25,17 @@ progress:
 
 **Core value:** When income is recorded as received, it is automatically split across the user's Profit First allocation percentages — the user always knows exactly how much belongs to each bucket.
 
-**Current focus:** Phase 04 — wallets
+**Current focus:** Phase 06 — settings & notifications (next up)
 
 ---
 
 ## Current Position
 
-Phase: 04 (wallets) — COMPLETE
-Plan: 3 of 3
-**Phase:** 04
-**Plan:** Plan 03 complete — wallet detail page, manual transactions, soft-delete/restore, WAL-04/05
-**Status:** Ready to execute
-**Phase goal:** Users can create wallets with Profit First or standalone source types, configure income/expense mappings, and track money with computed balances
+Phase: 05 (dashboard) — COMPLETE (2026-06-07, re-verification 10/10, DASH-01 closed)
+**Phase:** 06 next
+**Plan:** Not started
+**Status:** Phase 05 complete and merged to master; Phase 06 UI-SPEC already approved
+**Phase 05 goal (met):** Users land on a summary page that surfaces the most important financial information without navigating to individual sections
 
 ```
 Progress: [██████████] Phase 1 (4/4 automated) — Auth
@@ -70,6 +69,7 @@ Progress: [██████████] Phase 1 (4/4 automated) — Auth
 | Phase 04 P01 | ~6 min active | 3 tasks | 10 files |
 | Phase 04 P02 | 12 | 4 tasks | 10 files |
 | Phase 04 P03 | 12 | 3 tasks | 7 files |
+| Phase 04 P04-04 | 15 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -110,16 +110,18 @@ None currently.
 
 ### Quick Tasks Completed
 
-| #          | Description                                                                                                               | Date       | Commit  | Directory                                                                                                           |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
-| 260606-tln | Shared navbar in (dashboard) shell; moved /income + /expenses into route group; ROADMAP Phase 5 nav-shell criterion added | 2026-06-06 | 14fb3e6 | [260606-tln-add-shared-navbar-to-authenticated-app-s](./quick/260606-tln-add-shared-navbar-to-authenticated-app-s/) |
+| #          | Description                                                                                                                                                                                   | Date       | Commit  | Directory                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| 260606-tln | Shared navbar in (dashboard) shell; moved /income + /expenses into route group; ROADMAP Phase 5 nav-shell criterion added                                                                     | 2026-06-06 | 14fb3e6 | [260606-tln-add-shared-navbar-to-authenticated-app-s](./quick/260606-tln-add-shared-navbar-to-authenticated-app-s/) |
+| 260607-hci | Removed redundant wallets.sourceType enum — profitFirstAccountId nullability is now the sole PF discriminator (DB migration 0004, API re-key, web type-picker → optional allocation selector) | 2026-06-07 | e3cea15 | [260607-hci-remove-wallet-sourcetype-enum](./quick/260607-hci-remove-wallet-sourcetype-enum/)                       |
+| 260607-iib | Fixed dark mode toggle floating mid-bar on mobile — pinned ThemeToggle wrapper to trailing grid track (`col-start-3`) in DashboardNav                                                         | 2026-06-07 | 23c491c | [260607-iib-fix-dark-mode-toggle-position-in-mobile-](./quick/260607-iib-fix-dark-mode-toggle-position-in-mobile-/) |
 
 ---
 
 ## Session Continuity
 
-**Stopped at:** Phase 6 UI-SPEC approved
-**Next:** Phase 04 Plan 02 — wallet CRUD service, server actions, wallet list UI
+**Stopped at:** Phase 5 complete — gap-closure plans 05-04/05-05/05-06 executed directly (user opted out of GSD executor), re-verified 10/10, merged to master
+**Next:** Phase 06 — settings & notifications (UI-SPEC already approved)
 
 **Phase 1 completed files (Plans 01-02):**
 
@@ -169,6 +171,10 @@ _State initialized: 2026-06-05_
 - [Phase 04-02]: GET /api/profit-first/summary used for PF accounts (no standalone GET /accounts endpoint); accounts in summary.data.accounts
 - [Phase 04-02]: Edit dropdown in WalletCard navigates to /wallets/{id} detail page (D-05); no separate /edit route created in Phase 4
 - [Phase 04-02]: setIncomeCategoryMappings/setExpenseMappings implemented in Task 1a factory alongside create/update; WAL-02 tests were green on first run (plan-authorized ordering)
-- [Phase ?]: [Phase 04-03]: assertCanInsertTransaction module-level, pure (no DB), runs before insert — double-count guard (T-04-12)
-- [Phase ?]: [Phase 04-03]: getById balance queries exclude deletedAt; history queries include deletedAt — Pitfall 4 distinct queries
-- [Phase ?]: [Phase 04-03]: WalletDetail blocking uses breakdown cents as conservative proxy; server enforces assertCanInsertTransaction regardless
+- [Phase 04-03]: assertCanInsertTransaction module-level, pure (no DB), runs before insert — double-count guard (T-04-12)
+- [Phase 04-03]: getById balance queries exclude deletedAt; history queries include deletedAt — Pitfall 4 distinct queries
+- [Phase 04-03]: WalletDetail blocking uses breakdown cents as conservative proxy; server enforces assertCanInsertTransaction regardless
+- [Phase 04-04]: Per-source COUNT(\*) queries are independent of fetchLimit window so totalPages is never understated by the windowed fetch cap
+- [Phase 04-04]: inArray replaces per-category for-loops for both income and expense history — eliminates N+1 queries and duplicate rows in autoDeductAllExpenses path
+- [Phase 04-04]: walletIdParamSchema + txIdParamSchema use z.coerce.number().int().positive() mirroring walletTransactionQuerySchema style; coerce handles string-typed path params from Hono
+- [Phase 04-04]: isRedirectError from next/dist/client/components/redirect-error is the stable Next.js 15 guard for distinguishing redirect throws from real errors in server action catch blocks

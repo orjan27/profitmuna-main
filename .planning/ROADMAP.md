@@ -13,7 +13,7 @@
 - [x] **Phase 2: Income & Expenses** - Users can record, browse, and manage income and expense entries with categories (completed 2026-06-06)
 - [x] **Phase 3: Profit First Allocation** - Users can configure allocation accounts and view derived balance summaries (completed 2026-06-06)
 - [x] **Phase 4: Wallets** - Users can create wallets, map categories, record transactions, and view computed balances (completed 2026-06-06)
-- [ ] **Phase 5: Dashboard** - Users land on a summary view showing totals, allocation balances, and recent transactions
+- [x] **Phase 5: Dashboard** - Users land on a summary view showing totals, allocation balances, and recent transactions (completed 2026-06-07; re-verification 10/10)
 - [ ] **Phase 6: Settings & Notifications** - Users can configure currency, set reminder schedules, and use the notification center
 
 ---
@@ -158,7 +158,7 @@ Plans:
 
 **Wave 3** _(gap closure — blocked on Wave 2 completion)_
 
-- [ ] 04-04-PLAN.md — Gap closure (SC-5): order + COUNT-back paginated history in getById, single inArray expense-history query (CR-01/CR-03/WR-02); co-fix CR-02 Zod param 422 validation + WR-04 NewWalletForm redirect-aware error toast; regression tests for >1-page failure mode (WAL-05)
+- [x] 04-04-PLAN.md — Gap closure (SC-5): order + COUNT-back paginated history in getById, single inArray expense-history query (CR-01/CR-03/WR-02); co-fix CR-02 Zod param 422 validation + WR-04 NewWalletForm redirect-aware error toast; regression tests for >1-page failure mode (WAL-05)
 
 **UI hint**: yes
 
@@ -174,18 +174,26 @@ Plans:
 2. User sees a list of recent transactions (income, expenses, wallet transactions) on the dashboard
 3. Dashboard data reflects the user's current financial state without requiring a manual refresh
 4. All authenticated pages (Dashboard, Income, Expenses, Profit First, Wallets) share a navigation shell with links to each section; a Settings link appears once Phase 6 ships
-   **Plans**: 3 plans
+   **Plans**: 3 gap-closure plans (original 05-01..05-03 never executed — superseded)
 
 Plans:
 
-**Wave 0** _(05-01 and 05-03 run in parallel — no file overlap)_
+**Original plans (never executed — superseded by the gap-closure set below)** _(A redesign session built `/overview` (commit d51c994), adopted as the Phase 5 base instead of executing these. Kept for provenance.)_
 
-- [ ] 05-01-PLAN.md — Dashboard data backend: failing test scaffold → createDashboardService (income CASE aggregate, period-scoped wallet balance, PF summary reuse, unified recent-transactions feed) → /api/dashboard/summary route behind requireAuth + index mount + web DashboardSummary types + BFF proxy (DASH-01)
-- [ ] 05-03-PLAN.md — Nav shell + landing: Dashboard nav entry → /dashboard, authenticated `/` redirects to /dashboard (marketing page preserved for logged-out) (DASH-01)
+- [~] 05-01-PLAN.md — Dashboard data backend (superseded by 05-04)
+- [~] 05-02-PLAN.md — Dashboard UI slice at /dashboard (superseded by 05-05, retargeted to the adopted /overview)
+- [~] 05-03-PLAN.md — Nav shell + landing → /dashboard (superseded by 05-06, retargeted to /overview; nav already points at /overview)
 
-**Wave 1** _(blocked on 05-01 completion)_
+**Gap closure** _(VERIFICATION 2026-06-06: 2/10 must-haves, 8 blockers. Build ON the adopted `/overview` design. Accepted deviations: route is `/overview`, nav label "Overview".)_
 
-- [ ] 05-02-PLAN.md — Dashboard UI slice: DashboardFilters (This Month default, Manila tz, nuqs) + DashboardContent (5 stat cards, read-only PF section, unified color-coded feed with client-side Load more, zeroed/getting-started empty state) + /dashboard RSC page (fresh SSR fetch) (DASH-01)
+**Wave 0** _(05-04 and 05-06 run in parallel — no file overlap)_
+
+- [x] 05-04-PLAN.md — Dashboard data backend (closes missing /api/dashboard endpoint, service, web types, BFF proxy, tests): RED dashboard.test.ts → createDashboardService (income CASE aggregate, period-scoped wallet balance, PF summary reuse, unified income+expense+wallet-tx feed) → /api/dashboard/summary behind requireAuth + index mount + web DashboardSummary/RecentTransaction types + BFF proxy (DASH-01)
+- [x] 05-06-PLAN.md — Root landing: authenticated `/` redirects to `/overview` via getSession() (marketing preserved for logged-out); middleware untouched (DASH-01)
+
+**Wave 1** _(blocked on 05-04 completion)_
+
+- [x] 05-05-PLAN.md — Overview UI gap closure (extends the adopted `/overview`, not a rewrite): overview-filters (This Month/Manila/nuqs date presets) + overview-content (income/pending/expense/net figures, per-account PF computedBalance, unified navigable feed incl. wallet deposits/withdrawals, client-side Load more, period-scoped wallet balance label) + overview/page.tsx rewired to the single summary endpoint (DASH-01)
 
 **UI hint**: yes
 
@@ -200,8 +208,24 @@ Plans:
 1. User can select their display currency and see all monetary values formatted in that currency throughout the app
 2. User can configure an income reminder schedule and have reminder emails delivered on that schedule via Workers cron + Resend
 3. User can open an in-app notification center, see unread notifications highlighted, and mark them as read
-   **Plans**: TBD
-   **UI hint**: yes
+   **Plans**: 4 plans
+
+Plans:
+
+**Wave 0**
+
+- [ ] 06-01-PLAN.md — Foundation: notifications table + users settings columns + incomes.pendingDueNotifiedAt [BLOCKING migration], test DDL sync, RED test scaffolds, currency-aware formatCurrency + shared web contract types (SET-01, SET-02, NOTIF-01, NOTIF-02 infra)
+
+**Wave 1** _(blocked on 06-01; 06-02 and 06-03 run in parallel — no file overlap)_
+
+- [ ] 06-02-PLAN.md — Settings slice: settings service/schema/router behind requireAuth, BFF proxy, SSR settings page + form (currency + Daily/Weekly/Monthly reminder schedule), CurrencyProvider wired into layout, Settings nav link (SET-01, SET-02)
+- [ ] 06-03-PLAN.md — Notification center slice: notification service (list/unread-count/markAsRead/markAllAsRead/create)/router behind requireAuth, BFF proxy, NotificationBell + NotificationList, bell wired into nav with SSR unread count (NOTIF-01)
+
+**Wave 2** _(blocked on 06-02 + 06-03 completion)_
+
+- [ ] 06-04-PLAN.md — Cron slice: dependency-free Manila-time helper + runCron (due-user reminders mirrored as INCOME_REMINDER, one-time PENDING_INCOME_DUE dedup), sendIncomeReminderEmail, Module Worker scheduled export + hourly cron trigger (NOTIF-02)
+
+  **UI hint**: yes
 
 ---
 
@@ -212,8 +236,8 @@ Plans:
 | 1. Authentication           | 4/4            | Complete    | 2026-06-06 |
 | 2. Income & Expenses        | 4/4            | Complete    | 2026-06-06 |
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
-| 4. Wallets                  | 3/3            | Complete    | 2026-06-06 |
-| 5. Dashboard                | 0/3            | Planned     | -          |
+| 4. Wallets                  | 4/4            | Complete    | 2026-06-06 |
+| 5. Dashboard                | 0/3            | Gap closure | -          |
 | 6. Settings & Notifications | 0/0            | Not started | -          |
 
 ---
@@ -259,3 +283,4 @@ Plans:
 ---
 
 _Roadmap created: 2026-06-05_
+</content>

@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased">
         <TooltipProvider>
           <NuqsAdapter>{children}</NuqsAdapter>
-          <Toaster richColors />
+          <Toaster richColors theme="dark" />
         </TooltipProvider>
       </body>
     </html>

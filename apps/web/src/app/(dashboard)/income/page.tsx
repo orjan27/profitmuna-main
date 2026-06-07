@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/auth';
-import { apiFetch } from '@/server/api';
+import { apiFetch, ApiError } from '@/server/api';
 import type { IncomeListResponse, IncomeCategoryListResponse } from '@/types/income';
 import { IncomeOverview } from './_components/income-overview';
 
@@ -30,14 +30,24 @@ export default async function IncomePage({ searchParams }: Props) {
     ...(params.to ? { to: params.to } : {}),
   }).toString();
 
-  const [incomeData, categoriesData] = await Promise.all([
-    apiFetch<IncomeListResponse>(`/api/incomes?${qs}`),
-    apiFetch<IncomeCategoryListResponse>('/api/income-categories'),
-  ]);
+  let incomeData: IncomeListResponse;
+  let categoriesData: IncomeCategoryListResponse;
+  try {
+    [incomeData, categoriesData] = await Promise.all([
+      apiFetch<IncomeListResponse>(`/api/incomes?${qs}`),
+      apiFetch<IncomeCategoryListResponse>('/api/income-categories'),
+    ]);
+  } catch (err) {
+    // A decodable-but-rejected token passes getSession but 401s at the API
+    // (expired session after a failed silent refresh). Send the user to
+    // login instead of crashing the page.
+    if (err instanceof ApiError && err.status === 401) redirect('/login');
+    throw err;
+  }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
+    <div className="mx-auto w-full max-w-3xl">
       <IncomeOverview initialData={incomeData.data} categories={categoriesData.data} />
-    </main>
+    </div>
   );
 }

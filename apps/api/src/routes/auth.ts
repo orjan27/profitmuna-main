@@ -131,13 +131,17 @@ authRouter.post('/refresh', async (c) => {
     path: '/',
     maxAge: 1800,
   });
-  setCookie(c, 'refresh_token', result.refreshToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: 604800,
-  });
+  // Undefined on the concurrent-refresh grace path — keep the existing
+  // refresh cookie (the winning rotation already set the new one).
+  if (result.refreshToken !== undefined) {
+    setCookie(c, 'refresh_token', result.refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 604800,
+    });
+  }
   return c.json({ data: { userId: result.userId } });
 });
 

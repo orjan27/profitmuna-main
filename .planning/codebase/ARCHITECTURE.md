@@ -1,4 +1,5 @@
 <!-- refreshed: 2026-06-05 -->
+
 # Architecture
 
 **Analysis Date:** 2026-06-05
@@ -31,19 +32,20 @@
 
 ## Component Responsibilities
 
-| Component | Responsibility | File |
-|-----------|----------------|------|
-| Web Frontend | Server-side rendering, page routing, UI components, client state | `apps/web/src/app/` |
-| Web Utils | Shared utilities (class merging, formatters) | `apps/web/src/lib/` |
-| API Server | HTTP routing, request validation, CORS, business logic, auth, DB queries | `apps/api/src/index.ts` |
-| DB Schema | Table definitions, type exports, Drizzle config | `packages/db/src/schema.ts` |
-| DB Client | Query builder factory, Drizzle instance creation | `packages/db/src/index.ts` |
+| Component    | Responsibility                                                           | File                        |
+| ------------ | ------------------------------------------------------------------------ | --------------------------- |
+| Web Frontend | Server-side rendering, page routing, UI components, client state         | `apps/web/src/app/`         |
+| Web Utils    | Shared utilities (class merging, formatters)                             | `apps/web/src/lib/`         |
+| API Server   | HTTP routing, request validation, CORS, business logic, auth, DB queries | `apps/api/src/index.ts`     |
+| DB Schema    | Table definitions, type exports, Drizzle config                          | `packages/db/src/schema.ts` |
+| DB Client    | Query builder factory, Drizzle instance creation                         | `packages/db/src/index.ts`  |
 
 ## Pattern Overview
 
 **Overall:** Monorepo-based separation of concerns with a three-tier architecture — frontend, API edge layer, and database.
 
 **Key Characteristics:**
+
 - **Monorepo**: Turbo workspace management (`pnpm`) with three independent applications sharing a database package
 - **API-driven**: Frontend talks exclusively to the Hono API; direct DB access only in `apps/api`
 - **Edge-first**: API runs on Cloudflare Workers (not a traditional Node.js server)
@@ -53,6 +55,7 @@
 ## Layers
 
 **Client Layer (Next.js):**
+
 - Purpose: Server-side rendered React UI, routing, dynamic page generation
 - Location: `apps/web/`
 - Contains: Page routes (`app/`), components, utilities, server actions (future)
@@ -61,6 +64,7 @@
 - Entry point: `apps/web/src/app/layout.tsx` (root layout) → `apps/web/src/app/page.tsx` (home page)
 
 **API Layer (Hono on Cloudflare Workers):**
+
 - Purpose: HTTP request handling, request validation, business logic, database access orchestration
 - Location: `apps/api/src/`
 - Contains: Route handlers, middleware, services (when added), validation schemas
@@ -70,6 +74,7 @@
 - Runtime: Cloudflare Workers edge network (configured in `wrangler.toml`)
 
 **Data Layer (Drizzle ORM + Cloudflare D1):**
+
 - Purpose: Database schema definition, query abstraction, type safety
 - Location: `packages/db/src/`
 - Contains: Schema tables (`schema.ts`), Drizzle factory (`index.ts`), future query helpers (`queries/`)
@@ -99,6 +104,7 @@
 9. Client receives JSON response
 
 **State Management:**
+
 - Frontend: React component state (via `useState` hooks, no global state yet)
 - Backend: Stateless HTTP handlers; all state in D1 database
 - Session: Not yet implemented (future JWT auth via `jose` package visible in dependencies)
@@ -106,18 +112,21 @@
 ## Key Abstractions
 
 **Database Factory (`createDb`):**
+
 - Purpose: Isolates Drizzle client initialization from route handlers
 - Location: `packages/db/src/index.ts`
 - Pattern: Factory function accepting `D1Database` binding, returns typed Drizzle instance
 - Usage: `const db = createDb(c.env.DB)` in API route handlers (when needed)
 
 **Schema Exports:**
+
 - Purpose: Type-safe table and column references across API
 - Location: `packages/db/src/schema.ts`
 - Pattern: Named exports for each table (e.g., `export const users = sqliteTable(...)`)
 - Usage: `import { users } from '@app/db/schema'` in queries
 
 **Zod Validation (Future):**
+
 - Purpose: Request/response validation at route boundary
 - Location: `apps/api/src/schemas/` (to be created)
 - Pattern: Separate schema file per resource (e.g., `users.ts`, `allocations.ts`)
@@ -126,21 +135,25 @@
 ## Entry Points
 
 **Web Frontend Entry:**
+
 - Location: `apps/web/src/app/layout.tsx`
 - Triggers: Browser request to `/` or any route under `apps/web/src/app/`
 - Responsibilities: Apply root layout, set metadata, render child pages
 
 **Web Home Page:**
+
 - Location: `apps/web/src/app/page.tsx`
 - Triggers: Browser request to `/`
 - Responsibilities: Render home page UI (currently a placeholder)
 
 **API Entry:**
+
 - Location: `apps/api/src/index.ts`
 - Triggers: HTTP request to any `/` or `/api/*` endpoint
 - Responsibilities: Initialize Hono app, attach middleware (CORS), register routes, export default app for Cloudflare Workers
 
 **Database Entry:**
+
 - Location: `packages/db/src/index.ts`
 - Triggers: API layer calls `createDb(d1Binding)` when handling a request
 - Responsibilities: Instantiate Drizzle client with schema, export schema definitions
@@ -161,8 +174,9 @@
 
 **Why it's wrong:** Breaks the API boundary. Frontend should only communicate via the Hono API; direct DB access violates separation of concerns and makes auth/validation harder.
 
-**Do this instead:** 
-- Keep DB imports only in `apps/api/src/` 
+**Do this instead:**
+
+- Keep DB imports only in `apps/api/src/`
 - Fetch from Next.js to Hono via `fetch('http://localhost:8793/api/...')` (dev) or `fetch('https://api.example.com/api/...')` (prod)
 - Let the API layer handle validation and persistence
 
@@ -173,6 +187,7 @@
 **Why it's wrong:** As the app grows, `index.ts` becomes unmaintainable. Hard to test, hard to reuse logic, hard to add new endpoints.
 
 **Do this instead:**
+
 - Create `apps/api/src/routes/` directory with resource-based files (e.g., `users.ts`, `allocations.ts`)
 - Move business logic to `apps/api/src/services/` (e.g., `userService.ts`)
 - Routes stay thin: validate → call service → return response
@@ -183,6 +198,7 @@
 **Strategy:** Structured responses with HTTP status codes.
 
 **Patterns:**
+
 - Validation errors: `422 Unprocessable Entity` with details (future: via Zod middleware)
 - Auth errors: `401 Unauthorized` (future: when auth is added)
 - Permission errors: `403 Forbidden` (future: when authorization is added)
@@ -194,7 +210,8 @@
 
 **Logging:** Not yet centralized. Currently uses browser `console` on frontend and Cloudflare Workers logs on API. Future: structured logging with context (correlation IDs, user IDs).
 
-**Validation:** 
+**Validation:**
+
 - Frontend: React form validation (future: client-side Zod)
 - API: Zod schemas in route handlers or middleware (future: `apps/api/src/schemas/`)
 
@@ -204,4 +221,4 @@
 
 ---
 
-*Architecture analysis: 2026-06-05*
+_Architecture analysis: 2026-06-05_

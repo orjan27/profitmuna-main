@@ -1,14 +1,12 @@
 // types/ is runtime-free — only type definitions (CLAUDE.md: types/ for shared TypeScript types)
 // Use interface for extensible shapes; type for unions/aliases
 
-export type WalletSourceType = 'PROFIT_FIRST' | 'BLANK';
 export type WalletTransactionType = 'DEPOSIT' | 'WITHDRAWAL';
 export type ProfitFirstAccountType = 'PROFIT' | 'OWNERS_PAY' | 'TAX' | 'OPEX' | 'CUSTOM';
 
 export interface WalletListItem {
   id: number;
   name: string;
-  sourceType: WalletSourceType;
   color: string;
   sortOrder: number;
   /** Derived balance in cents — never stored */
@@ -18,6 +16,12 @@ export interface WalletListItem {
   transactionCount: number;
   /** Count of income + expense category mappings (for delete impact dialog) */
   mappingCount: number;
+  /** Income category ids mapped to this wallet (D-06: disable in pickers elsewhere) */
+  incomeCategoryIds: number[];
+  /** Expense category ids mapped to this wallet (D-06: disable in pickers elsewhere) */
+  expenseCategoryIds: number[];
+  /** When true, ALL user expenses auto-deduct from this wallet (3-mode selector, D-07) */
+  autoDeductAllExpenses: boolean;
 }
 
 export interface WalletTransaction {
@@ -49,7 +53,6 @@ export interface WalletDetailResponse {
 
 export interface CreateWalletInput {
   name: string;
-  sourceType: WalletSourceType;
   profitFirstAccountId?: number | null;
   color?: string;
   sortOrder?: number;

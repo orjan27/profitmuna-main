@@ -2,68 +2,83 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, TrendingUp, TrendingDown, PieChart, Wallet } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { BrandMark } from '@/components/BrandMark';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface NavItem {
   readonly label: string;
   readonly href: string;
-  readonly icon: LucideIcon;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { label: 'Income', href: '/income', icon: TrendingUp },
-  { label: 'Expenses', href: '/expenses', icon: TrendingDown },
-  { label: 'Profit First', href: '/profit-first', icon: PieChart },
-  { label: 'Wallets', href: '/wallets', icon: Wallet },
+  { label: 'Overview', href: '/overview' },
+  { label: 'Income', href: '/income' },
+  { label: 'Expenses', href: '/expenses' },
+  { label: 'Profit First', href: '/profit-first' },
+  { label: 'Wallets', href: '/wallets' },
 ] as const;
 
 /**
- * Shared navigation bar for all authenticated pages.
+ * Shared top bar for all authenticated pages. At md+ it carries the brand
+ * lockup and five quiet text links; on mobile the links hide and this becomes
+ * a slim brand bar — navigation moves to BottomNav. Active state is carried
+ * by ink color and weight, not pills or icons — the chrome stays out of the
+ * money's way.
  *
- * Renders a horizontal nav with five links: Dashboard, Income, Expenses,
- * Profit First, and Wallets. The link matching the current pathname is
- * highlighted as active.
+ * Record actions live in page content (one labeled primary per page; the
+ * mobile RecordFab on record pages), not in the chrome — one primary action
+ * per view.
  *
- * Must be a Client Component because it uses `usePathname` for active-state
- * detection. The parent (dashboard) layout stays a Server Component and
- * renders this component at the top of every authenticated page.
+ * Client Component: usePathname for active state. Sits on the deeper chrome
+ * gray (paper-deep) so the content surface reads as the page.
  */
 export function DashboardNav(): React.JSX.Element {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <ul className="flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
-          {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-            const isActive =
-              href === '/'
-                ? pathname === '/'
-                : pathname === href || pathname.startsWith(href + '/');
+    <header className="sticky top-0 z-10 border-b border-hairline bg-paper-deep/90 backdrop-blur">
+      {/* Three-zone grid: brand | centered links | theme toggle.
+          Equal 1fr side columns keep the menu truly centered in the bar. */}
+      <div className="mx-auto grid h-14 w-full max-w-6xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-4 md:px-8">
+        <Link
+          href="/overview"
+          aria-label="Profitmuna overview"
+          className="shrink-0 justify-self-start"
+        >
+          <BrandMark markClassName="h-8" />
+        </Link>
 
-            return (
-              <li key={href} className="flex-shrink-0">
-                <Link
-                  href={href}
-                  className={cn(
-                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-                  )}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  <span>{label}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        {/* md+: BottomNav owns primary navigation on mobile. */}
+        <nav className="min-w-0 max-md:hidden" aria-label="Primary">
+          <ul className="-mx-2 flex items-center gap-0.5 overflow-x-auto px-2">
+            {NAV_ITEMS.map(({ label, href }) => {
+              const isActive = pathname === href || pathname.startsWith(href + '/');
+              return (
+                <li key={href} className="shrink-0">
+                  <Link
+                    href={href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={cn(
+                      'block rounded-md px-2.5 py-2 text-sm whitespace-nowrap transition-colors',
+                      isActive
+                        ? 'font-medium text-ink'
+                        : 'text-ink-faint hover:text-ink-soft focus-visible:text-ink-soft'
+                    )}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        <div className="col-start-3 justify-self-end">
+          <ThemeToggle />
+        </div>
       </div>
-    </nav>
+    </header>
   );
 }

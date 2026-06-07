@@ -27,6 +27,9 @@ interface ExpenseCategory {
 
 interface ManageCategoriesDialogProps {
   categories: ExpenseCategory[];
+  /** Controlled mode: when provided, the internal trigger button is not rendered. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -34,9 +37,19 @@ interface ManageCategoriesDialogProps {
  * - System categories: displayed with "(default)" label, edit/delete controls disabled.
  * - Custom categories: inline rename, delete (blocked if in use via category_in_use error).
  * - Add new custom category via text input at the bottom.
+ *
+ * Supports controlled open state so it can be launched from a menu item
+ * (the page header's overflow menu) instead of its own trigger button.
  */
-export function ManageCategoriesDialog({ categories }: ManageCategoriesDialogProps) {
-  const [open, setOpen] = useState(false);
+export function ManageCategoriesDialog({
+  categories,
+  open: controlledOpen,
+  onOpenChange,
+}: ManageCategoriesDialogProps) {
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? (onOpenChange ?? (() => undefined)) : setInternalOpen;
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -111,11 +124,13 @@ export function ManageCategoriesDialog({ categories }: ManageCategoriesDialogPro
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          Manage categories
-        </Button>
-      </DialogTrigger>
+      {isControlled ? null : (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            Manage categories
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Manage Expense Categories</DialogTitle>
