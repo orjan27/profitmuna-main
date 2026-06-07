@@ -26,7 +26,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { formatCurrency, toCents } from '@/lib/format-currency';
+import { toCents } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { todayLocal } from '@/lib/format-date';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import {
@@ -197,6 +198,7 @@ interface SplitPreviewProps {
  * share so the rows always sum to the entered amount.
  */
 function SplitPreview({ accounts, amountCents, pending }: SplitPreviewProps): React.JSX.Element {
+  const formatCurrency = useFormatCurrency();
   const rows = useMemo(() => {
     const computed = accounts.map((a) => ({
       ...a,
@@ -260,6 +262,7 @@ interface EntryFormProps {
 }
 
 function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
+  const formatCurrency = useFormatCurrency();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -432,6 +435,7 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 // ── Expense entry ─────────────────────────────────────────────────────────────
 
 function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
+  const formatCurrency = useFormatCurrency();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 

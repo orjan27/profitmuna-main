@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/server/auth';
 import { apiFetch } from '@/server/api';
 import { formatCurrency } from '@/lib/format-currency';
+import type { CurrencyCode } from '@/lib/format-currency';
+import type { UserSettings } from '@/types/settings';
 import { Button } from '@/components/ui/button';
 import { WalletFab } from '@/components/WalletFab';
 import type { WalletListItem, PfAccount } from '@/types/wallet';
@@ -22,6 +24,15 @@ type PfSummaryResponse = {
 export default async function WalletsPage() {
   const session = await getSession();
   if (!session) redirect('/login');
+
+  // Fetch display currency setting (falls back to PHP if unavailable — Server Component)
+  let displayCurrency: CurrencyCode = 'PHP';
+  try {
+    const { data: settings } = await apiFetch<{ data: UserSettings }>('/api/settings');
+    displayCurrency = settings.displayCurrency;
+  } catch {
+    // Fall back to PHP default
+  }
 
   // Fetch wallet list and PF accounts in parallel
   const [walletsRes, pfSummaryRes] = await Promise.all([
@@ -54,7 +65,7 @@ export default async function WalletsPage() {
               {/* Same display scale as the Overview hero — money reads at one
                   size across pages */}
               <p className="mt-3 text-[34px] leading-none font-semibold tracking-tight tabular-nums">
-                {formatCurrency(totalBalanceCents)}
+                {formatCurrency(totalBalanceCents, displayCurrency)}
               </p>
               <p className="mt-1.5 text-sm text-ink-faint">
                 across {wallets.length} wallet{wallets.length !== 1 ? 's' : ''}

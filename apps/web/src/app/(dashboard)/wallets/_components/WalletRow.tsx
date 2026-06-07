@@ -7,7 +7,7 @@ import { MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { sourceLabel } from '@/lib/wallet-labels';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +41,7 @@ interface WalletRowProps {
  * minus sign formatCurrency already includes (D-13).
  */
 export function WalletRow({ wallet }: WalletRowProps) {
+  const formatCurrency = useFormatCurrency();
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [isPending, startTransition] = useTransition();

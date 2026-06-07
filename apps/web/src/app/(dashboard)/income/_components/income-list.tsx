@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { Income } from '@/types/income';
-import { formatCurrency } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { formatDateGroup } from '@/lib/format-date';
 import { Button } from '@/components/ui/button';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
@@ -46,6 +46,7 @@ function groupByDate(items: Income[]): DateGroup[] {
  */
 export function IncomeList({ items, filtered, onEditRow, onReceiveRow }: IncomeListProps) {
   const { openRecordSheet } = useRecordSheet();
+  const formatCurrency = useFormatCurrency();
 
   if (items.length === 0) {
     // Filtered-empty is not first-run: the records exist, the filters hide

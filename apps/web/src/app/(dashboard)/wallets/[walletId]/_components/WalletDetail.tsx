@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { formatCurrency, toCents } from '@/lib/format-currency';
+import { toCents } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { formatDate } from '@/lib/format-date';
 import { sourceLabel } from '@/lib/wallet-labels';
 import { Badge } from '@/components/ui/badge';
@@ -250,6 +251,7 @@ interface DeleteTxDialogProps {
 }
 
 function DeleteTxDialog({ tx, walletId, onClose }: DeleteTxDialogProps) {
+  const formatCurrency = useFormatCurrency();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -310,6 +312,7 @@ export function WalletDetail({
   otherWalletHasAutoDeductAll,
   initialEditOpen,
 }: WalletDetailProps) {
+  const formatCurrency = useFormatCurrency();
   const router = useRouter();
   const { wallet, breakdown, transactions, pagination } = detail;
 

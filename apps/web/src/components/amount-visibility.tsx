@@ -5,7 +5,7 @@ import { Eye, EyeOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { formatCurrency } from '@/lib/format-currency';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 
 const STORAGE_KEY = 'pf-amounts-visible';
 
@@ -87,6 +87,7 @@ interface MaskedAmountProps {
  * The `mounted` flag ensures client hydration matches the server render.
  */
 export function MaskedAmount({ cents, visible, mounted, className }: MaskedAmountProps) {
+  const formatCurrency = useFormatCurrency();
   // mounted && visible is the hydration-safe guard — SSR always renders masked
   const shouldShow = mounted && visible;
 
