@@ -4,6 +4,8 @@ export type EmailService = {
   sendVerificationEmail(to: string, verifyUrl: string): Promise<void>;
   sendWelcomeEmail(to: string, name: string): Promise<void>;
   sendPasswordResetEmail(to: string, resetUrl: string): Promise<void>;
+  /** Phase 6: D-04 — simple income-reminder nudge with a link to the income page. */
+  sendIncomeReminderEmail(to: string, name: string, incomePageUrl: string): Promise<void>;
 };
 
 /**
@@ -46,6 +48,26 @@ export function createEmailService(apiKey: string, fromEmail: string): EmailServ
         html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour. If you didn't request this, you can ignore this email.</p>`,
       });
       if (error) console.error('sendPasswordResetEmail failed:', { to, error });
+    },
+
+    /**
+     * Sends a simple income-logging nudge to the user (D-04).
+     * Short plain-HTML message with the user's name + link to the income page.
+     * No aggregate stats — just a reminder to record income (locked by CONTEXT.md D-04).
+     *
+     * @param to           Recipient email address
+     * @param name         User's display name
+     * @param incomePageUrl  Full URL to the income page (from env.APP_BASE_URL + /income)
+     */
+    async sendIncomeReminderEmail(to: string, name: string, incomePageUrl: string): Promise<void> {
+      const { error } = await resend.emails.send({
+        from,
+        to,
+        subject: 'Profitmuna: Time to log your income',
+        html: `<p>Hi ${name}, don&apos;t forget to log any income you received. <a href="${incomePageUrl}">Go to income page</a></p>`,
+      });
+      // Log without PII body (security.md: no PII bodies in logs)
+      if (error) console.error('sendIncomeReminderEmail failed:', { to, error });
     },
   };
 }
