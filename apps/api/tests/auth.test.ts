@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 
 import { schema } from '@app/db';
 
-import app from '../src/index';
+import { app } from '../src/index';
 import { requireAuth } from '@/middleware/auth';
 import type { Bindings, Variables } from '@/types';
 import { hashPassword, verifyPassword } from '@/lib/password';
