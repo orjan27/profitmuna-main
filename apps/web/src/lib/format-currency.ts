@@ -1,24 +1,53 @@
 /**
- * Format an integer cent amount as a Philippine Peso display string.
- * Phase 6 currency swap point: change locale/prefix here to support other currencies.
+ * Currency locale and symbol mapping for the 8 supported ISO 4217 codes.
+ * JPY uses 0 fraction digits (whole yen); all others use 2.
  *
- * @param cents - Amount in integer cents (e.g. 10000 = ₱100.00)
- * @returns Formatted currency string (e.g. "₱100.00")
+ * @see SET-01 — user-selectable display currency
  */
-export function formatCurrency(cents: number): string {
-  return `₱${(cents / 100).toLocaleString('en-PH', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+export const CURRENCY_LOCALES = {
+  PHP: { locale: 'en-PH', symbol: '₱' },
+  USD: { locale: 'en-US', symbol: '$' },
+  EUR: { locale: 'de-DE', symbol: '€' },
+  GBP: { locale: 'en-GB', symbol: '£' },
+  SGD: { locale: 'en-SG', symbol: 'S$' },
+  AUD: { locale: 'en-AU', symbol: 'A$' },
+  JPY: { locale: 'ja-JP', symbol: '¥' },
+  CAD: { locale: 'en-CA', symbol: 'C$' },
+} as const satisfies Record<string, { locale: string; symbol: string }>;
+
+/** Union of supported ISO 4217 currency codes (SET-01). */
+export type CurrencyCode = keyof typeof CURRENCY_LOCALES;
+
+/**
+ * Format an integer cent amount as a currency display string.
+ *
+ * The second param defaults to 'PHP' so all existing call sites continue to
+ * produce identical ₱-prefixed output — no call-site rework required (D-14).
+ *
+ * JPY is a zero-decimal currency — formatCurrency(10000, 'JPY') = '¥100'.
+ * All other currencies use 2 decimal places.
+ *
+ * @param cents - Amount in integer cents (e.g. 10000 = 100.00 in the currency unit)
+ * @param currency - ISO 4217 code from the supported list (default: 'PHP')
+ * @returns Formatted currency string (e.g. "₱100.00", "$100.00", "¥100")
+ */
+export function formatCurrency(cents: number, currency: CurrencyCode = 'PHP'): string {
+  const { locale, symbol } = CURRENCY_LOCALES[currency];
+  // JPY is a zero-decimal currency; fraction digits = 0.
+  const fractionDigits = currency === 'JPY' ? 0 : 2;
+  return `${symbol}${(cents / 100).toLocaleString(locale, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   })}`;
 }
 
 /**
- * Convert a decimal peso input to integer cents for storage.
+ * Convert a decimal amount input to integer cents for storage.
  * Uses Math.round to avoid floating-point precision issues (D-08).
  *
- * @param pesos - Decimal peso amount from a form input (e.g. 100.50)
+ * @param amount - Decimal amount from a form input (e.g. 100.50)
  * @returns Integer cents (e.g. 10050)
  */
-export function toCents(pesos: number): number {
-  return Math.round(pesos * 100);
+export function toCents(amount: number): number {
+  return Math.round(amount * 100);
 }
