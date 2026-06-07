@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { apiFetch, ApiError } from '@/server/api';
 import type {
   CreateWalletInput,
+  UpdateWalletInput,
   CreateTransactionInput,
   UpdateTransactionInput,
 } from '@/types/wallet';
@@ -27,6 +28,28 @@ export async function createWalletAction(input: CreateWalletInput) {
   }
   revalidatePath('/wallets');
   redirect('/wallets');
+}
+
+/**
+ * Updates a wallet's mutable fields (name, color, mappings, expense mode).
+ * On success: revalidates /wallets and the wallet detail page.
+ * On ApiError: returns { error: code } for the form to surface.
+ */
+export async function updateWalletAction(
+  walletId: number,
+  input: UpdateWalletInput
+): Promise<{ error: string } | undefined> {
+  try {
+    await apiFetch(`/api/wallets/${walletId}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.code };
+    return { error: 'unknown' };
+  }
+  revalidatePath('/wallets');
+  revalidatePath(`/wallets/${walletId}`);
 }
 
 /**

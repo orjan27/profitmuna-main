@@ -101,9 +101,9 @@ export function WalletRow({ wallet }: WalletRowProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {/* Edit navigates to detail page (D-05: inline edit; no separate /edit route) */}
+          {/* Edit opens the inline edit dialog on the detail page (D-05: no separate /edit route) */}
           <DropdownMenuItem asChild>
-            <Link href={`/wallets/${wallet.id}`}>Edit</Link>
+            <Link href={`/wallets/${wallet.id}?edit=1`}>Edit</Link>
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-destructive focus:text-destructive"

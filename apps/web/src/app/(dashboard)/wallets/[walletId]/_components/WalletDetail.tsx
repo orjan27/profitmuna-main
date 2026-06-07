@@ -40,7 +40,13 @@ import {
   restoreTransactionAction,
   deleteWalletAction,
 } from '../../_actions/wallet-actions';
-import type { WalletDetailResponse, WalletTransaction } from '@/types/wallet';
+import { EditWalletDialog } from './EditWalletDialog';
+import type {
+  WalletDetailResponse,
+  WalletTransaction,
+  IncomeCategory,
+  ExpenseCategory,
+} from '@/types/wallet';
 
 // ── Copywriting Contract ──────────────────────────────────────────────────────
 const BLOCKING_COPY = {
@@ -81,6 +87,14 @@ function todayIso(): string {
 
 interface WalletDetailProps {
   detail: WalletDetailResponse;
+  incomeCategories: IncomeCategory[];
+  expenseCategories: ExpenseCategory[];
+  /** D-06: category ids already mapped to a DIFFERENT wallet */
+  mappedIncomeCategoryIds: Set<number>;
+  mappedExpenseCategoryIds: Set<number>;
+  otherWalletHasAutoDeductAll: boolean;
+  /** When true (via ?edit=1), the edit dialog opens on first render */
+  initialEditOpen: boolean;
 }
 
 // ── Add/Edit Transaction Dialog ───────────────────────────────────────────────
@@ -287,7 +301,15 @@ function DeleteTxDialog({ tx, walletId, onClose }: DeleteTxDialogProps) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function WalletDetail({ detail }: WalletDetailProps) {
+export function WalletDetail({
+  detail,
+  incomeCategories,
+  expenseCategories,
+  mappedIncomeCategoryIds,
+  mappedExpenseCategoryIds,
+  otherWalletHasAutoDeductAll,
+  initialEditOpen,
+}: WalletDetailProps) {
   const router = useRouter();
   const { wallet, breakdown, transactions, pagination } = detail;
 
@@ -305,6 +327,9 @@ export function WalletDetail({ detail }: WalletDetailProps) {
   >(null);
   const [editTx, setEditTx] = useState<WalletTransaction | null>(null);
   const [deleteTx, setDeleteTx] = useState<WalletTransaction | null>(null);
+
+  // Edit wallet dialog state — ?edit=1 (from the list's Edit action) opens it on load
+  const [editWalletOpen, setEditWalletOpen] = useState(initialEditOpen);
 
   // Delete wallet dialog state
   const [deleteWalletOpen, setDeleteWalletOpen] = useState(false);
@@ -364,7 +389,11 @@ export function WalletDetail({ detail }: WalletDetailProps) {
           <Badge variant="secondary">{sourceLabel(wallet.sourceType)}</Badge>
         </div>
         <div className="flex items-center gap-2">
-          {/* No /edit route in Phase 4 — wallet editing ships in a later phase (D-05) */}
+          {/* D-05: inline edit on the detail page — no separate /edit route */}
+          <Button variant="outline" size="sm" onClick={() => setEditWalletOpen(true)}>
+            <Pencil className="h-3.5 w-3.5 mr-1" />
+            Edit
+          </Button>
           <Button variant="destructive" size="sm" onClick={() => setDeleteWalletOpen(true)}>
             Delete
           </Button>
@@ -602,6 +631,20 @@ export function WalletDetail({ detail }: WalletDetailProps) {
 
       {/* Delete Transaction Dialog */}
       <DeleteTxDialog tx={deleteTx} walletId={wallet.id} onClose={() => setDeleteTx(null)} />
+
+      {/* Edit Wallet Dialog — mounted only while open so state prefills fresh each time */}
+      {editWalletOpen && (
+        <EditWalletDialog
+          open={editWalletOpen}
+          onClose={() => setEditWalletOpen(false)}
+          wallet={wallet}
+          incomeCategories={incomeCategories}
+          expenseCategories={expenseCategories}
+          mappedIncomeCategoryIds={mappedIncomeCategoryIds}
+          mappedExpenseCategoryIds={mappedExpenseCategoryIds}
+          otherWalletHasAutoDeductAll={otherWalletHasAutoDeductAll}
+        />
+      )}
 
       {/* Delete Wallet Dialog */}
       <Dialog open={deleteWalletOpen} onOpenChange={setDeleteWalletOpen}>
