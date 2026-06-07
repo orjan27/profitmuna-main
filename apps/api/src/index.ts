@@ -12,6 +12,7 @@ import { expenseCategoriesRouter } from '@/routes/expense-categories';
 import { profitFirstRouter } from '@/routes/profit-first';
 import { walletsRouter } from '@/routes/wallets';
 import { dashboardRouter } from '@/routes/dashboard';
+import { settingsRouter } from '@/routes/settings';
 import type { Bindings, Variables } from '@/types';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -78,5 +79,8 @@ app.route('/api/wallets', walletsRouter);
 
 // Dashboard routes — auth guard applied inside dashboardRouter via .use('/*', requireAuth) (T-05-01)
 app.route('/api/dashboard', dashboardRouter);
+
+// Settings routes — auth guard applied inside settingsRouter via .use('/*', requireAuth) (T-6-03)
+app.route('/api/settings', settingsRouter);
 
 export default app;
