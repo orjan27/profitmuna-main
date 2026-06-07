@@ -14,7 +14,7 @@
 - [x] **Phase 3: Profit First Allocation** - Users can configure allocation accounts and view derived balance summaries (completed 2026-06-06)
 - [x] **Phase 4: Wallets** - Users can create wallets, map categories, record transactions, and view computed balances (completed 2026-06-06)
 - [x] **Phase 5: Dashboard** - Users land on a summary view showing totals, allocation balances, and recent transactions (completed 2026-06-07; re-verification 10/10)
-- [ ] **Phase 6: Settings & Notifications** - Users can configure currency, set reminder schedules, and use the notification center
+- [x] **Phase 6: Settings & Notifications** - Users can configure currency, set reminder schedules, and use the notification center (completed 2026-06-07)
 
 ---
 
@@ -223,7 +223,7 @@ Plans:
 
 **Wave 2** _(blocked on 06-02 + 06-03 completion)_
 
-- [ ] 06-04-PLAN.md — Cron slice: dependency-free Manila-time helper + runCron (due-user reminders mirrored as INCOME_REMINDER, one-time PENDING_INCOME_DUE dedup), sendIncomeReminderEmail, Module Worker scheduled export + hourly cron trigger (NOTIF-02)
+- [x] 06-04-PLAN.md — Cron slice: dependency-free Manila-time helper + runCron (due-user reminders mirrored as INCOME_REMINDER, one-time PENDING_INCOME_DUE dedup), sendIncomeReminderEmail, Module Worker scheduled export + hourly cron trigger (NOTIF-02)
 
   **UI hint**: yes
 
@@ -238,7 +238,7 @@ Plans:
 | 3. Profit First Allocation  | 6/6            | Complete    | 2026-06-06 |
 | 4. Wallets                  | 4/4            | Complete    | 2026-06-06 |
 | 5. Dashboard                | 0/3            | Gap closure | -          |
-| 6. Settings & Notifications | 3/4 | In Progress|  |
+| 6. Settings & Notifications | 4/4 | Complete   | 2026-06-07 |
 
 ---
 
