@@ -48,7 +48,7 @@ interface StatFigure {
   label: string;
   subLabel: string;
   cents: number;
-  /** Apply the negative tone when the value dips below zero (Net Income) */
+  /** Apply the negative tone when the value dips below zero (Savings) */
   negativeAware?: boolean;
 }
 
@@ -183,7 +183,7 @@ export function OverviewContent({
       cents: summary?.totalExpensesCents ?? 0,
     },
     {
-      label: 'Net Income',
+      label: 'Savings',
       subLabel: 'Income minus expenses',
       cents: netIncomeCents,
       negativeAware: true,
