@@ -111,9 +111,10 @@ None currently.
 
 ### Quick Tasks Completed
 
-| #          | Description                                                                                                               | Date       | Commit  | Directory                                                                                                           |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
-| 260606-tln | Shared navbar in (dashboard) shell; moved /income + /expenses into route group; ROADMAP Phase 5 nav-shell criterion added | 2026-06-06 | 14fb3e6 | [260606-tln-add-shared-navbar-to-authenticated-app-s](./quick/260606-tln-add-shared-navbar-to-authenticated-app-s/) |
+| #          | Description                                                                                                                                                                                   | Date       | Commit  | Directory                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| 260606-tln | Shared navbar in (dashboard) shell; moved /income + /expenses into route group; ROADMAP Phase 5 nav-shell criterion added                                                                     | 2026-06-06 | 14fb3e6 | [260606-tln-add-shared-navbar-to-authenticated-app-s](./quick/260606-tln-add-shared-navbar-to-authenticated-app-s/) |
+| 260607-hci | Removed redundant wallets.sourceType enum — profitFirstAccountId nullability is now the sole PF discriminator (DB migration 0004, API re-key, web type-picker → optional allocation selector) | 2026-06-07 | e3cea15 | [260607-hci-remove-wallet-sourcetype-enum](./quick/260607-hci-remove-wallet-sourcetype-enum/)                       |
 
 ---
 
