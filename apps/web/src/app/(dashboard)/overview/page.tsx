@@ -3,33 +3,9 @@ import { TZDate } from '@date-fns/tz';
 
 import { getSession } from '@/server/auth';
 import { apiFetch } from '@/server/api';
-import type { Income, IncomeListResponse } from '@/types/income';
-import type { WalletListItem } from '@/types/wallet';
-import type { PfAccount } from '@/app/(dashboard)/profit-first/_components/pf-overview';
-import { OverviewContent, type RecentEntry } from './_components/overview-content';
-
-// ── API response shapes ───────────────────────────────────────────────────────
-
-interface SummaryResponse {
-  data: {
-    totalIncome: number;
-    accounts: PfAccount[];
-  };
-}
-
-interface ExpenseItem {
-  id: number;
-  categoryName: string;
-  amount: number;
-  description: string | null;
-  expenseDate: string;
-  deletedAt: string | null;
-}
-
-/** /api/expenses returns the page object directly — no { data } envelope. */
-interface PaginatedExpenses {
-  content: ExpenseItem[];
-}
+import type { DashboardSummary } from '@/types/dashboard';
+import { OverviewContent } from './_components/overview-content';
+import { ALL_TIME_SENTINEL, getDefaultOverviewRange } from './_components/overview-filters';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -48,66 +24,50 @@ function greetingForNow(): string {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 /**
- * The signed-in home: total balance across wallets in display scale, the
- * allocation split at a glance, and recent money movement — the app's promise
- * on one screen. Each fetch degrades independently so one failing endpoint
- * never blanks the whole page.
+ * The signed-in home: period-scoped wallet balance, income/expense/net
+ * figures, the allocation split with per-account balances, and a unified
+ * recent-transactions feed — all from one summary endpoint (DASH-01).
+ *
+ * The date filter lives in the URL (?from/?to, nuqs in the client component —
+ * Pitfall 2: no nuqs here). Empty URL applies the This Month Manila default
+ * (D-08); ?from=all marks an explicit All Time choice.
  */
-export default async function OverviewPage() {
+export default async function OverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string }>;
+}) {
   const session = await getSession();
   if (!session) redirect('/login');
 
-  const [walletsRes, summaryRes, incomesRes, expensesRes] = await Promise.all([
-    apiFetch<{ data: WalletListItem[] }>('/api/wallets').catch(() => ({
-      data: [] as WalletListItem[],
-    })),
-    apiFetch<SummaryResponse>('/api/profit-first/summary').catch(() => ({
-      data: { totalIncome: 0, accounts: [] as PfAccount[] },
-    })),
-    apiFetch<IncomeListResponse>('/api/incomes?page=0&limit=6').catch(() => ({
-      data: { content: [] as Income[], page: 0, last: true },
-    })),
-    apiFetch<PaginatedExpenses>('/api/expenses?page=0&limit=6').catch(() => ({
-      content: [] as ExpenseItem[],
-    })),
-  ]);
+  const params = await searchParams;
+  const hasUrlFilter = Boolean(params.from || params.to);
+  const allTime = params.from === ALL_TIME_SENTINEL;
+  const defaults = getDefaultOverviewRange();
+  const from = allTime ? undefined : (params.from ?? defaults.from);
+  const to = allTime ? undefined : (params.to ?? defaults.to);
 
-  const wallets = walletsRes.data ?? [];
-  const accounts = summaryRes.data?.accounts ?? [];
-  const totalIncome = summaryRes.data?.totalIncome ?? 0;
-  const totalBalanceCents = wallets.reduce((sum, w) => sum + w.balanceCents, 0);
+  const query = new URLSearchParams();
+  if (from) query.set('from', from);
+  if (to) query.set('to', to);
 
-  const recent: RecentEntry[] = [
-    ...(incomesRes.data?.content ?? []).map((income) => ({
-      id: `income-${income.id}`,
-      kind: 'income' as const,
-      label: income.categoryName,
-      date: income.incomeDate,
-      amountCents: income.amount,
-      pending: income.moneyStatus === 'PENDING',
-    })),
-    ...(expensesRes.content ?? [])
-      .filter((expense) => expense.deletedAt === null)
-      .map((expense) => ({
-        id: `expense-${expense.id}`,
-        kind: 'expense' as const,
-        label: expense.categoryName,
-        date: expense.expenseDate,
-        amountCents: expense.amount,
-      })),
-  ]
-    // ISO YYYY-MM-DD sorts correctly as a string
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 8);
+  // One aggregate call replaces the old four-endpoint fan-out. On failure the
+  // content renders zeroed figures rather than blanking the page (D-12).
+  const summary = await apiFetch<{ data: DashboardSummary }>(
+    `/api/dashboard/summary?${query.toString()}`
+  )
+    .then((res) => res.data)
+    .catch(() => null);
 
   return (
     <OverviewContent
+      // Re-key per period so the client feed state resets on filter change
+      key={`${from ?? 'all'}-${to ?? 'all'}`}
       greeting={greetingForNow()}
-      totalBalanceCents={totalBalanceCents}
-      hasWallets={wallets.length > 0}
-      accounts={accounts}
-      totalIncomeCents={totalIncome}
-      recent={recent}
+      summary={summary}
+      from={from}
+      to={to}
+      hasUrlFilter={hasUrlFilter}
     />
   );
 }
