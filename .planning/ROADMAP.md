@@ -13,7 +13,7 @@
 - [x] **Phase 2: Income & Expenses** - Users can record, browse, and manage income and expense entries with categories (completed 2026-06-06)
 - [x] **Phase 3: Profit First Allocation** - Users can configure allocation accounts and view derived balance summaries (completed 2026-06-06)
 - [x] **Phase 4: Wallets** - Users can create wallets, map categories, record transactions, and view computed balances (completed 2026-06-06)
-- [ ] **Phase 5: Dashboard** - Users land on a summary view showing totals, allocation balances, and recent transactions
+- [x] **Phase 5: Dashboard** - Users land on a summary view showing totals, allocation balances, and recent transactions (completed 2026-06-07; re-verification 10/10)
 - [ ] **Phase 6: Settings & Notifications** - Users can configure currency, set reminder schedules, and use the notification center
 
 ---
@@ -188,12 +188,12 @@ Plans:
 
 **Wave 0** _(05-04 and 05-06 run in parallel — no file overlap)_
 
-- [ ] 05-04-PLAN.md — Dashboard data backend (closes missing /api/dashboard endpoint, service, web types, BFF proxy, tests): RED dashboard.test.ts → createDashboardService (income CASE aggregate, period-scoped wallet balance, PF summary reuse, unified income+expense+wallet-tx feed) → /api/dashboard/summary behind requireAuth + index mount + web DashboardSummary/RecentTransaction types + BFF proxy (DASH-01)
-- [ ] 05-06-PLAN.md — Root landing: authenticated `/` redirects to `/overview` via getSession() (marketing preserved for logged-out); middleware untouched (DASH-01)
+- [x] 05-04-PLAN.md — Dashboard data backend (closes missing /api/dashboard endpoint, service, web types, BFF proxy, tests): RED dashboard.test.ts → createDashboardService (income CASE aggregate, period-scoped wallet balance, PF summary reuse, unified income+expense+wallet-tx feed) → /api/dashboard/summary behind requireAuth + index mount + web DashboardSummary/RecentTransaction types + BFF proxy (DASH-01)
+- [x] 05-06-PLAN.md — Root landing: authenticated `/` redirects to `/overview` via getSession() (marketing preserved for logged-out); middleware untouched (DASH-01)
 
 **Wave 1** _(blocked on 05-04 completion)_
 
-- [ ] 05-05-PLAN.md — Overview UI gap closure (extends the adopted `/overview`, not a rewrite): overview-filters (This Month/Manila/nuqs date presets) + overview-content (income/pending/expense/net figures, per-account PF computedBalance, unified navigable feed incl. wallet deposits/withdrawals, client-side Load more, period-scoped wallet balance label) + overview/page.tsx rewired to the single summary endpoint (DASH-01)
+- [x] 05-05-PLAN.md — Overview UI gap closure (extends the adopted `/overview`, not a rewrite): overview-filters (This Month/Manila/nuqs date presets) + overview-content (income/pending/expense/net figures, per-account PF computedBalance, unified navigable feed incl. wallet deposits/withdrawals, client-side Load more, period-scoped wallet balance label) + overview/page.tsx rewired to the single summary endpoint (DASH-01)
 
 **UI hint**: yes
 

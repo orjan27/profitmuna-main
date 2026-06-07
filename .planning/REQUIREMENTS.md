@@ -60,7 +60,7 @@ Requirements for initial release. Each maps to roadmap phases. Finance behavior 
 
 ### Dashboard
 
-- [ ] **DASH-01**: User lands on a dashboard showing income/expense totals, Profit First balances, and recent transactions
+- [x] **DASH-01**: User lands on a dashboard showing income/expense totals, Profit First balances, and recent transactions
 
 ## v2 Requirements
 
@@ -110,7 +110,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WAL-03      | Phase 4 | Complete |
 | WAL-04      | Phase 4 | Complete |
 | WAL-05      | Phase 4 | Complete |
-| DASH-01     | Phase 5 | Pending  |
+| DASH-01     | Phase 5 | Complete |
 | SET-01      | Phase 6 | Pending  |
 | SET-02      | Phase 6 | Pending  |
 | NOTIF-01    | Phase 6 | Pending  |
