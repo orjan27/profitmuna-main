@@ -115,6 +115,7 @@ None currently.
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
 | 260606-tln | Shared navbar in (dashboard) shell; moved /income + /expenses into route group; ROADMAP Phase 5 nav-shell criterion added                                                                     | 2026-06-06 | 14fb3e6 | [260606-tln-add-shared-navbar-to-authenticated-app-s](./quick/260606-tln-add-shared-navbar-to-authenticated-app-s/) |
 | 260607-hci | Removed redundant wallets.sourceType enum — profitFirstAccountId nullability is now the sole PF discriminator (DB migration 0004, API re-key, web type-picker → optional allocation selector) | 2026-06-07 | e3cea15 | [260607-hci-remove-wallet-sourcetype-enum](./quick/260607-hci-remove-wallet-sourcetype-enum/)                       |
+| 260607-iib | Fixed dark mode toggle floating mid-bar on mobile — pinned ThemeToggle wrapper to trailing grid track (`col-start-3`) in DashboardNav                                                         | 2026-06-07 | 23c491c | [260607-iib-fix-dark-mode-toggle-position-in-mobile-](./quick/260607-iib-fix-dark-mode-toggle-position-in-mobile-/) |
 
 ---
 
