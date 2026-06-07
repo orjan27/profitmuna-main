@@ -109,7 +109,7 @@ function seedExpense(
 
 describe('wallets service', () => {
   describe('WAL-01: wallet CRUD', () => {
-    it('creates a PROFIT_FIRST wallet linked to a PF account', async () => {
+    it('creates a PF-linked wallet linked to a PF account', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal01a@test.com', name: 'User A', emailVerified: true });
       const pfAccount = seedPfAccount(db, user.id);
@@ -117,30 +117,26 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Profit Wallet',
-        sourceType: 'PROFIT_FIRST',
         profitFirstAccountId: pfAccount.id,
         color: '#10b981',
       });
 
       expect(wallet.name).toBe('Profit Wallet');
-      expect(wallet.sourceType).toBe('PROFIT_FIRST');
       expect(wallet.profitFirstAccountId).toBe(pfAccount.id);
       expect(wallet.userId).toBe(user.id);
     });
 
-    it('creates a BLANK (standalone) wallet without a PF account link', async () => {
+    it('creates a standalone wallet without a PF account link', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal01b@test.com', name: 'User B', emailVerified: true });
 
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Blank Wallet',
-        sourceType: 'BLANK',
         color: '#8b5cf6',
       });
 
       expect(wallet.name).toBe('Blank Wallet');
-      expect(wallet.sourceType).toBe('BLANK');
       expect(wallet.profitFirstAccountId).toBeNull();
     });
 
@@ -152,7 +148,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       await svc.create(user.id, {
         name: 'First Wallet',
-        sourceType: 'PROFIT_FIRST',
         profitFirstAccountId: pfAccount.id,
         color: '#10b981',
       });
@@ -160,7 +155,6 @@ describe('wallets service', () => {
       await expect(
         svc.create(user.id, {
           name: 'Second Wallet',
-          sourceType: 'PROFIT_FIRST',
           profitFirstAccountId: pfAccount.id,
           color: '#8b5cf6',
         })
@@ -172,8 +166,8 @@ describe('wallets service', () => {
       const user = seedUser(db, { email: 'wal01d@test.com', name: 'User D', emailVerified: true });
 
       const svc = createWalletService(dbD1);
-      await svc.create(user.id, { name: 'W1', sourceType: 'BLANK', color: '#10b981' });
-      await svc.create(user.id, { name: 'W2', sourceType: 'BLANK', color: '#8b5cf6' });
+      await svc.create(user.id, { name: 'W1', color: '#10b981' });
+      await svc.create(user.id, { name: 'W2', color: '#8b5cf6' });
 
       const wallets = await svc.list(user.id);
       expect(wallets).toHaveLength(2);
@@ -189,7 +183,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Old Name',
-        sourceType: 'BLANK',
         color: '#10b981',
       });
 
@@ -211,7 +204,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'To Delete',
-        sourceType: 'BLANK',
         color: '#10b981',
       });
 
@@ -237,7 +229,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       await svc.create(user.id, {
         name: 'Mapped Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
         incomeCategoryIds: [incCat.id],
       });
@@ -259,7 +250,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       await svc.create(user.id, {
         name: 'First Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
         incomeCategoryIds: [incCat.id],
       });
@@ -267,7 +257,6 @@ describe('wallets service', () => {
       await expect(
         svc.create(user.id, {
           name: 'Second Wallet',
-          sourceType: 'BLANK',
           color: '#8b5cf6',
           incomeCategoryIds: [incCat.id],
         })
@@ -282,7 +271,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Expense Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
         expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
       });
@@ -312,7 +300,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       await svc.create(user.id, {
         name: 'First Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
         expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
       });
@@ -320,7 +307,6 @@ describe('wallets service', () => {
       await expect(
         svc.create(user.id, {
           name: 'Second Wallet',
-          sourceType: 'BLANK',
           color: '#8b5cf6',
           expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
         })
@@ -336,7 +322,6 @@ describe('wallets service', () => {
       // Create with CATEGORIES first
       const wallet = await svc.create(user.id, {
         name: 'All Expenses Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
         expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
       });
@@ -369,7 +354,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Clear Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
         expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
       });
@@ -402,7 +386,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Replace Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
         incomeCategoryIds: [cat1.id],
       });
@@ -429,7 +412,6 @@ describe('wallets service', () => {
       // First wallet gets ALL
       await svc.create(user.id, {
         name: 'Auto Deduct All',
-        sourceType: 'BLANK',
         color: '#10b981',
         expenseMode: { kind: 'ALL' },
       });
@@ -438,7 +420,6 @@ describe('wallets service', () => {
       await expect(
         svc.create(user.id, {
           name: 'Second Wallet',
-          sourceType: 'BLANK',
           color: '#8b5cf6',
           expenseMode: { kind: 'ALL' },
         })
@@ -464,7 +445,6 @@ describe('wallets service', () => {
       await expect(
         svc.create(user1.id, {
           name: 'Bad Wallet',
-          sourceType: 'BLANK',
           color: '#10b981',
           incomeCategoryIds: [cat.id],
         })
@@ -489,14 +469,13 @@ describe('wallets service', () => {
       await expect(
         svc.create(user1.id, {
           name: 'Bad Wallet',
-          sourceType: 'BLANK',
           color: '#10b981',
           expenseMode: { kind: 'CATEGORIES', ids: [cat.id] },
         })
       ).rejects.toMatchObject({ status: 403 });
     });
 
-    it('PROFIT_FIRST wallet does not apply income mappings (D-08)', async () => {
+    it('PF-linked wallet does not apply income mappings (D-08)', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal02k@test.com', name: 'User K', emailVerified: true });
       const pfAccount = seedPfAccount(db, user.id);
@@ -505,7 +484,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        sourceType: 'PROFIT_FIRST',
         profitFirstAccountId: pfAccount.id,
         color: '#10b981',
         incomeCategoryIds: [incCat.id], // should be ignored for PF wallets
@@ -541,7 +519,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        sourceType: 'PROFIT_FIRST',
         profitFirstAccountId: pfAccount.id,
         color: '#10b981',
         expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
@@ -566,7 +543,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Negative',
-        sourceType: 'BLANK',
         color: '#f43f5e',
         expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
       });
@@ -579,7 +555,7 @@ describe('wallets service', () => {
       expect(listed.balanceCents).toBeLessThan(0);
     });
 
-    it('pfAllocation is basis-point ratio of total RECEIVED income for PROFIT_FIRST wallet', async () => {
+    it('pfAllocation is basis-point ratio of total RECEIVED income for PF-linked wallet', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal03c@test.com', name: 'User C', emailVerified: true });
 
@@ -594,7 +570,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        sourceType: 'PROFIT_FIRST',
         profitFirstAccountId: pfAccount.id,
         color: '#10b981',
       });
@@ -616,7 +591,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Blank',
-        sourceType: 'BLANK',
         color: '#8b5cf6',
       });
 
@@ -633,19 +607,16 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const w3 = await svc.create(user.id, {
         name: 'W3',
-        sourceType: 'BLANK',
         color: '#10b981',
         sortOrder: 10,
       });
       const w1 = await svc.create(user.id, {
         name: 'W1',
-        sourceType: 'BLANK',
         color: '#8b5cf6',
         sortOrder: 0,
       });
       const w2 = await svc.create(user.id, {
         name: 'W2',
-        sourceType: 'BLANK',
         color: '#f59e0b',
         sortOrder: 5,
       });
@@ -664,7 +635,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'W',
-        sourceType: 'BLANK',
         color: '#10b981',
       });
 
@@ -699,7 +669,7 @@ describe('wallets service', () => {
   // ─── WAL-04: manual transaction guard ────────────────────────────────────
 
   describe('WAL-04: manual transaction guard (assertCanInsertTransaction)', () => {
-    it('blocks manual DEPOSIT on a PROFIT_FIRST wallet (manual_deposit_blocked_pf_wallet)', async () => {
+    it('blocks manual DEPOSIT on a PF-linked wallet (manual_deposit_blocked_pf_wallet)', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal04a@test.com', name: 'User A', emailVerified: true });
       const pfAccount = seedPfAccount(db, user.id);
@@ -707,7 +677,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        sourceType: 'PROFIT_FIRST',
         profitFirstAccountId: pfAccount.id,
         color: '#10b981',
       });
@@ -729,7 +698,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Mapped Wallet',
-        sourceType: 'BLANK',
         color: '#8b5cf6',
         incomeCategoryIds: [incCat.id],
       });
@@ -751,7 +719,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Expense Wallet',
-        sourceType: 'BLANK',
         color: '#f59e0b',
         expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
       });
@@ -772,7 +739,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Auto All Wallet',
-        sourceType: 'BLANK',
         color: '#f43f5e',
         expenseMode: { kind: 'ALL' },
       });
@@ -786,7 +752,7 @@ describe('wallets service', () => {
       ).rejects.toMatchObject({ status: 400, message: 'manual_withdrawal_blocked_expense_mapped' });
     });
 
-    it('allows manual WITHDRAWAL on a PROFIT_FIRST wallet with no expense mappings', async () => {
+    it('allows manual WITHDRAWAL on a PF-linked wallet with no expense mappings', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal04e@test.com', name: 'User E', emailVerified: true });
       const pfAccount = seedPfAccount(db, user.id);
@@ -794,7 +760,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Withdrawal Wallet',
-        sourceType: 'PROFIT_FIRST',
         profitFirstAccountId: pfAccount.id,
         color: '#10b981',
       });
@@ -818,7 +783,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Blank Wallet',
-        sourceType: 'BLANK',
         color: '#3b82f6',
       });
 
@@ -857,7 +821,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
       });
 
@@ -881,7 +844,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Wallet',
-        sourceType: 'BLANK',
         color: '#8b5cf6',
       });
 
@@ -903,7 +865,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Wallet',
-        sourceType: 'BLANK',
         color: '#f59e0b',
       });
 
@@ -929,7 +890,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Wallet',
-        sourceType: 'BLANK',
         color: '#f43f5e',
       });
 
@@ -965,7 +925,6 @@ describe('wallets service', () => {
       // BLANK wallet with income + expense mappings to auto-include them in history
       const wallet = await svc.create(user.id, {
         name: 'Full Wallet',
-        sourceType: 'BLANK',
         color: '#14b8a6',
         incomeCategoryIds: [incCat.id],
         expenseMode: { kind: 'CATEGORIES', ids: [expCat.id] },
@@ -1024,7 +983,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user1.id, {
         name: 'Private Wallet',
-        sourceType: 'BLANK',
         color: '#10b981',
       });
 
@@ -1046,7 +1004,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Volume Wallet',
-        sourceType: 'BLANK',
         color: '#6366f1',
         incomeCategoryIds: [incCat.id],
       });
@@ -1123,7 +1080,6 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Auto Expense Wallet',
-        sourceType: 'BLANK',
         color: '#f97316',
         expenseMode: { kind: 'ALL' },
       });

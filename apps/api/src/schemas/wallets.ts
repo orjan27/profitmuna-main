@@ -8,10 +8,10 @@ export const expenseModeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('CATEGORIES'), ids: z.array(z.number().int().positive()).min(1) }),
 ]);
 
-// Base object without refine — needed so .partial() works on update (Zod v4 disallows .partial() on refined schemas)
+// Base object — .partial() works on update since it is unrefined (Zod v4 disallows .partial() on refined schemas)
 const walletBaseSchema = z.object({
   name: z.string().min(1).max(80),
-  sourceType: z.enum(['PROFIT_FIRST', 'BLANK']),
+  // Non-null = PF wallet (auto-funded by its allocation); omitted/null = standalone. Sole PF discriminator.
   profitFirstAccountId: z.number().int().positive().optional().nullable(),
   color: z
     .string()
@@ -22,15 +22,7 @@ const walletBaseSchema = z.object({
   expenseMode: expenseModeSchema.optional(),
 });
 
-export const createWalletSchema = walletBaseSchema.refine(
-  (d) =>
-    d.sourceType !== 'PROFIT_FIRST' ||
-    (d.profitFirstAccountId !== undefined && d.profitFirstAccountId !== null),
-  {
-    message: 'profitFirstAccountId is required when sourceType is PROFIT_FIRST',
-    path: ['profitFirstAccountId'],
-  }
-);
+export const createWalletSchema = walletBaseSchema;
 
 // Update schema: all fields optional; no PF-account refine needed (partial edits are valid)
 export const updateWalletSchema = walletBaseSchema.partial();

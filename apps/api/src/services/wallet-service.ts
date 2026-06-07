@@ -49,7 +49,7 @@ function computeBalanceCents({
 
 /**
  * Blocking guard: prevents manual transactions that would double-count automatically sourced money.
- * DEPOSIT blocked when wallet is PROFIT_FIRST or has income category mappings.
+ * DEPOSIT blocked when wallet is PF-linked or has income category mappings.
  * WITHDRAWAL blocked when wallet has expense mappings or autoDeductAllExpenses=true.
  * Port of RESEARCH Pattern 3 verbatim.
  */
@@ -245,16 +245,16 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
   /**
    * Sets income category mappings for a wallet atomically (clear-and-replace).
    * Validates category ownership and cross-wallet conflicts before writing.
-   * Skips entirely if the wallet is PROFIT_FIRST (D-08).
+   * Skips entirely if the wallet is PF-linked (D-08).
    */
   async function setIncomeCategoryMappings(
     walletId: number,
     userId: number,
-    sourceType: string,
+    profitFirstAccountId: number | null,
     ids: number[]
   ): Promise<void> {
-    // D-08: PF wallets skip income-category mapping
-    if (sourceType === 'PROFIT_FIRST') return;
+    // D-08: PF-linked wallets skip income-category mapping
+    if (profitFirstAccountId != null) return;
     if (ids.length === 0) {
       // Just clear existing mappings
       await db
@@ -458,9 +458,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           activeCount: 0,
         };
 
-        // pfAllocation: only for PROFIT_FIRST wallets
+        // pfAllocation: only for PF-linked wallets
         let pfAllocation = 0;
-        if (wallet.sourceType === 'PROFIT_FIRST' && wallet.profitFirstAccountId != null) {
+        if (wallet.profitFirstAccountId != null) {
           const pfAccount = pfAccountMap.get(wallet.profitFirstAccountId);
           if (pfAccount) {
             pfAllocation = Math.round((totalReceivedIncome * pfAccount.targetPercentage) / 10000);
@@ -515,7 +515,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
      */
     async create(userId: number, input: CreateWalletInput) {
       // Validate PF link uniqueness (WAL-01)
-      if (input.sourceType === 'PROFIT_FIRST' && input.profitFirstAccountId != null) {
+      if (input.profitFirstAccountId != null) {
         const alreadyLinked = await hasWalletForPfAccount(userId, input.profitFirstAccountId);
         if (alreadyLinked) {
           throw new HTTPException(409, { message: 'wallet_pf_account_already_linked' });
@@ -537,7 +537,6 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         .values({
           userId,
           name: input.name,
-          sourceType: input.sourceType,
           profitFirstAccountId: input.profitFirstAccountId ?? null,
           color: input.color ?? '#10b981',
           sortOrder,
@@ -550,7 +549,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         await setIncomeCategoryMappings(
           created.id,
           userId,
-          created.sourceType,
+          created.profitFirstAccountId,
           input.incomeCategoryIds
         );
       }
@@ -596,7 +595,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         await setIncomeCategoryMappings(
           walletId,
           userId,
-          wallet.sourceType,
+          wallet.profitFirstAccountId,
           input.incomeCategoryIds
         );
       }
@@ -698,9 +697,9 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       // ── Breakdown (balance components) ────────────────────────────────────
       // These queries EXCLUDE soft-deleted transactions (Pitfall 4)
 
-      // pfAllocation: only for PROFIT_FIRST wallets
+      // pfAllocation: only for PF-linked wallets
       let pfAllocationCents = 0;
-      if (wallet.sourceType === 'PROFIT_FIRST' && wallet.profitFirstAccountId != null) {
+      if (wallet.profitFirstAccountId != null) {
         const pfRows = await db
           .select()
           .from(profitFirstAccounts)

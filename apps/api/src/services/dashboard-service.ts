@@ -288,7 +288,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
       const tx = txByWallet.get(wallet.id) ?? { deposits: 0, withdrawals: 0 };
 
       let pfAllocation = 0;
-      if (wallet.sourceType === 'PROFIT_FIRST' && wallet.profitFirstAccountId != null) {
+      if (wallet.profitFirstAccountId != null) {
         const pfAccount = pfAccountMap.get(wallet.profitFirstAccountId);
         if (pfAccount) {
           // targetPercentage is BASIS POINTS here (raw table value)

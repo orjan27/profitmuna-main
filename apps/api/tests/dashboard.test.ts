@@ -80,7 +80,6 @@ function seedWallet(
   input: {
     userId: number;
     name: string;
-    sourceType: 'PROFIT_FIRST' | 'BLANK';
     profitFirstAccountId?: number | null;
     autoDeductAllExpenses?: boolean;
   }
@@ -90,7 +89,6 @@ function seedWallet(
     .values({
       userId: input.userId,
       name: input.name,
-      sourceType: input.sourceType,
       profitFirstAccountId: input.profitFirstAccountId ?? null,
       autoDeductAllExpenses: input.autoDeductAllExpenses ?? false,
       color: '#0ea5e9',
@@ -334,15 +332,14 @@ describe('dashboard service — getSummary', () => {
     const profitAccount = pfAccounts.find((a) => a.accountType === 'PROFIT');
     expect(profitAccount).toBeDefined();
 
-    // PROFIT_FIRST wallet: allocation = 5% (500 bp) of received income
+    // PF-linked wallet: allocation = 5% (500 bp) of received income
     seedWallet(db, {
       userId: user.id,
       name: 'Profit Vault',
-      sourceType: 'PROFIT_FIRST',
       profitFirstAccountId: profitAccount!.id,
     });
-    // BLANK wallet with manual transactions
-    const blank = seedWallet(db, { userId: user.id, name: 'Cash', sourceType: 'BLANK' });
+    // Standalone wallet with manual transactions
+    const blank = seedWallet(db, { userId: user.id, name: 'Cash' });
 
     seedIncome(db, {
       userId: user.id,
@@ -385,7 +382,7 @@ describe('dashboard service — getSummary', () => {
     const user = seedUser(db, { email: 'feed@dash.test', name: 'Feed User' });
     const incomeCat = seedIncomeCategory(db, user.id, 'Salary');
     const expenseCat = seedExpenseCategory(db, user.id, 'Food');
-    const wallet = seedWallet(db, { userId: user.id, name: 'Cash', sourceType: 'BLANK' });
+    const wallet = seedWallet(db, { userId: user.id, name: 'Cash' });
 
     seedIncome(db, {
       userId: user.id,
@@ -547,7 +544,7 @@ describe('dashboard service — getSummary', () => {
       amount: 66_666,
       expenseDate: '2026-06-12',
     });
-    const walletB = seedWallet(db, { userId: userB.id, name: 'B Cash', sourceType: 'BLANK' });
+    const walletB = seedWallet(db, { userId: userB.id, name: 'B Cash' });
     seedWalletTx(db, {
       userId: userB.id,
       walletId: walletB.id,
