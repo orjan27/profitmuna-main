@@ -79,18 +79,26 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
 
   // Reminder state
   const [reminderEnabled, setReminderEnabled] = useState(initialSettings.reminderEnabled);
-  const [reminderFrequency, setReminderFrequency] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>(
-    initialSettings.reminderFrequency ?? 'DAILY'
-  );
+  const [reminderFrequency, setReminderFrequency] = useState<
+    'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'
+  >(initialSettings.reminderFrequency ?? 'DAILY');
   const [reminderDayOfWeek, setReminderDayOfWeek] = useState<number>(
     initialSettings.reminderDayOfWeek ?? 1
   );
   const [reminderDayOfMonth, setReminderDayOfMonth] = useState<number>(
     initialSettings.reminderDayOfMonth ?? 1
   );
+  const [reminderDayOfMonth2, setReminderDayOfMonth2] = useState<number>(
+    initialSettings.reminderDayOfMonth2 ?? 15
+  );
   const [reminderHour, setReminderHour] = useState<number>(initialSettings.reminderHour ?? 9);
 
   async function handleSave() {
+    if (reminderEnabled && reminderFrequency === 'BIWEEKLY' && reminderDayOfMonth === reminderDayOfMonth2) {
+      toast.error('Bi-weekly reminder days must be two different days.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const body = reminderEnabled
@@ -99,7 +107,11 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
             reminderEnabled: true,
             reminderFrequency,
             reminderDayOfWeek: reminderFrequency === 'WEEKLY' ? reminderDayOfWeek : null,
-            reminderDayOfMonth: reminderFrequency === 'MONTHLY' ? reminderDayOfMonth : null,
+            reminderDayOfMonth:
+              reminderFrequency === 'MONTHLY' || reminderFrequency === 'BIWEEKLY'
+                ? reminderDayOfMonth
+                : null,
+            reminderDayOfMonth2: reminderFrequency === 'BIWEEKLY' ? reminderDayOfMonth2 : null,
             reminderHour,
           }
         : {
@@ -108,6 +120,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
             reminderFrequency: null,
             reminderDayOfWeek: null,
             reminderDayOfMonth: null,
+            reminderDayOfMonth2: null,
             reminderHour: null,
           };
 
@@ -195,7 +208,9 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
               </Label>
               <Select
                 value={reminderFrequency}
-                onValueChange={(v) => setReminderFrequency(v as 'DAILY' | 'WEEKLY' | 'MONTHLY')}
+                onValueChange={(v) =>
+                  setReminderFrequency(v as 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY')
+                }
               >
                 <SelectTrigger id="reminder-frequency" className="w-full">
                   <SelectValue />
@@ -203,6 +218,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 <SelectContent>
                   <SelectItem value="DAILY">Daily</SelectItem>
                   <SelectItem value="WEEKLY">Weekly</SelectItem>
+                  <SelectItem value="BIWEEKLY">Bi-Weekly</SelectItem>
                   <SelectItem value="MONTHLY">Monthly</SelectItem>
                 </SelectContent>
               </Select>
@@ -229,6 +245,55 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            ) : null}
+
+            {/* Two days of month — BIWEEKLY only */}
+            {reminderFrequency === 'BIWEEKLY' ? (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="reminder-day-of-month-1" className="text-sm font-semibold">
+                    First day of month
+                  </Label>
+                  <Select
+                    value={String(reminderDayOfMonth)}
+                    onValueChange={(v) => setReminderDayOfMonth(Number(v))}
+                  >
+                    <SelectTrigger id="reminder-day-of-month-1" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                        <SelectItem key={day} value={String(day)}>
+                          {formatOrdinal(day)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="reminder-day-of-month-2" className="text-sm font-semibold">
+                    Second day of month
+                  </Label>
+                  <Select
+                    value={String(reminderDayOfMonth2)}
+                    onValueChange={(v) => setReminderDayOfMonth2(Number(v))}
+                  >
+                    <SelectTrigger id="reminder-day-of-month-2" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                        <SelectItem key={day} value={String(day)}>
+                          {formatOrdinal(day)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Reminders are sent on both days each month.
+                  </p>
+                </div>
               </div>
             ) : null}
 

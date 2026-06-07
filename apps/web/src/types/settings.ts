@@ -7,8 +7,9 @@ export type { CurrencyCode };
 export interface UserSettings {
   displayCurrency: CurrencyCode;
   reminderEnabled: boolean;
-  reminderFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | null;
+  reminderFrequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | null;
   reminderDayOfWeek: number | null;
   reminderDayOfMonth: number | null;
+  reminderDayOfMonth2: number | null;
   reminderHour: number | null;
 }

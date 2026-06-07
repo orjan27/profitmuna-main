@@ -6,9 +6,11 @@ export const updateSettingsSchema = z.object({
   displayCurrency: z.enum(CURRENCY_CODES).optional(),
   reminderEnabled: z.boolean().optional(),
   // Nullable: the form sends null to clear the schedule when reminders are disabled
-  reminderFrequency: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']).optional().nullable(),
+  reminderFrequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional().nullable(),
   reminderDayOfWeek: z.number().int().min(0).max(6).optional().nullable(),
   // Max 28 caps the day-31 short-month pitfall at the boundary (Pitfall 6)
   reminderDayOfMonth: z.number().int().min(1).max(28).optional().nullable(),
+  // Second day for BIWEEKLY (twice a month); null for other frequencies
+  reminderDayOfMonth2: z.number().int().min(1).max(28).optional().nullable(),
   reminderHour: z.number().int().min(0).max(23).optional().nullable(),
 });

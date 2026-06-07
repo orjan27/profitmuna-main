@@ -52,21 +52,31 @@ function formatPendingDueMessage(
  * - reminderEnabled must be true
  * - DAILY: reminderHour matches
  * - WEEKLY: reminderDayOfWeek matches AND reminderHour matches
+ * - BIWEEKLY: reminderDayOfMonth OR reminderDayOfMonth2 matches (with day-31 clamp) AND reminderHour matches
  * - MONTHLY: reminderDayOfMonth matches (with day-31 clamp) AND reminderHour matches
  */
 function isUserDue(
   user: {
     reminderEnabled: boolean;
-    reminderFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | null;
+    reminderFrequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | null;
     reminderHour: number | null;
     reminderDayOfWeek: number | null;
     reminderDayOfMonth: number | null;
+    reminderDayOfMonth2: number | null;
   },
   parts: ManilaParts
 ): boolean {
   if (!user.reminderEnabled) return false;
   if (user.reminderFrequency === null || user.reminderHour === null) return false;
   if (user.reminderHour !== parts.hour) return false;
+
+  // Pitfall 6: clamp day > last day of this month (e.g. stored 31, month has 28)
+  const clampToMonth = (day: number): number => {
+    const manilaDate = new Date(parts.dateStr + 'T00:00:00Z');
+    const year = manilaDate.getUTCFullYear();
+    const month0 = manilaDate.getUTCMonth();
+    return Math.min(day, lastDayOfMonth(year, month0));
+  };
 
   switch (user.reminderFrequency) {
     case 'DAILY':
@@ -75,15 +85,18 @@ function isUserDue(
     case 'WEEKLY':
       return user.reminderDayOfWeek === parts.dayOfWeek;
 
+    case 'BIWEEKLY': {
+      // Twice a month: due when either configured day matches today
+      if (user.reminderDayOfMonth === null || user.reminderDayOfMonth2 === null) return false;
+      return (
+        clampToMonth(user.reminderDayOfMonth) === parts.dayOfMonth ||
+        clampToMonth(user.reminderDayOfMonth2) === parts.dayOfMonth
+      );
+    }
+
     case 'MONTHLY': {
       if (user.reminderDayOfMonth === null) return false;
-      // Pitfall 6: clamp day > last day of this month (e.g. stored 31, month has 28)
-      const manilaDate = new Date(parts.dateStr + 'T00:00:00Z');
-      const year = manilaDate.getUTCFullYear();
-      const month0 = manilaDate.getUTCMonth();
-      const lastDay = lastDayOfMonth(year, month0);
-      const effectiveDay = Math.min(user.reminderDayOfMonth, lastDay);
-      return effectiveDay === parts.dayOfMonth;
+      return clampToMonth(user.reminderDayOfMonth) === parts.dayOfMonth;
     }
 
     default:
@@ -114,6 +127,7 @@ async function sendReminderEmails(
       reminderHour: users.reminderHour,
       reminderDayOfWeek: users.reminderDayOfWeek,
       reminderDayOfMonth: users.reminderDayOfMonth,
+      reminderDayOfMonth2: users.reminderDayOfMonth2,
     })
     .from(users)
     .where(eq(users.reminderEnabled, true));

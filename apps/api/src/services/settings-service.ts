@@ -23,7 +23,7 @@ export function createSettingsService(env: { DB: D1Database }) {
 
   return {
     /**
-     * Returns the six settings columns for the user.
+     * Returns the seven settings columns for the user.
      *
      * @param userId  Authenticated user ID — always server-supplied
      * @throws HTTPException 404 if no user row found
@@ -36,6 +36,7 @@ export function createSettingsService(env: { DB: D1Database }) {
           reminderFrequency: users.reminderFrequency,
           reminderDayOfWeek: users.reminderDayOfWeek,
           reminderDayOfMonth: users.reminderDayOfMonth,
+          reminderDayOfMonth2: users.reminderDayOfMonth2,
           reminderHour: users.reminderHour,
         })
         .from(users)

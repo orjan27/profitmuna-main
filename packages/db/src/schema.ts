@@ -16,11 +16,15 @@ export const users = sqliteTable('users', {
   displayCurrency: text('display_currency').notNull().default('PHP'),
   // Reminders off by default until explicitly configured (D-02 recommendation)
   reminderEnabled: integer('reminder_enabled', { mode: 'boolean' }).notNull().default(false),
-  reminderFrequency: text('reminder_frequency', { enum: ['DAILY', 'WEEKLY', 'MONTHLY'] }),
+  reminderFrequency: text('reminder_frequency', {
+    enum: ['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY'],
+  }),
   // 0–6 (Sun–Sat); null if not WEEKLY
   reminderDayOfWeek: integer('reminder_day_of_week'),
-  // 1–28; null if not MONTHLY (capped at 28 to avoid day-31 short-month pitfall)
+  // 1–28; null if not MONTHLY/BIWEEKLY (capped at 28 to avoid day-31 short-month pitfall)
   reminderDayOfMonth: integer('reminder_day_of_month'),
+  // 1–28; second reminder day for BIWEEKLY (twice a month); null otherwise
+  reminderDayOfMonth2: integer('reminder_day_of_month_2'),
   // 0–23 Manila time; null if reminders disabled
   reminderHour: integer('reminder_hour'),
   createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),

@@ -57,6 +57,13 @@
       "when": 1780816876612,
       "tag": "0007_default_wallet_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1780823018523,
+      "tag": "0008_dapper_red_hulk",
+      "breakpoints": true
     }
   ]
 }

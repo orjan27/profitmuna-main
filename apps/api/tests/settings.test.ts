@@ -67,6 +67,23 @@ describe('SET-02: updateSettings — reminder schedule', () => {
     expect(updated.reminderHour).toBe(8);
   });
 
+  it('persists bi-weekly reminderFrequency, both days of month, and hour', async () => {
+    const { d1, db } = createTestDb();
+    const user = seedUser(db, { email: 'set02d@test.com', name: 'Set User F' });
+    const svc = createSettingsService({ DB: d1 } as Parameters<typeof createSettingsService>[0]);
+    const updated = await svc.updateSettings(user.id, {
+      reminderEnabled: true,
+      reminderFrequency: 'BIWEEKLY',
+      reminderDayOfMonth: 15,
+      reminderDayOfMonth2: 28,
+      reminderHour: 9,
+    });
+    expect(updated.reminderFrequency).toBe('BIWEEKLY');
+    expect(updated.reminderDayOfMonth).toBe(15);
+    expect(updated.reminderDayOfMonth2).toBe(28);
+    expect(updated.reminderHour).toBe(9);
+  });
+
   it('persists monthly reminderFrequency, dayOfMonth, and hour', async () => {
     const { d1, db } = createTestDb();
     const user = seedUser(db, { email: 'set02c@test.com', name: 'Set User E' });

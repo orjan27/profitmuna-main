@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `reminder_day_of_month_2` integer;

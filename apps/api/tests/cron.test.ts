@@ -83,6 +83,92 @@ describe('NOTIF-02: runCron — income reminder emails', () => {
   });
 });
 
+describe('NOTIF-02: runCron — bi-weekly (twice a month) reminders', () => {
+  it('sends reminder when Manila day-of-month matches the first bi-weekly day', async () => {
+    const { d1, db } = createTestDb();
+    const env = mockEnv({}, d1);
+
+    const user = seedUser(db, { email: 'cronBW1@test.com', name: 'BW User', emailVerified: true });
+    db.update(schema.users)
+      .set({
+        reminderEnabled: true,
+        reminderFrequency: 'BIWEEKLY',
+        reminderDayOfMonth: 15,
+        reminderDayOfMonth2: 28,
+        reminderHour: 9,
+      })
+      // intentional: direct db update for test seeding
+      .where(require('drizzle-orm').eq(schema.users.id, user.id))
+      .run();
+
+    vi.clearAllMocks();
+    // 2026-06-15 09:00 Manila = 2026-06-15 01:00 UTC
+    await runCron(env, new Date('2026-06-15T01:00:00.000Z'));
+
+    const { Resend } = await import('resend');
+    const mockInstance = vi.mocked(Resend).mock.results[0].value as {
+      emails: { send: ReturnType<typeof vi.fn> };
+    };
+    expect(mockInstance.emails.send).toHaveBeenCalledOnce();
+  });
+
+  it('sends reminder when Manila day-of-month matches the second bi-weekly day', async () => {
+    const { d1, db } = createTestDb();
+    const env = mockEnv({}, d1);
+
+    const user = seedUser(db, { email: 'cronBW2@test.com', name: 'BW User', emailVerified: true });
+    db.update(schema.users)
+      .set({
+        reminderEnabled: true,
+        reminderFrequency: 'BIWEEKLY',
+        reminderDayOfMonth: 15,
+        reminderDayOfMonth2: 28,
+        reminderHour: 9,
+      })
+      // intentional: direct db update for test seeding
+      .where(require('drizzle-orm').eq(schema.users.id, user.id))
+      .run();
+
+    vi.clearAllMocks();
+    // 2026-06-28 09:00 Manila = 2026-06-28 01:00 UTC
+    await runCron(env, new Date('2026-06-28T01:00:00.000Z'));
+
+    const { Resend } = await import('resend');
+    const mockInstance = vi.mocked(Resend).mock.results[0].value as {
+      emails: { send: ReturnType<typeof vi.fn> };
+    };
+    expect(mockInstance.emails.send).toHaveBeenCalledOnce();
+  });
+
+  it('does not send bi-weekly reminder on a day matching neither configured day', async () => {
+    const { d1, db } = createTestDb();
+    const env = mockEnv({}, d1);
+
+    const user = seedUser(db, { email: 'cronBW3@test.com', name: 'BW User', emailVerified: true });
+    db.update(schema.users)
+      .set({
+        reminderEnabled: true,
+        reminderFrequency: 'BIWEEKLY',
+        reminderDayOfMonth: 15,
+        reminderDayOfMonth2: 28,
+        reminderHour: 9,
+      })
+      // intentional: direct db update for test seeding
+      .where(require('drizzle-orm').eq(schema.users.id, user.id))
+      .run();
+
+    vi.clearAllMocks();
+    // 2026-06-10 09:00 Manila — matches neither the 15th nor the 28th
+    await runCron(env, new Date('2026-06-10T01:00:00.000Z'));
+
+    const { Resend } = await import('resend');
+    const mockInstance = vi.mocked(Resend).mock.results[0].value as {
+      emails: { send: ReturnType<typeof vi.fn> };
+    };
+    expect(mockInstance.emails.send).not.toHaveBeenCalled();
+  });
+});
+
 // ─── NOTIF-02: Pending-income-due dedup ─────────────────────────────────────
 
 describe('NOTIF-02: runCron — pending-income-due dedup', () => {

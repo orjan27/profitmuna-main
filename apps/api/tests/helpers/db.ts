@@ -24,6 +24,7 @@ CREATE TABLE users (
   reminder_frequency TEXT,
   reminder_day_of_week INTEGER,
   reminder_day_of_month INTEGER,
+  reminder_day_of_month_2 INTEGER,
   reminder_hour INTEGER,
   created_at TEXT
 );
