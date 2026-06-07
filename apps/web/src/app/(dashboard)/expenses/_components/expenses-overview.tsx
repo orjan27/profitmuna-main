@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
-import { useFormatCurrency } from '@/components/CurrencyProvider';
+import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
 import { fetchExpensesAction } from './expense-actions';
 import { ExpenseList } from './expense-list';
 import type { ExpenseRow } from './edit-expense-dialog';
@@ -67,7 +67,8 @@ export function ExpensesOverview({
   defaultWalletId,
 }: ExpensesOverviewProps) {
   const { openRecordSheet } = useRecordSheet();
-  const formatCurrency = useFormatCurrency();
+  // Shared visibility state (same localStorage key as Overview/Profit First)
+  const { visible, toggle, mounted } = useAmountVisibility();
 
   // Date-range filter via nuqs (D-07) — synced to URL search params
   const [from, setFrom] = useQueryState('from', { defaultValue: '' });
@@ -167,10 +168,16 @@ export function ExpensesOverview({
           {activeCount > 0 ? (
             <>
               {/* Same display scale as the Overview hero — money reads at one
-                  size across pages */}
-              <p className="mt-3 text-[34px] leading-none font-semibold tracking-tight tabular-nums">
-                {formatCurrency(activeTotal)}
-              </p>
+                  size across pages, eye toggle anchored to the total it masks */}
+              <div className="mt-3 flex items-center gap-2">
+                <MaskedAmount
+                  cents={activeTotal}
+                  visible={visible}
+                  mounted={mounted}
+                  className="text-[34px] leading-none font-semibold tracking-tight tabular-nums"
+                />
+                <AmountToggle visible={visible} toggle={toggle} />
+              </div>
               <p className="mt-1.5 text-sm text-ink-faint">
                 spent across {activeCount} record{activeCount !== 1 ? 's' : ''} in view
               </p>

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import type { Income, IncomeCategory } from '@/types/income';
-import { useFormatCurrency } from '@/components/CurrencyProvider';
+import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
 import { IncomeFilters } from './income-filters';
 import { IncomeList } from './income-list';
 import { EditIncomeDialog } from './edit-income-dialog';
@@ -40,7 +40,8 @@ interface IncomeOverviewProps {
  */
 export function IncomeOverview({ initialData, categories }: IncomeOverviewProps) {
   const { openRecordSheet } = useRecordSheet();
-  const formatCurrency = useFormatCurrency();
+  // Shared visibility state (same localStorage key as Overview/Profit First)
+  const { visible, toggle, mounted } = useAmountVisibility();
 
   const [items, setItems] = useState<Income[]>(initialData.content);
   const [currentPage, setCurrentPage] = useState(initialData.page);
@@ -124,10 +125,16 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
           {items.length > 0 ? (
             <>
               {/* Same display scale as the Overview hero — money reads at one
-                  size across pages */}
-              <p className="mt-3 text-[34px] leading-none font-semibold tracking-tight tabular-nums">
-                {formatCurrency(loadedTotal)}
-              </p>
+                  size across pages, eye toggle anchored to the total it masks */}
+              <div className="mt-3 flex items-center gap-2">
+                <MaskedAmount
+                  cents={loadedTotal}
+                  visible={visible}
+                  mounted={mounted}
+                  className="text-[34px] leading-none font-semibold tracking-tight tabular-nums"
+                />
+                <AmountToggle visible={visible} toggle={toggle} />
+              </div>
               <p className="mt-1.5 text-sm text-ink-faint">
                 across {items.length} record{items.length !== 1 ? 's' : ''} in view
               </p>
