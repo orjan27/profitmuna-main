@@ -14,6 +14,7 @@ import { walletsRouter } from '@/routes/wallets';
 import { dashboardRouter } from '@/routes/dashboard';
 import { settingsRouter } from '@/routes/settings';
 import { notificationsRouter } from '@/routes/notifications';
+import { runCron } from '@/services/cron-service';
 import type { Bindings, Variables } from '@/types';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -87,4 +88,30 @@ app.route('/api/settings', settingsRouter);
 // Notification routes — auth guard applied inside notificationsRouter via .use('/*', requireAuth) (T-6-07)
 app.route('/api/notifications', notificationsRouter);
 
-export default app;
+// Named export keeps the Hono app instance available to test helpers that call
+// app.request() directly (index.test.ts, auth.test.ts use this for HTTP-layer tests).
+export { app };
+
+// Module Worker export — required for the `scheduled` handler to register (Pitfall 5).
+// `export default app` is the Hono shorthand but does not support the scheduled event;
+// the explicit object form exposes both fetch and scheduled (RESEARCH.md Pattern 1).
+export default {
+  fetch: app.fetch,
+
+  /**
+   * Hourly cron handler — fires at `0 * * * *` UTC (wrangler.toml [triggers]).
+   * Converts UTC to Manila time, finds due users, emails reminders, and creates
+   * INCOME_REMINDER + PENDING_INCOME_DUE in-app notifications (NOTIF-02).
+   *
+   * ctx.waitUntil keeps the Worker alive until all DB writes + emails complete
+   * (Cloudflare Workers docs: https://developers.cloudflare.com/workers/runtime-apis/context/).
+   * Local testing: `curl "http://localhost:8793/cdn-cgi/handler/scheduled"`
+   */
+  async scheduled(
+    _controller: ScheduledController,
+    env: Bindings,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    ctx.waitUntil(runCron(env));
+  },
+};

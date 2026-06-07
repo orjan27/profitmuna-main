@@ -11,6 +11,14 @@ migrations_dir = "../../packages/db/migrations"
 # Replace database_id with your real D1 database ID for production:
 #   wrangler d1 create profitmuna-main-db
 
+# Hourly cron trigger — fires at minute 0 of every hour in UTC.
+# The scheduled handler converts UTC to Manila time (UTC+8, no DST) to determine
+# which users are due for a reminder in their configured Manila hour.
+# Local testing: curl "http://localhost:8793/cdn-cgi/handler/scheduled"
+# Docs: https://developers.cloudflare.com/workers/configuration/cron-triggers/
+[triggers]
+crons = ["0 * * * *"]
+
 # Non-secret vars. Secrets are set via `wrangler secret put <NAME>`:
 #   JWT_ACCESS_SECRET, RESEND_API_KEY, GOOGLE_CLIENT_SECRET
 # (refresh tokens are opaque random strings, not JWTs — no refresh secret)
