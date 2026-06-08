@@ -29,3 +29,41 @@ GOOGLE_REDIRECT_URI = "http://localhost:8793/api/auth/google/callback"
 APP_BASE_URL = "http://localhost:3006"
 NODE_ENV = "development"
 
+# ── Production environment ─────────────────────────────────────────────────
+# Deployed by CI via `wrangler deploy --env production`. The top-level config
+# above is the local-dev config (`wrangler dev` uses it untouched). Env sections
+# do NOT inherit top-level bindings/triggers/vars, so they are redefined here.
+# Secrets (JWT_ACCESS_SECRET, RESEND_API_KEY, GOOGLE_CLIENT_SECRET) are set once
+# via `wrangler secret put <NAME> --env production` — never committed here.
+[env.production]
+name = "profitmuna-main-api"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "profitmuna-main-db"
+database_id = "debddd97-e6d8-44e1-8e0c-89f72ca5da4a"
+migrations_dir = "../../packages/db/migrations"
+
+[env.production.triggers]
+crons = ["0 * * * *"]
+
+# Custom domain. Wrangler provisions the DNS record + edge cert on deploy.
+# Requires the profitmuna.com zone to live in this Cloudflare account.
+[[env.production.routes]]
+pattern = "main-api.profitmuna.com"
+custom_domain = true
+
+[env.production.observability]
+enabled = true
+
+[env.production.vars]
+RESEND_FROM_EMAIL = "onboarding@profitmuna.com"
+GOOGLE_CLIENT_ID = "157322816870-agbm786q3058l5umh6vn8umhl828lt8e.apps.googleusercontent.com"
+# Callback must route through the BFF (main.profitmuna.com), NOT the API host:
+# the oauth_state/oauth_code_verifier cookies are host-only on main.profitmuna.com
+# (the browser only ever talks to the BFF). A direct main-api.* callback never
+# receives those cookies → invalid_oauth_state. The BFF relays the Cookie header.
+GOOGLE_REDIRECT_URI = "https://main.profitmuna.com/api/auth/google/callback"
+APP_BASE_URL = "https://main.profitmuna.com"
+NODE_ENV = "production"
+

@@ -35,6 +35,7 @@ Thumbs.db
 # cloudflare
 .wrangler/
 .dev.vars
+.open-next/
 
 # scaffold
 .scaffold/

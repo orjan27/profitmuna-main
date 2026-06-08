@@ -18,12 +18,15 @@ import { signAccessToken } from '@/lib/jwt';
 /**
  * A well-formed but unmatchable PBKDF2 hash used to equalise login timing
  * (CR-03). When the email is unknown or the account is Google-only
- * (passwordHash === null) we still run the full 210k-iteration derivation
+ * (passwordHash === null) we still run the full 100k-iteration derivation
  * against this constant so the response time does not reveal account
  * existence. The derived value is never expected to match a real password.
+ * Its iteration count MUST match PBKDF2_ITERATIONS (100000) — a higher count
+ * here would throw NotSupportedError on the Workers runtime and 500 every
+ * unknown-email login.
  */
 const DUMMY_PASSWORD_HASH =
-  'pbkdf2$sha256$210000$9c26e209ce1cb20e680edbf93dc17a52$ea39536b2dc5d43e491537ab71dda69ddb190445ff8b8167232398a8eaa453fd';
+  'pbkdf2$sha256$100000$1d68365f80bc30a63d607fd49dc13f55$23cc4f46128fc162964118c04c8a8f470ccacfa7dd74f2fd6043159439316c3d';
 
 /** Maximum failed attempts before lockout */
 const MAX_LOGIN_ATTEMPTS = 5;

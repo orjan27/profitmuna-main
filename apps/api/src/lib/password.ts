@@ -1,9 +1,11 @@
 import { encodeHex } from '@/lib/token';
 
-// PBKDF2-SHA256 with 210k iterations — the Workers-native equivalent of
-// bcrypt cost>=12 (documented deviation in plan 01-01 decisions_resolved).
-// bcryptjs risks CPU-timeout on Workers; crypto.subtle PBKDF2 is native-speed.
-const PBKDF2_ITERATIONS = 210000;
+// PBKDF2-SHA256 with 100k iterations. bcryptjs risks CPU-timeout on Workers;
+// crypto.subtle PBKDF2 is native-speed. NOTE: the Cloudflare Workers Web Crypto
+// runtime hard-caps PBKDF2 at 100000 iterations — values above that throw
+// NotSupportedError in production (workerd/miniflare locally does not enforce
+// the cap, which masked this). 100000 is therefore the platform ceiling here.
+const PBKDF2_ITERATIONS = 100000;
 const SALT_BYTES = 16;
 const HASH_BYTES = 32;
 const SCHEME_PREFIX = 'pbkdf2$sha256$';

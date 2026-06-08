@@ -52,9 +52,9 @@ function postJson(path: string, body: unknown, testEnv = env) {
 }
 
 describe('lib/password (PBKDF2)', () => {
-  it('hashPassword returns the pbkdf2$sha256$210000$ encoded format', async () => {
+  it('hashPassword returns the pbkdf2$sha256$100000$ encoded format', async () => {
     const hash = await hashPassword('correct horse battery staple');
-    expect(hash.startsWith('pbkdf2$sha256$210000$')).toBe(true);
+    expect(hash.startsWith('pbkdf2$sha256$100000$')).toBe(true);
     const parts = hash.split('$');
     expect(parts).toHaveLength(5);
     expect(parts[3]).toMatch(/^[0-9a-f]{32}$/); // 16-byte salt hex
@@ -76,9 +76,9 @@ describe('lib/password (PBKDF2)', () => {
 
   it('rejects a stored hash with malformed (odd-length / non-hex) salt (WR-09)', async () => {
     // Odd-length salt hex — previously dropped a nibble and derived a NaN byte
-    expect(await verifyPassword('pw', 'pbkdf2$sha256$210000$abc$00ff')).toBe(false);
+    expect(await verifyPassword('pw', 'pbkdf2$sha256$100000$abc$00ff')).toBe(false);
     // Non-hex characters in the salt
-    expect(await verifyPassword('pw', 'pbkdf2$sha256$210000$zzzz$00ff')).toBe(false);
+    expect(await verifyPassword('pw', 'pbkdf2$sha256$100000$zzzz$00ff')).toBe(false);
   });
 });
 
@@ -253,7 +253,7 @@ describe('POST /api/auth/register', () => {
       .all();
     expect(rows).toHaveLength(1);
     expect(rows[0].emailVerified).toBe(false);
-    expect(rows[0].passwordHash).toMatch(/^pbkdf2\$sha256\$210000\$/);
+    expect(rows[0].passwordHash).toMatch(/^pbkdf2\$sha256\$100000\$/);
 
     const tokens = db
       .select()

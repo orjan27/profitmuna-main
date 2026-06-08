@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "profitmuna-main-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-04-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  // Keep the *.workers.dev URL alive alongside the custom hostname (defining
+  // `routes` otherwise disables it).
+  "workers_dev": true,
+  // Serve the app at https://main.profitmuna.com via a Workers custom domain.
+  // Cloudflare creates and manages the proxied `main` record + certificate on
+  // deploy (covered by Universal SSL since it's a 2nd-level subdomain). Requires
+  // the pre-existing `main` DNS record to be deleted first, or it 409s (100117).
+  "routes": [{ "pattern": "main.profitmuna.com", "custom_domain": true }],
+  // Server-only, non-secret. The browser never sees this (CSP connect-src 'self');
+  // the same-origin BFF proxy reads it to reach the API Worker.
+  "vars": { "API_BASE_URL": "https://main-api.profitmuna.com" },
+}
