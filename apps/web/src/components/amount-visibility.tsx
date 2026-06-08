@@ -8,9 +8,14 @@ import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { StellaSprite } from '@/components/Stella';
 
 const STORAGE_KEY = 'pf-amounts-visible';
+// Same-tab broadcast so every hook instance (hero toggle, wallet cards, …)
+// stays in sync — the native `storage` event only fires in OTHER tabs.
+const VISIBILITY_EVENT = 'pf-amounts-visibility-change';
 
 /**
  * Hook that manages amount visibility state with localStorage persistence.
+ * All instances stay in sync via a window event, so a toggle anywhere
+ * updates every masked amount on the page.
  *
  * SSR safety: `visible` is guarded by `mounted` — on the server and before
  * the effect runs both are false, so `visible` is always false. This prevents
@@ -24,17 +29,19 @@ export function useAmountVisibility(): { visible: boolean; toggle: () => void; m
 
   useEffect(() => {
     setMounted(true);
-    if (localStorage.getItem(STORAGE_KEY) === 'true') {
-      setVisible(true);
-    }
+    const sync = () => setVisible(localStorage.getItem(STORAGE_KEY) === 'true');
+    sync();
+    window.addEventListener(VISIBILITY_EVENT, sync);
+    return () => window.removeEventListener(VISIBILITY_EVENT, sync);
   }, []);
 
   const toggle = useCallback(() => {
-    setVisible((prev) => {
-      const next = !prev;
-      localStorage.setItem(STORAGE_KEY, String(next));
-      return next;
-    });
+    // localStorage is the source of truth; the event fans the change out to
+    // every other hook instance on the page
+    const next = localStorage.getItem(STORAGE_KEY) !== 'true';
+    localStorage.setItem(STORAGE_KEY, String(next));
+    setVisible(next);
+    window.dispatchEvent(new Event(VISIBILITY_EVENT));
   }, []);
 
   return { visible: mounted && visible, toggle, mounted };

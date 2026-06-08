@@ -61,7 +61,15 @@ interface WalletsResponse {
   data: Array<{ id: number; name: string; isDefault: boolean }>;
 }
 
-type ActionResult = { ok: true } | { error: string };
+type ActionResult = { ok: true } | { ok: true; warning: 'recurrence_failed' } | { error: string };
+
+/** Recurrence schedule submitted alongside an entry (creates a template too). */
+export interface RecurrenceInput {
+  frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+  dayOfWeek?: number | null;
+  dayOfMonth?: number | null;
+  dayOfMonth2?: number | null;
+}
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
@@ -108,6 +116,11 @@ function revalidateMoneySurfaces(): void {
 /**
  * Records an income entry from the sheet.
  * Amount arrives as decimal pesos and is converted to integer cents (D-08).
+ *
+ * Optional `recurrence` also creates a recurring template after the entry —
+ * lastGeneratedDate is seeded to the entry date so the cron doesn't generate a
+ * second entry the same day. Template failure is a soft warning: the recorded
+ * entry is never rolled back.
  */
 export async function recordIncomeFromSheet(input: {
   categoryId: number;
@@ -118,6 +131,7 @@ export async function recordIncomeFromSheet(input: {
   description?: string;
   expectedReleaseDate?: string;
   profitFirstAllocated: boolean;
+  recurrence?: RecurrenceInput;
 }): Promise<ActionResult> {
   if (!Number.isFinite(input.amountPesos) || input.amountPesos <= 0) {
     return { error: 'invalid_amount' };
@@ -144,6 +158,29 @@ export async function recordIncomeFromSheet(input: {
     return { error: 'unknown' };
   }
 
+  if (input.recurrence) {
+    try {
+      await apiFetch('/api/recurring-incomes', {
+        method: 'POST',
+        body: JSON.stringify({
+          categoryId: input.categoryId,
+          amount: toCents(input.amountPesos),
+          description: input.description || undefined,
+          profitFirstAllocated: input.profitFirstAllocated,
+          frequency: input.recurrence.frequency,
+          dayOfWeek: input.recurrence.dayOfWeek ?? null,
+          dayOfMonth: input.recurrence.dayOfMonth ?? null,
+          dayOfMonth2: input.recurrence.dayOfMonth2 ?? null,
+          // Prevent same-day double generation by the cron
+          lastGeneratedDate: input.incomeDate,
+        }),
+      });
+    } catch {
+      revalidateMoneySurfaces();
+      return { ok: true, warning: 'recurrence_failed' };
+    }
+  }
+
   revalidateMoneySurfaces();
   return { ok: true };
 }
@@ -151,6 +188,9 @@ export async function recordIncomeFromSheet(input: {
 /**
  * Records an expense entry from the sheet.
  * Amount arrives as decimal pesos and is converted to integer cents (D-08).
+ *
+ * Optional `recurrence` also creates a recurring template after the entry —
+ * same soft-warning semantics as recordIncomeFromSheet.
  */
 export async function recordExpenseFromSheet(input: {
   categoryId: number;
@@ -159,6 +199,7 @@ export async function recordExpenseFromSheet(input: {
   expenseDate: string;
   walletId: number;
   description?: string;
+  recurrence?: RecurrenceInput;
 }): Promise<ActionResult> {
   if (!Number.isFinite(input.amountPesos) || input.amountPesos <= 0) {
     return { error: 'invalid_amount' };
@@ -184,6 +225,29 @@ export async function recordExpenseFromSheet(input: {
   } catch (err) {
     if (err instanceof ApiError) return { error: err.code };
     return { error: 'unknown' };
+  }
+
+  if (input.recurrence) {
+    try {
+      await apiFetch('/api/recurring-expenses', {
+        method: 'POST',
+        body: JSON.stringify({
+          categoryId: input.categoryId,
+          amount: toCents(input.amountPesos),
+          description: input.description || undefined,
+          walletId: input.walletId,
+          frequency: input.recurrence.frequency,
+          dayOfWeek: input.recurrence.dayOfWeek ?? null,
+          dayOfMonth: input.recurrence.dayOfMonth ?? null,
+          dayOfMonth2: input.recurrence.dayOfMonth2 ?? null,
+          // Prevent same-day double generation by the cron
+          lastGeneratedDate: input.expenseDate,
+        }),
+      });
+    } catch {
+      revalidateMoneySurfaces();
+      return { ok: true, warning: 'recurrence_failed' };
+    }
   }
 
   revalidateMoneySurfaces();

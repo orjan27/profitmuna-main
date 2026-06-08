@@ -2,11 +2,10 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { FormActions } from '@/components/FormActions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -29,6 +29,13 @@ import { cn } from '@/lib/utils';
 import { toCents } from '@/lib/format-currency';
 import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { Stella, StellaSprite } from '@/components/Stella';
+import {
+  RecurrenceFields,
+  NO_RECURRENCE,
+  recurrenceIsValid,
+  toRecurrenceInput,
+  type RecurrenceValue,
+} from '@/components/RecurrenceFields';
 import { todayLocal } from '@/lib/format-date';
 import {
   getRecordSheetData,
@@ -106,18 +113,32 @@ export function RecordSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 overflow-y-auto sm:max-w-md">
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="w-full gap-0 overflow-y-auto sm:max-w-md"
+      >
         <SheetHeader className="px-6 pt-6 pb-2">
-          <SheetTitle className="text-[20px] leading-tight">Record</SheetTitle>
+          {/* Custom title row so the close X shares the 24px content gutter
+              and centers vertically with the title (the built-in close sits
+              at top-4 right-4, off this sheet's grid). */}
+          <div className="flex items-center justify-between">
+            <SheetTitle className="text-[20px] leading-tight">Record</SheetTitle>
+            <SheetClose className="rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden">
+              <X aria-hidden="true" className="size-4" />
+              <span className="sr-only">Close</span>
+            </SheetClose>
+          </div>
           <SheetDescription className="sr-only">
             Record income or an expense without leaving this page.
           </SheetDescription>
 
-          {/* Mode switch — income | expense */}
+          {/* Mode switch — income | expense. The active mode's direction gets
+              its money color: the one place the switch is allowed a hue. */}
           <div
             role="tablist"
             aria-label="What to record"
-            className="mt-3 inline-flex w-fit items-center rounded-lg bg-raised/60 p-0.5"
+            className="mt-3 grid w-full grid-cols-2 rounded-lg bg-raised/60 p-1"
           >
             {(['income', 'expense'] as const).map((m) => (
               <button
@@ -126,20 +147,28 @@ export function RecordSheet({
                 aria-selected={mode === m}
                 onClick={() => onModeChange(m)}
                 className={cn(
-                  'rounded-md px-3.5 py-1.5 text-sm transition-colors',
+                  'flex items-center justify-center gap-1.5 rounded-md py-2 text-sm transition-colors',
                   mode === m
-                    ? 'bg-paper font-medium text-ink'
+                    ? cn(
+                        'bg-paper font-medium shadow-xs',
+                        m === 'income' ? 'text-income' : 'text-expense'
+                      )
                     : 'text-ink-faint hover:text-ink-soft'
                 )}
               >
+                {m === 'income' ? (
+                  <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDown aria-hidden="true" className="h-3.5 w-3.5" />
+                )}
                 {m === 'income' ? 'Income' : 'Expense'}
               </button>
             ))}
           </div>
         </SheetHeader>
 
-        {/* flex-1 lets the entry forms stretch so the mobile action bar can
-            anchor to the sheet bottom even when the form is short. */}
+        {/* flex-1 lets the entry forms stretch so the action bar can anchor
+            to the sheet bottom even when the form is short. */}
         <div className="flex flex-1 flex-col px-6 pt-4 pb-8">
           {isLoading ? <SheetSkeleton /> : null}
 
@@ -175,10 +204,118 @@ export function RecordSheet({
 function SheetSkeleton(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-5" aria-hidden="true">
-      <div className="h-12 animate-pulse rounded-md bg-raised/50" />
+      <div className="h-14 animate-pulse rounded-lg bg-raised/50" />
       <div className="h-9 animate-pulse rounded-md bg-raised/50" />
       <div className="h-9 animate-pulse rounded-md bg-raised/50" />
       <div className="h-9 w-2/3 animate-pulse rounded-md bg-raised/50" />
+    </div>
+  );
+}
+
+// ── Amount field ──────────────────────────────────────────────────────────────
+
+interface AmountFieldProps {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  mode: RecordMode;
+  /** Rendered below the input box, inside the label group (e.g. Stella). */
+  children?: React.ReactNode;
+}
+
+/**
+ * The hero field: a large bordered box with the peso sign in-field and a
+ * direction pill ("Money in" / "Money out") — the pill carries the mode's
+ * money color so the direction reads at a glance.
+ */
+function AmountField({ id, value, onChange, mode, children }: AmountFieldProps): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>Amount</Label>
+      <div className="flex h-14 items-center gap-2 rounded-lg border border-input px-4 shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
+        <span aria-hidden="true" className="text-2xl font-semibold text-ink-faint">
+          ₱
+        </span>
+        <input
+          id={id}
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min="0.01"
+          placeholder="0.00"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-full min-w-0 flex-1 bg-transparent text-2xl font-semibold tabular-nums outline-none selection:bg-primary selection:text-primary-foreground placeholder:text-ink-faint/50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          autoFocus
+          required
+        />
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-2.5 py-1 text-xs font-medium',
+            mode === 'income' ? 'bg-income/15 text-income' : 'bg-expense/15 text-expense'
+          )}
+        >
+          {mode === 'income' ? 'Money in' : 'Money out'}
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Advanced options disclosure ───────────────────────────────────────────────
+
+interface AdvancedToggleProps {
+  open: boolean;
+  onToggle: () => void;
+}
+
+function AdvancedToggle({ open, onToggle }: AdvancedToggleProps): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className="flex items-center gap-1 self-start text-sm font-medium text-ink-soft transition-colors hover:text-ink"
+    >
+      Advanced options
+      <ChevronDown
+        aria-hidden="true"
+        className={cn('h-4 w-4 transition-transform', open && 'rotate-180')}
+      />
+    </button>
+  );
+}
+
+// ── Pinned action bar ─────────────────────────────────────────────────────────
+
+interface RecordActionsProps {
+  submitLabel: string;
+  isPending: boolean;
+  disabled: boolean;
+  onCancel: () => void;
+}
+
+/**
+ * Sheet footer: divider, full-width primary on top, full-width Cancel below.
+ * Sticky against the sheet's scroll container so the commit action never
+ * scrolls away. DOM order stays Cancel-then-primary (flex-col-reverse) so
+ * tabbing reaches Cancel before the destructive-ish commit.
+ */
+function RecordActions({
+  submitLabel,
+  isPending,
+  disabled,
+  onCancel,
+}: RecordActionsProps): React.JSX.Element {
+  return (
+    <div className="sticky bottom-0 z-10 mt-auto -mx-6 -mb-8 flex flex-col-reverse gap-2 border-t border-hairline bg-background/95 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur [&>button]:h-11 [&>button]:w-full">
+      <Button type="button" variant="outline" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="submit" disabled={disabled}>
+        {isPending ? 'Recording…' : submitLabel}
+      </Button>
     </div>
   );
 }
@@ -278,6 +415,7 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
   const [description, setDescription] = useState('');
   const [expectedReleaseDate, setExpectedReleaseDate] = useState('');
   const [pfAllocated, setPfAllocated] = useState(true);
+  const [recurrence, setRecurrence] = useState<RecurrenceValue>(NO_RECURRENCE);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const amountPesos = Number(amount);
@@ -286,6 +424,10 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!recurrenceIsValid(recurrence)) {
+      toast.error('Pick two different days for the bi-weekly repeat.');
+      return;
+    }
     startTransition(async () => {
       const result = await recordIncomeFromSheet({
         categoryId: Number(categoryId),
@@ -295,17 +437,23 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
         description: description.trim() || undefined,
         expectedReleaseDate: expectedReleaseDate || undefined,
         profitFirstAllocated: pfAllocated,
+        recurrence: toRecurrenceInput(recurrence),
       });
       if ('error' in result) {
         toast.error(errorMessage(result.error));
         return;
       }
-      toast.success(`${formatCurrency(amountCents)} recorded.`, {
-        icon: <StellaSprite mood="happy" size={20} decorative />,
-      });
+      if ('warning' in result) {
+        toast.warning('Income recorded, but the repeat schedule could not be saved.');
+      } else {
+        toast.success(`${formatCurrency(amountCents)} recorded.`, {
+          icon: <StellaSprite mood="happy" size={20} decorative />,
+        });
+      }
       setAmount('');
       setDescription('');
       setExpectedReleaseDate('');
+      setRecurrence(NO_RECURRENCE);
       onDone();
       router.refresh();
     });
@@ -313,28 +461,12 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-5" noValidate>
-      {/* Amount — the one field that matters most, sized accordingly */}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="record-income-amount">Amount (₱)</Label>
-        <Input
-          id="record-income-amount"
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          min="0.01"
-          placeholder="0.00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="h-12 text-2xl font-semibold tabular-nums md:text-2xl"
-          autoFocus
-          required
-        />
-      </div>
+      <AmountField id="record-income-amount" value={amount} onChange={setAmount} mode="income" />
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="record-income-category">Category</Label>
         <Select value={categoryId} onValueChange={setCategoryId} required>
-          <SelectTrigger id="record-income-category">
+          <SelectTrigger id="record-income-category" className="w-full">
             <SelectValue placeholder="Pick a category" />
           </SelectTrigger>
           <SelectContent>
@@ -349,21 +481,6 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="record-income-status">Status</Label>
-          <Select
-            value={moneyStatus}
-            onValueChange={(v) => setMoneyStatus(v as 'PENDING' | 'RECEIVED')}
-          >
-            <SelectTrigger id="record-income-status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="RECEIVED">Received</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-1.5">
           <Label htmlFor="record-income-date">Date</Label>
           <Input
             id="record-income-date"
@@ -372,6 +489,21 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
             onChange={(e) => setIncomeDate(e.target.value)}
             required
           />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="record-income-status">Status</Label>
+          <Select
+            value={moneyStatus}
+            onValueChange={(v) => setMoneyStatus(v as 'PENDING' | 'RECEIVED')}
+          >
+            <SelectTrigger id="record-income-status" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="RECEIVED">Received</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -384,18 +516,7 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
       ) : null}
 
       {/* Less-used fields stay out of the way until asked for */}
-      <button
-        type="button"
-        onClick={() => setMoreOpen((v) => !v)}
-        aria-expanded={moreOpen}
-        className="flex items-center gap-1 self-start text-sm text-ink-faint transition-colors hover:text-ink"
-      >
-        <ChevronDown
-          aria-hidden="true"
-          className={cn('h-4 w-4 transition-transform', moreOpen && 'rotate-180')}
-        />
-        More options
-      </button>
+      <AdvancedToggle open={moreOpen} onToggle={() => setMoreOpen((v) => !v)} />
 
       {moreOpen ? (
         <div className="flex flex-col gap-5">
@@ -418,23 +539,38 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
               onChange={(e) => setExpectedReleaseDate(e.target.value)}
             />
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <Label htmlFor="record-income-pf">Include in Profit First</Label>
-              <p className="mt-0.5 text-xs text-ink-faint">
-                When off, this income won&apos;t be split across your buckets.
-              </p>
-            </div>
-            <Switch id="record-income-pf" checked={pfAllocated} onCheckedChange={setPfAllocated} />
-          </div>
+          <RecurrenceFields
+            value={recurrence}
+            onChange={setRecurrence}
+            referenceDate={incomeDate}
+            idPrefix="record-income-recurrence"
+          />
         </div>
       ) : null}
 
-      <FormActions variant="sheet" className="md:justify-start">
-        <Button type="submit" disabled={isPending || !categoryId || amountCents <= 0}>
-          {isPending ? 'Recording…' : 'Record income'}
-        </Button>
-      </FormActions>
+      {/* Whether this income splits is core to the promise, so the toggle
+          stays visible instead of hiding under Advanced options. */}
+      <div className="flex items-center justify-between gap-4 rounded-lg bg-raised/40 px-4 py-3.5">
+        <div>
+          <Label htmlFor="record-income-pf">Include in Profit First</Label>
+          <p className="mt-0.5 text-xs text-ink-faint">
+            When off, this income won&apos;t be split across your buckets.
+          </p>
+        </div>
+        <Switch
+          id="record-income-pf"
+          checked={pfAllocated}
+          onCheckedChange={setPfAllocated}
+          className="data-[state=checked]:bg-income"
+        />
+      </div>
+
+      <RecordActions
+        submitLabel="Record income"
+        isPending={isPending}
+        disabled={isPending || !categoryId || amountCents <= 0}
+        onCancel={onDone}
+      />
     </form>
   );
 }
@@ -453,6 +589,8 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
   );
   const [expenseDate, setExpenseDate] = useState(todayLocal());
   const [description, setDescription] = useState('');
+  const [recurrence, setRecurrence] = useState<RecurrenceValue>(NO_RECURRENCE);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const amountPesos = Number(amount);
   const amountCents = Number.isFinite(amountPesos) && amountPesos > 0 ? toCents(amountPesos) : 0;
@@ -465,6 +603,10 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!recurrenceIsValid(recurrence)) {
+      toast.error('Pick two different days for the bi-weekly repeat.');
+      return;
+    }
     startTransition(async () => {
       const result = await recordExpenseFromSheet({
         categoryId: Number(categoryId),
@@ -472,16 +614,22 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
         expenseDate,
         walletId: Number(walletId),
         description: description.trim() || undefined,
+        recurrence: toRecurrenceInput(recurrence),
       });
       if ('error' in result) {
         toast.error(errorMessage(result.error));
         return;
       }
-      toast.success(`${formatCurrency(amountCents)} expense recorded.`, {
-        icon: <StellaSprite mood="wink" size={20} decorative />,
-      });
+      if ('warning' in result) {
+        toast.warning('Expense recorded, but the repeat schedule could not be saved.');
+      } else {
+        toast.success(`${formatCurrency(amountCents)} expense recorded.`, {
+          icon: <StellaSprite mood="wink" size={20} decorative />,
+        });
+      }
       setAmount('');
       setDescription('');
+      setRecurrence(NO_RECURRENCE);
       onDone();
       router.refresh();
     });
@@ -489,21 +637,7 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-5" noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="record-expense-amount">Amount (₱)</Label>
-        <Input
-          id="record-expense-amount"
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          min="0.01"
-          placeholder="0.00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="h-12 text-2xl font-semibold tabular-nums md:text-2xl"
-          autoFocus
-          required
-        />
+      <AmountField id="record-expense-amount" value={amount} onChange={setAmount} mode="expense">
         {opex && amountCents > 0 ? (
           <Stella
             mood={overOpex ? 'sad' : 'smiling'}
@@ -517,12 +651,12 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
             }
           />
         ) : null}
-      </div>
+      </AmountField>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="record-expense-category">Category</Label>
         <Select value={categoryId} onValueChange={setCategoryId} required>
-          <SelectTrigger id="record-expense-category">
+          <SelectTrigger id="record-expense-category" className="w-full">
             <SelectValue placeholder="Pick a category" />
           </SelectTrigger>
           <SelectContent>
@@ -537,9 +671,19 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
+          <Label htmlFor="record-expense-date">Date</Label>
+          <Input
+            id="record-expense-date"
+            type="date"
+            value={expenseDate}
+            onChange={(e) => setExpenseDate(e.target.value)}
+            required
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
           <Label htmlFor="record-expense-wallet">Paid with</Label>
           <Select value={walletId} onValueChange={setWalletId} required>
-            <SelectTrigger id="record-expense-wallet">
+            <SelectTrigger id="record-expense-wallet" className="w-full">
               <SelectValue placeholder="Select a wallet" />
             </SelectTrigger>
             <SelectContent>
@@ -551,34 +695,38 @@ function ExpenseEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="record-expense-date">Date</Label>
-          <Input
-            id="record-expense-date"
-            type="date"
-            value={expenseDate}
-            onChange={(e) => setExpenseDate(e.target.value)}
-            required
+      </div>
+
+      {/* Less-used fields stay out of the way until asked for */}
+      <AdvancedToggle open={moreOpen} onToggle={() => setMoreOpen((v) => !v)} />
+
+      {moreOpen ? (
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="record-expense-description">Description (optional)</Label>
+            <Textarea
+              id="record-expense-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={500}
+              rows={2}
+            />
+          </div>
+          <RecurrenceFields
+            value={recurrence}
+            onChange={setRecurrence}
+            referenceDate={expenseDate}
+            idPrefix="record-expense-recurrence"
           />
         </div>
-      </div>
+      ) : null}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="record-expense-description">Description (optional)</Label>
-        <Textarea
-          id="record-expense-description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          maxLength={500}
-          rows={2}
-        />
-      </div>
-
-      <FormActions variant="sheet" className="md:justify-start">
-        <Button type="submit" disabled={isPending || !categoryId || amountCents <= 0}>
-          {isPending ? 'Recording…' : 'Record expense'}
-        </Button>
-      </FormActions>
+      <RecordActions
+        submitLabel="Record expense"
+        isPending={isPending}
+        disabled={isPending || !categoryId || amountCents <= 0}
+        onCancel={onDone}
+      />
     </form>
   );
 }

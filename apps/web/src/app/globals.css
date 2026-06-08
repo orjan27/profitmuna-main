@@ -25,6 +25,14 @@
   /* Semantic: money only — lifted for contrast on the dark surface */
   --color-income: oklch(0.72 0.13 155);
   --color-expense: oklch(0.68 0.18 25);
+  /* Savings accent (overview donut) — money state, same family as income/expense */
+  --color-saving: oklch(0.7 0.1 195);
+
+  /* Bento money-surface tints (overview cards). Low chroma keeps the dark
+     surface calm; the light theme lifts these to the pastel mockup palette. */
+  --color-tint-income: oklch(0.31 0.025 160);
+  --color-tint-expense: oklch(0.31 0.025 50);
+  --color-tint-saving: oklch(0.31 0.025 195);
 
   /* shadcn/ui token mapping onto the monochrome ramp */
   --color-background: var(--color-paper);
@@ -90,6 +98,12 @@
   /* Money hues darkened for AA contrast on light paper */
   --color-income: oklch(0.52 0.13 155);
   --color-expense: oklch(0.5 0.18 25);
+  --color-saving: oklch(0.48 0.1 195);
+
+  /* Bento tints — pastel money surfaces (mint / peach / teal) */
+  --color-tint-income: oklch(0.95 0.028 165);
+  --color-tint-expense: oklch(0.95 0.032 65);
+  --color-tint-saving: oklch(0.94 0.03 195);
 
   --color-background: var(--color-paper);
   --color-foreground: var(--color-ink);
