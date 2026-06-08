@@ -6,6 +6,7 @@ import { createDb } from '@app/db';
 import { createIncomeService } from '@/services/income-service';
 import {
   incomeQuerySchema,
+  incomeStatsQuerySchema,
   createIncomeSchema,
   updateIncomeSchema,
   receiveIncomeSchema,
@@ -38,6 +39,24 @@ incomesRouter.get(
     const userId = c.get('userId');
     const svc = createIncomeService(createDb(c.env.DB));
     const result = await svc.list(userId, params);
+    return c.json({ data: result });
+  }
+);
+
+// GET /stats — analytics aggregate. MUST precede /:id so "stats" is not
+// matched as an id param.
+incomesRouter.get(
+  '/stats',
+  zValidator('query', incomeStatsQuerySchema, (result, c) => {
+    if (!result.success) {
+      return c.json({ error: { code: 'validation_error', message: 'Invalid query params' } }, 422);
+    }
+  }),
+  async (c) => {
+    const params = c.req.valid('query');
+    const userId = c.get('userId');
+    const svc = createIncomeService(createDb(c.env.DB));
+    const result = await svc.stats(userId, params);
     return c.json({ data: result });
   }
 );

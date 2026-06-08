@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useTransition, useCallback, useEffect } from 'react';
-import { useQueryState } from 'nuqs';
-import { MoreHorizontal, Plus, SlidersHorizontal } from 'lucide-react';
+import { MoreHorizontal, Plus, TrendingDown, TrendingUp } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,11 +11,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
+import { StatTile } from '@/components/StatTile';
+import { MonthlyBars, type MonthlyBarDatum } from '@/components/MonthlyBars';
+import { SourceBreakdown } from '@/components/SourceBreakdown';
+import { PeriodControl } from '@/components/PeriodControl';
+import { monthShortLabel, type LedgerPeriodKey } from '@/lib/ledger-period';
+import { nextDueDate } from '@/lib/recurrence';
+import { formatDate } from '@/lib/format-date';
 import type { RecurringExpense } from '@/types/recurring';
+import type { LedgerStats } from '@/types/stats';
 import { fetchExpensesAction } from './expense-actions';
 import { ExpenseList } from './expense-list';
 import type { ExpenseRow } from './edit-expense-dialog';
@@ -47,22 +54,66 @@ interface ExpensesOverviewProps {
   categories: ExpenseCategory[];
   wallets: WalletOption[];
   defaultWalletId: number | null;
-  /** Recurring expense templates for the "Recurring" section */
+  /** Recurring expense templates for the "Recurring" section + monthly stat. */
   recurring: RecurringExpense[];
+  /** Aggregate figures for the stat band and charts. */
+  stats: LedgerStats;
+  /** Resolved period key (drives the period caption). */
+  periodKey: LedgerPeriodKey;
+  /** Resolved period bounds — keep load-more / refresh scoped to the window. */
+  from?: string;
+  to?: string;
+  /** Asia/Manila-resolved date keys for the monthly bar series. */
+  statsDate: { year: string; month: string; prevMonth: string };
 }
 
 const PAGE_LIMIT = 20;
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const PERIOD_CAPTION: Record<LedgerPeriodKey, string> = {
+  '30d': 'last 30 days',
+  month: 'this month',
+  year: 'this year',
+  all: 'all time',
+};
+
+/** Monthly-equivalent contribution of a recurring expense template. */
+function monthlyEquivalent(template: RecurringExpense): number {
+  if (!template.active) return 0;
+  switch (template.frequency) {
+    case 'WEEKLY':
+      return template.amount * 4;
+    case 'BIWEEKLY':
+      return template.amount * 2;
+    case 'MONTHLY':
+      return template.amount;
+    default:
+      return 0;
+  }
+}
+
+/** Jan → current month, zero-filled, current month flagged for the money tone. */
+function buildMonthlyBars(stats: LedgerStats, year: string, month: string): MonthlyBarDatum[] {
+  const currentMonthNum = Number(month.slice(5, 7));
+  const byYm = new Map(stats.monthly.map((m) => [m.ym, m.total]));
+  const bars: MonthlyBarDatum[] = [];
+  for (let m = 1; m <= currentMonthNum; m++) {
+    const ym = `${year}-${String(m).padStart(2, '0')}`;
+    bars.push({
+      label: monthShortLabel(ym),
+      total: byYm.get(ym) ?? 0,
+      current: m === currentMonthNum,
+    });
+  }
+  return bars;
+}
 
 /**
- * Client shell for the expense ledger: holds the collapsed date-range filter,
- * the grouped expense list, and load-more. Recording goes through the global
- * Record sheet.
+ * Client shell for the expense ledger. Mobile keeps a lean hero (the in-view
+ * total + records); the web view (md+) adds the period control, a three-tile
+ * stat band, and the monthly / by-source charts. Recording goes through the
+ * global Record sheet; the FAB carries it on mobile.
  *
- * Filter change resets the accumulator to page 0 results (D-07 — date range only, no free-text).
- * "Load more" appends the next page to the accumulated list without resetting (D-06).
- * The header total sums ACTIVE (non-deleted) amounts only.
+ * The header total sums ACTIVE (non-deleted) amounts via the stats aggregate.
  */
 export function ExpensesOverview({
   initialData,
@@ -70,164 +121,217 @@ export function ExpensesOverview({
   wallets,
   defaultWalletId,
   recurring,
-}: ExpensesOverviewProps) {
+  stats,
+  periodKey,
+  from,
+  to,
+  statsDate,
+}: ExpensesOverviewProps): React.JSX.Element {
   const { openRecordSheet } = useRecordSheet();
-  // Shared visibility state (same localStorage key as Overview/Profit First)
+  const formatCurrency = useFormatCurrency();
   const { visible, toggle, mounted } = useAmountVisibility();
 
-  // Date-range filter via nuqs (D-07) — synced to URL search params
-  const [from, setFrom] = useQueryState('from', { defaultValue: '' });
-  const [to, setTo] = useQueryState('to', { defaultValue: '' });
-
-  // Accumulated expense rows across pages; reset on filter change
   const [expenses, setExpenses] = useState<ExpenseRow[]>(initialData.content);
   const [currentPage, setCurrentPage] = useState(initialData.page);
   const [isLast, setIsLast] = useState(initialData.last);
-
   const [isLoadingMore, startLoadMoreTransition] = useTransition();
 
-  // Re-sync accumulator when the RSC parent re-fetches after router.refresh()
-  // (e.g. after a create via the Record sheet). useState ignores prop changes
-  // after initial mount, so an effect is needed to pick up the new initialData.
+  // Re-sync the accumulator when the RSC re-fetches (record sheet → refresh).
   useEffect(() => {
     setExpenses(initialData.content);
     setCurrentPage(initialData.page);
     setIsLast(initialData.last);
   }, [initialData]);
 
-  const activeFilterCount = [from, to].filter(Boolean).length;
-  // Collapsed unless a shared/refreshed URL already carries a filter
-  const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0);
-  // Manage categories lives in the header's overflow menu (controlled dialog)
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
-  // Fetch a page with current filter and return the result
-  async function fetchPage(
-    page: number,
-    fromVal: string,
-    toVal: string
-  ): Promise<PaginatedExpenses> {
-    return fetchExpensesAction({
-      page,
-      limit: PAGE_LIMIT,
-      ...(fromVal ? { from: fromVal } : {}),
-      ...(toVal ? { to: toVal } : {}),
-    });
-  }
-
-  // Apply filter: reset accumulator to page 0 with new filter values
-  async function applyFilter(newFrom: string, newTo: string) {
-    await setFrom(newFrom || null);
-    await setTo(newTo || null);
-    const data = await fetchPage(0, newFrom, newTo);
-    setExpenses(data.content);
-    setCurrentPage(data.page);
-    setIsLast(data.last);
-  }
-
-  // Load more: append next page to existing list
-  function handleLoadMore() {
+  function handleLoadMore(): void {
     startLoadMoreTransition(async () => {
       const nextPage = currentPage + 1;
-      const data = await fetchPage(nextPage, from, to);
+      const data = await fetchExpensesAction({ page: nextPage, limit: PAGE_LIMIT, from, to });
       setExpenses((prev) => [...prev, ...data.content]);
       setCurrentPage(data.page);
       setIsLast(data.last);
     });
   }
 
-  // After a mutation (edit/delete/restore) re-fetch page 0 with current filter
+  // After a mutation (edit/delete/restore) re-fetch page 0 within the period.
   const handleMutated = useCallback(() => {
     startLoadMoreTransition(async () => {
-      const data = await fetchPage(0, from, to);
+      const data = await fetchExpensesAction({ page: 0, limit: PAGE_LIMIT, from, to });
       setExpenses(data.content);
       setCurrentPage(data.page);
       setIsLast(data.last);
     });
   }, [from, to]);
 
-  // Totals: sum of active (non-deleted) expenses only
-  const activeTotal = expenses
-    .filter((e) => e.deletedAt === null)
-    .reduce((sum, e) => sum + e.amount, 0);
-  const activeCount = expenses.filter((e) => e.deletedAt === null).length;
+  // ── Derived stat figures ────────────────────────────────────────────────
+  const recordCount = stats.period.count;
+  const periodCaption = PERIOD_CAPTION[periodKey];
 
-  // One primary action per view: a truly empty ledger (no records, no filters)
-  // leaves the empty state's CTA as the only action on the page.
-  const showHeaderControls = expenses.length > 0 || activeFilterCount > 0;
+  // Month-over-month delta. For spending, up reads as expense (red) and down as
+  // income (green) — less spending is the good direction.
+  const prevTotal = stats.prevMonthTotal;
+  const monthDelta =
+    prevTotal > 0 ? Math.round(((stats.thisMonthTotal - prevTotal) / prevTotal) * 100) : null;
+  const prevMonthLabel = monthShortLabel(statsDate.prevMonth);
 
-  function handleFromChange(e: React.ChangeEvent<HTMLInputElement>) {
-    void applyFilter(e.target.value, to);
-  }
+  const activeRecurring = recurring.filter((r) => r.active);
+  const recurringMonthly = activeRecurring.reduce((sum, r) => sum + monthlyEquivalent(r), 0);
+  const topRecurring = activeRecurring
+    .slice()
+    .sort((a, b) => monthlyEquivalent(b) - monthlyEquivalent(a))[0];
 
-  function handleToChange(e: React.ChangeEvent<HTMLInputElement>) {
-    void applyFilter(from, e.target.value);
-  }
+  const monthlyBars = buildMonthlyBars(stats, statsDate.year, statsDate.month);
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[20px] leading-tight font-semibold">Expenses</h1>
-          {activeCount > 0 ? (
-            <>
-              {/* Same display scale as the Overview hero — money reads at one
-                  size across pages, eye toggle anchored to the total it masks */}
-              <div className="mt-3 flex items-center gap-2">
-                <MaskedAmount
-                  cents={activeTotal}
-                  visible={visible}
-                  mounted={mounted}
-                  className="text-[34px] leading-none font-semibold tracking-tight tabular-nums"
-                />
-                <AmountToggle visible={visible} toggle={toggle} />
-              </div>
-              <p className="mt-1.5 text-sm text-ink-faint">
-                spent across {activeCount} record{activeCount !== 1 ? 's' : ''} in view
-              </p>
-            </>
-          ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[22px] leading-tight font-semibold">Expenses</h1>
+        <div className="flex items-center gap-1.5">
+          <PeriodControl className="max-md:hidden" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="More actions"
+                className="text-ink-soft"
+              >
+                <MoreHorizontal aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setCategoriesOpen(true)}>
+                Manage categories
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button size="sm" className="max-md:hidden" onClick={() => openRecordSheet('expense')}>
+            <Plus aria-hidden="true" />
+            Record expense
+          </Button>
         </div>
-        {showHeaderControls ? (
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setFiltersOpen((v) => !v)}
-              aria-expanded={filtersOpen}
-              className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
-            >
-              <SlidersHorizontal aria-hidden="true" />
-              Filter
-              {activeFilterCount > 0 ? (
-                <span className="tabular-nums">· {activeFilterCount}</span>
-              ) : null}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="More actions"
-                  className="text-ink-soft"
-                >
-                  <MoreHorizontal aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setCategoriesOpen(true)}>
-                  Manage categories
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {/* Hidden on mobile: RecordFab is the record affordance there. */}
-            <Button size="sm" className="max-md:hidden" onClick={() => openRecordSheet('expense')}>
-              <Plus aria-hidden="true" />
-              Record expense
-            </Button>
+      </div>
+
+      {/* Time scope — full-width segmented row on mobile (the header copy is
+          md+ only); the stat band and charts below render on every size. */}
+      <PeriodControl className="flex w-full justify-between overflow-x-auto md:hidden" />
+
+      {/* Stat band — total spans full width on mobile, then the pair; three
+          across on the web view. */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+        <StatTile
+          className="col-span-2 md:col-span-1"
+          label="Total in view"
+          caption={
+            <>
+              spent across {recordCount} record{recordCount !== 1 ? 's' : ''} · {periodCaption}
+            </>
+          }
+        >
+          <div className="flex items-center gap-2">
+            <MaskedAmount
+              cents={stats.period.total}
+              visible={visible}
+              mounted={mounted}
+              className="text-[30px] leading-none font-semibold tracking-tight tabular-nums sm:text-[32px]"
+            />
+            <AmountToggle visible={visible} toggle={toggle} />
           </div>
-        ) : null}
+        </StatTile>
+
+        <StatTile
+          label="This month"
+          caption={
+            monthDelta !== null ? (
+              <span className="inline-flex items-center gap-1">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-0.5 font-semibold tabular-nums',
+                    monthDelta > 0 ? 'text-expense' : 'text-income'
+                  )}
+                >
+                  {monthDelta > 0 ? (
+                    <TrendingUp aria-hidden="true" className="h-4 w-4" />
+                  ) : (
+                    <TrendingDown aria-hidden="true" className="h-4 w-4" />
+                  )}
+                  {monthDelta >= 0 ? '+' : ''}
+                  {monthDelta}%
+                </span>
+                <span>
+                  vs {formatCurrency(prevTotal)} in {prevMonthLabel}
+                </span>
+              </span>
+            ) : stats.thisMonthTotal > 0 ? (
+              'First month with spending'
+            ) : (
+              'Nothing spent this month'
+            )
+          }
+        >
+          <MaskedAmount
+            cents={stats.thisMonthTotal}
+            visible={visible}
+            mounted={mounted}
+            className="text-[22px] leading-none font-semibold tracking-tight tabular-nums sm:text-[28px]"
+          />
+        </StatTile>
+
+        <StatTile
+          label="Recurring / month"
+          caption={
+            topRecurring
+              ? `${topRecurring.categoryName} · next ${formatDate(nextDueDate(topRecurring))}`
+              : 'None set up'
+          }
+        >
+          <MaskedAmount
+            cents={recurringMonthly}
+            visible={visible}
+            mounted={mounted}
+            className="text-[22px] leading-none font-semibold tracking-tight tabular-nums sm:text-[28px]"
+          />
+        </StatTile>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section aria-labelledby="expense-monthly-heading" className="rounded-3xl bg-card p-6">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 id="expense-monthly-heading" className="text-base font-semibold">
+              Monthly spending
+            </h2>
+            <span className="text-xs text-ink-faint">{statsDate.year} · by month</span>
+          </div>
+          <div className="mt-6">
+            <MonthlyBars data={monthlyBars} tone="expense" formatCurrency={formatCurrency} />
+          </div>
+        </section>
+
+        <section aria-labelledby="expense-source-heading" className="rounded-3xl bg-card p-6">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 id="expense-source-heading" className="text-base font-semibold">
+              Spending by category
+            </h2>
+            <span className="text-xs text-ink-faint">{periodCaption}</span>
+          </div>
+          <div className="mt-5">
+            {stats.bySource.length > 0 ? (
+              <SourceBreakdown
+                data={stats.bySource}
+                tone="expense"
+                total={stats.period.total}
+                unitLabel="spending"
+                formatCurrency={formatCurrency}
+              />
+            ) : (
+              <p className="py-6 text-center text-sm text-ink-faint">No spending in this period.</p>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* Manage categories dialog — opened from the overflow menu */}
@@ -237,67 +341,33 @@ export function ExpensesOverview({
         onOpenChange={setCategoriesOpen}
       />
 
-      {/* Date-range filter (D-07 — no free-text search for expenses) */}
-      {filtersOpen ? (
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="filter-from" className="text-xs">
-              From
-            </Label>
-            <Input
-              id="filter-from"
-              type="date"
-              value={from}
-              onChange={handleFromChange}
-              className="w-40"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="filter-to" className="text-xs">
-              To
-            </Label>
-            <Input
-              id="filter-to"
-              type="date"
-              value={to}
-              onChange={handleToChange}
-              className="w-40"
-            />
-          </div>
-          {(from || to) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void applyFilter('', '')}
-              className="mb-px"
-            >
-              Clear filter
-            </Button>
-          )}
-        </div>
-      ) : null}
+      {/* Records */}
+      <section aria-label="Records" className="mt-1 flex flex-col gap-5">
+        <h2 className="text-xs font-semibold tracking-[0.12em] text-ink-faint uppercase max-md:sr-only">
+          Records
+        </h2>
 
-      {/* Recurring templates — renders nothing when the user has none */}
-      <RecurringExpenseList templates={recurring} categories={categories} wallets={wallets} />
+        {/* Recurring templates — renders nothing when the user has none */}
+        <RecurringExpenseList templates={recurring} categories={categories} wallets={wallets} />
 
-      {/* Expense ledger */}
-      <ExpenseList
-        expenses={expenses}
-        filtered={activeFilterCount > 0}
-        categories={categories}
-        wallets={wallets}
-        defaultWalletId={defaultWalletId}
-        onMutated={handleMutated}
-      />
+        <ExpenseList
+          expenses={expenses}
+          filtered={false}
+          categories={categories}
+          wallets={wallets}
+          defaultWalletId={defaultWalletId}
+          onMutated={handleMutated}
+        />
+      </section>
 
-      {/* Load more (D-06 — append-on-demand, not pagination) */}
-      {!isLast && (
-        <div className="flex justify-center pt-2">
+      {/* Load more (D-06 — append-on-demand) */}
+      {!isLast && expenses.length > 0 ? (
+        <div className="flex justify-center pt-1">
           <Button variant="ghost" onClick={handleLoadMore} disabled={isLoadingMore}>
             {isLoadingMore ? 'Loading…' : 'Load more'}
           </Button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

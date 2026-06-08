@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import { useQueryState, parseAsString } from 'nuqs';
 
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -19,15 +18,14 @@ interface IncomeFiltersProps {
 }
 
 /**
- * URL-persisted filter controls for the income list.
- * Uses nuqs useQueryState so filters survive page refresh and are shareable (D-07).
- * Search is debounced ~300ms to avoid excessive re-fetches.
+ * Secondary income filters: free-text search and money status. The primary time
+ * scope is the PeriodControl (URL `period`), so date range no longer lives here.
+ * Filter state lives in nuqs query params (survives refresh, shareable);
+ * search is debounced ~300ms to avoid excessive re-fetches.
  */
-export function IncomeFilters({ onFilterChange }: IncomeFiltersProps) {
+export function IncomeFilters({ onFilterChange }: IncomeFiltersProps): React.JSX.Element {
   const [search, setSearch] = useQueryState('search', parseAsString.withDefault(''));
   const [moneyStatus, setMoneyStatus] = useQueryState('moneyStatus', parseAsString.withDefault(''));
-  const [from, setFrom] = useQueryState('from', parseAsString.withDefault(''));
-  const [to, setTo] = useQueryState('to', parseAsString.withDefault(''));
 
   // Local controlled value for search so typing feels instant while debouncing the URL update
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,18 +51,8 @@ export function IncomeFilters({ onFilterChange }: IncomeFiltersProps) {
     onFilterChange?.();
   }
 
-  async function handleFromChange(value: string) {
-    await setFrom(value || null);
-    onFilterChange?.();
-  }
-
-  async function handleToChange(value: string) {
-    await setTo(value || null);
-    onFilterChange?.();
-  }
-
   return (
-    <div className="mb-4 flex flex-wrap gap-3">
+    <div className="flex flex-wrap gap-3">
       {/* Search */}
       <div className="min-w-48 flex-1">
         <Input
@@ -87,32 +75,6 @@ export function IncomeFilters({ onFilterChange }: IncomeFiltersProps) {
             <SelectItem value="RECEIVED">Received</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-
-      {/* Date range */}
-      <div className="flex items-center gap-2">
-        <Label htmlFor="income-from" className="shrink-0 text-sm text-muted-foreground">
-          From
-        </Label>
-        <Input
-          id="income-from"
-          type="date"
-          className="w-36"
-          value={from}
-          onChange={(e) => handleFromChange(e.target.value)}
-          aria-label="Filter from date"
-        />
-        <Label htmlFor="income-to" className="shrink-0 text-sm text-muted-foreground">
-          To
-        </Label>
-        <Input
-          id="income-to"
-          type="date"
-          className="w-36"
-          value={to}
-          onChange={(e) => handleToChange(e.target.value)}
-          aria-label="Filter to date"
-        />
       </div>
     </div>
   );

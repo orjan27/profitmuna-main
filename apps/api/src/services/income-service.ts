@@ -36,6 +36,40 @@ export interface IncomeListParams {
   to?: string;
 }
 
+/**
+ * Inputs for the analytics aggregate (INC-stats). Date math (period bounds and
+ * the YYYY[-MM] keys) is resolved in the Asia/Manila-aware web layer and passed
+ * down as concrete strings, keeping this service timezone-agnostic.
+ */
+export interface IncomeStatsParams {
+  /** Active period lower bound (inclusive); omitted = unbounded (All Time). */
+  from?: string;
+  /** Active period upper bound (inclusive); omitted = unbounded. */
+  to?: string;
+  /** Calendar year for the monthly bar series, `YYYY`. */
+  year: string;
+  /** Current calendar month, `YYYY-MM`. */
+  month: string;
+  /** Previous calendar month, `YYYY-MM`. */
+  prevMonth: string;
+}
+
+/** Aggregate figures backing the income analytics band and charts. */
+export interface IncomeStats {
+  /** Total + record count within the active period (all statuses — "in view"). */
+  period: { total: number; count: number };
+  /** Current calendar month total (independent of the period filter). */
+  thisMonthTotal: number;
+  /** Previous calendar month total, for the month-over-month delta. */
+  prevMonthTotal: number;
+  /** Highest single calendar month all-time, or null when there are no records. */
+  bestMonth: { ym: string; total: number } | null;
+  /** One bucket per calendar month present in `year` (`ym` = `YYYY-MM`). */
+  monthly: { ym: string; total: number }[];
+  /** Category breakdown within the active period, descending by total. */
+  bySource: { categoryName: string; total: number; count: number }[];
+}
+
 // ─── Response type ────────────────────────────────────────────────────────────
 
 export interface IncomeRecord {
@@ -125,6 +159,81 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
       const content = (hasMore ? rows.slice(0, limit) : rows).map(toRecord);
 
       return { content, page, last: !hasMore };
+    },
+
+    /**
+     * Analytics aggregate for the income ledger: the in-view period total, the
+     * month-over-month comparison, the all-time best month, a per-month series
+     * for the requested year, and the category breakdown for the period. All
+     * figures sum every record (received + pending) so they match "in view".
+     */
+    async stats(userId: number, params: IncomeStatsParams): Promise<IncomeStats> {
+      const { from, to, year, month, prevMonth } = params;
+      const ym = sql<string>`substr(${incomes.incomeDate}, 1, 7)`;
+
+      // Period total + count, scoped to the active range (or all-time).
+      const periodConds = [eq(incomes.userId, userId)];
+      if (from) periodConds.push(sql`${incomes.incomeDate} >= ${from}`);
+      if (to) periodConds.push(sql`${incomes.incomeDate} <= ${to}`);
+
+      const [periodRow] = await db
+        .select({
+          total: sql<number>`coalesce(sum(${incomes.amount}), 0)`,
+          count: sql<number>`count(*)`,
+        })
+        .from(incomes)
+        .where(and(...periodConds));
+
+      const bySourceRows = await db
+        .select({
+          categoryName: incomes.categoryName,
+          total: sql<number>`coalesce(sum(${incomes.amount}), 0)`,
+          count: sql<number>`count(*)`,
+        })
+        .from(incomes)
+        .where(and(...periodConds))
+        .groupBy(incomes.categoryName)
+        .orderBy(desc(sql`sum(${incomes.amount})`));
+
+      // Per-month series for the requested calendar year.
+      const monthlyRows = await db
+        .select({ ym, total: sql<number>`coalesce(sum(${incomes.amount}), 0)` })
+        .from(incomes)
+        .where(and(eq(incomes.userId, userId), sql`substr(${incomes.incomeDate}, 1, 4) = ${year}`))
+        .groupBy(ym)
+        .orderBy(ym);
+
+      // Best single calendar month across all of the user's history.
+      const [bestRow] = await db
+        .select({ ym, total: sql<number>`coalesce(sum(${incomes.amount}), 0)` })
+        .from(incomes)
+        .where(eq(incomes.userId, userId))
+        .groupBy(ym)
+        .orderBy(desc(sql`sum(${incomes.amount})`))
+        .limit(1);
+
+      const monthTotal = async (key: string): Promise<number> => {
+        const [row] = await db
+          .select({ total: sql<number>`coalesce(sum(${incomes.amount}), 0)` })
+          .from(incomes)
+          .where(
+            and(eq(incomes.userId, userId), sql`substr(${incomes.incomeDate}, 1, 7) = ${key}`)
+          );
+        return Number(row?.total ?? 0);
+      };
+
+      return {
+        period: { total: Number(periodRow?.total ?? 0), count: Number(periodRow?.count ?? 0) },
+        thisMonthTotal: await monthTotal(month),
+        prevMonthTotal: await monthTotal(prevMonth),
+        bestMonth: bestRow ? { ym: bestRow.ym, total: Number(bestRow.total) } : null,
+        monthly: monthlyRows.map((r) => ({ ym: r.ym, total: Number(r.total) })),
+        bySource: bySourceRows.map((r) => ({
+          categoryName: r.categoryName,
+          total: Number(r.total),
+          count: Number(r.count),
+        })),
+      };
     },
 
     /**

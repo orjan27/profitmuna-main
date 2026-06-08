@@ -1,12 +1,18 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { ArrowDownLeft, MoreHorizontal, Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { Income } from '@/types/income';
 import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { formatDateGroup } from '@/lib/format-date';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { StellaSprite } from '@/components/Stella';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 
@@ -38,21 +44,112 @@ function groupByDate(items: Income[]): DateGroup[] {
   return groups;
 }
 
+interface IncomeRowProps {
+  income: Income;
+  onEditRow: (income: Income) => void;
+  onReceiveRow: (income: Income) => void;
+}
+
 /**
- * The income ledger: borderless rows grouped under date headings, amounts
- * right-aligned in tabular numerals. Received amounts carry the income color
- * (always paired with the + sign); pending amounts stay in soft ink with a
- * "Pending" label and an inline Receive action (INC-05 / D-14).
- * Clicking a row opens the edit dialog.
+ * One ledger row: a tinted income glyph, the category and description, and the
+ * amount. Received amounts carry the income color (always with the + sign);
+ * pending amounts stay soft ink with a "Pending" tag. The whole row opens edit;
+ * the overflow menu hosts the same edit plus "Mark received" for pending money
+ * (INC-05 / D-14). Income has no wallet association, so the second line is the
+ * description only.
  */
-export function IncomeList({ items, filtered, onEditRow, onReceiveRow }: IncomeListProps) {
-  const { openRecordSheet } = useRecordSheet();
+function IncomeRow({ income, onEditRow, onReceiveRow }: IncomeRowProps): React.JSX.Element {
   const formatCurrency = useFormatCurrency();
+  const isPending = income.moneyStatus === 'PENDING';
+  const isAmountOnReceive = income.amount === 0 && isPending;
+
+  return (
+    <li>
+      <div
+        className="group -mx-3 flex items-center gap-3.5 rounded-2xl px-3 py-3 transition-colors hover:bg-raised/40"
+        onClick={() => onEditRow(income)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onEditRow(income);
+          }
+        }}
+        aria-label={`Edit income: ${income.categoryName}, ${formatCurrency(income.amount)}`}
+      >
+        <span
+          aria-hidden="true"
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+            isPending ? 'bg-raised text-ink-faint' : 'bg-tint-income text-income'
+          )}
+        >
+          <ArrowDownLeft className="h-5 w-5" />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{income.categoryName}</p>
+          {income.description ? (
+            <p className="mt-0.5 truncate text-xs text-ink-faint">{income.description}</p>
+          ) : null}
+        </div>
+
+        <div className="shrink-0 text-right">
+          {isAmountOnReceive ? (
+            <p className="text-xs text-ink-faint">Amount on receive</p>
+          ) : (
+            <p
+              className={cn(
+                'text-sm font-semibold tabular-nums',
+                isPending ? 'text-ink-soft' : 'text-income'
+              )}
+            >
+              +{formatCurrency(income.amount)}
+            </p>
+          )}
+          {isPending ? <p className="text-[11px] text-ink-faint">Pending</p> : null}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Actions for ${income.categoryName}`}
+              className="shrink-0 text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 max-md:opacity-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => onEditRow(income)}>Edit</DropdownMenuItem>
+            {isPending ? (
+              <DropdownMenuItem onSelect={() => onReceiveRow(income)}>
+                Mark received
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * The income ledger: rows grouped under date headings, amounts right-aligned in
+ * tabular numerals. Empty states teach (first run) or explain (filtered).
+ */
+export function IncomeList({
+  items,
+  filtered,
+  onEditRow,
+  onReceiveRow,
+}: IncomeListProps): React.JSX.Element {
+  const { openRecordSheet } = useRecordSheet();
 
   if (items.length === 0) {
-    // Filtered-empty is not first-run: the records exist, the filters hide
-    // them. Say so instead of the teach copy, and offer no competing CTA —
-    // the filter row sits right above.
     if (filtered) {
       return (
         <div className="py-16 text-center">
@@ -76,71 +173,20 @@ export function IncomeList({ items, filtered, onEditRow, onReceiveRow }: IncomeL
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-7">
       {groupByDate(items).map((group) => (
         <section key={group.label} aria-label={group.label}>
           <h2 className="text-xs font-medium tracking-[0.12em] text-ink-faint uppercase">
             {group.label}
           </h2>
-          <ul className="mt-1 divide-y divide-hairline/60">
+          <ul className="mt-1.5 flex flex-col">
             {group.items.map((income) => (
-              <li key={income.id}>
-                <div
-                  className="group -mx-3 flex cursor-pointer items-center gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-raised/40"
-                  onClick={() => onEditRow(income)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      onEditRow(income);
-                    }
-                  }}
-                  aria-label={`Edit income: ${income.categoryName}, ${formatCurrency(income.amount)}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{income.categoryName}</p>
-                    {income.description ? (
-                      <p className="mt-0.5 truncate text-xs text-ink-faint">{income.description}</p>
-                    ) : null}
-                  </div>
-
-                  {income.moneyStatus === 'PENDING' ? (
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      className="shrink-0 opacity-70 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                      onClick={(e) => {
-                        // Prevent row click from firing
-                        e.stopPropagation();
-                        onReceiveRow(income);
-                      }}
-                      aria-label={`Mark income as received: ${income.categoryName}`}
-                    >
-                      Receive
-                    </Button>
-                  ) : null}
-
-                  <div className="shrink-0 text-right">
-                    {/* Amount 0 + PENDING = recurring "amount set on receive" income */}
-                    {income.amount === 0 && income.moneyStatus === 'PENDING' ? (
-                      <p className="text-xs text-ink-faint">Amount on receive</p>
-                    ) : (
-                      <p
-                        className={cn(
-                          'text-sm font-semibold tabular-nums',
-                          income.moneyStatus === 'RECEIVED' ? 'text-income' : 'text-ink-soft'
-                        )}
-                      >
-                        +{formatCurrency(income.amount)}
-                      </p>
-                    )}
-                    {income.moneyStatus === 'PENDING' ? (
-                      <p className="text-[11px] text-ink-faint">Pending</p>
-                    ) : null}
-                  </div>
-                </div>
-              </li>
+              <IncomeRow
+                key={income.id}
+                income={income}
+                onEditRow={onEditRow}
+                onReceiveRow={onReceiveRow}
+              />
             ))}
           </ul>
         </section>

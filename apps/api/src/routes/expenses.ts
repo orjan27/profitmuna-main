@@ -3,14 +3,19 @@ import { zValidator } from '@hono/zod-validator';
 
 import { createDb } from '@app/db';
 import { createExpenseService } from '@/services/expense-service';
-import { createExpenseSchema, updateExpenseSchema, expenseQuerySchema } from '@/schemas/expense';
+import {
+  createExpenseSchema,
+  updateExpenseSchema,
+  expenseQuerySchema,
+  expenseStatsQuerySchema,
+} from '@/schemas/expense';
 import { idParamSchema } from '@/schemas/common';
 import type { Bindings, Variables } from '@/types';
 
 const expensesRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 /** Validation hook: returns 422 on schema failure (security.md). */
-function validationHook<T>(
+function validationHook(
   result: { success: boolean },
   c: { json: (body: unknown, status: number) => Response }
 ) {
@@ -34,6 +39,20 @@ expensesRouter.get(
       to: query.to,
     });
     return c.json(result, 200);
+  }
+);
+
+// GET /api/expenses/stats — analytics aggregate. MUST precede /:id so "stats"
+// is not matched as an id param.
+expensesRouter.get(
+  '/stats',
+  zValidator('query', expenseStatsQuerySchema, validationHook as Parameters<typeof zValidator>[2]),
+  async (c) => {
+    const query = c.req.valid('query');
+    const db = createDb(c.env.DB);
+    const svc = createExpenseService(db);
+    const result = await svc.stats(c.get('userId'), query);
+    return c.json({ data: result }, 200);
   }
 );
 
