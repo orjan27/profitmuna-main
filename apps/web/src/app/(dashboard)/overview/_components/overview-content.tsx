@@ -23,7 +23,7 @@ import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/am
 import { StellaSprite, type StellaMood } from '@/components/Stella';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import type { BalanceComparison, DashboardSummary, RecentTransaction } from '@/types/dashboard';
-import { OverviewFilters } from './overview-filters';
+import { DateRangeSelect } from '@/components/DateRangeSelect';
 import { StellaMessages } from './stella-messages';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -331,7 +331,7 @@ export function OverviewContent({
           {/* D-02: the wallet balance is period-scoped — the pill names the
               period AND opens the preset picker (one date filter governs
               every figure and the feed, D-07/D-08). */}
-          <OverviewFilters />
+          <DateRangeSelect />
         </div>
       </section>
 

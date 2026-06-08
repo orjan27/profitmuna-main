@@ -1,8 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { endOfMonth, endOfYear, format, startOfMonth, startOfYear, subMonths } from 'date-fns';
-import { TZDate } from '@date-fns/tz';
 import { Filter } from 'lucide-react';
 import { parseAsArrayOf, parseAsString, useQueryState } from 'nuqs';
 
@@ -17,55 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-
-// ── Manila timezone ──────────────────────────────────────────────────────────
-
-const APP_TIMEZONE = 'Asia/Manila';
-
-function nowManila(): TZDate {
-  return new TZDate(new Date(), APP_TIMEZONE);
-}
-
-function fmt(date: Date | TZDate): string {
-  return format(date, 'yyyy-MM-dd');
-}
-
-// ── Date presets ─────────────────────────────────────────────────────────────
-
-const DATE_PRESETS = [
-  {
-    label: 'This Month',
-    getRange: () => ({
-      from: fmt(startOfMonth(nowManila())),
-      to: fmt(endOfMonth(nowManila())),
-    }),
-  },
-  {
-    label: 'Last Month',
-    getRange: () => ({
-      from: fmt(startOfMonth(subMonths(nowManila(), 1))),
-      to: fmt(endOfMonth(subMonths(nowManila(), 1))),
-    }),
-  },
-  {
-    label: 'Last 3 Months',
-    getRange: () => ({
-      from: fmt(startOfMonth(subMonths(nowManila(), 2))),
-      to: fmt(endOfMonth(nowManila())),
-    }),
-  },
-  {
-    label: 'This Year',
-    getRange: () => ({
-      from: fmt(startOfYear(nowManila())),
-      to: fmt(endOfYear(nowManila())),
-    }),
-  },
-  {
-    label: 'All Time',
-    getRange: () => ({ from: undefined, to: undefined }),
-  },
-] as const;
+import { DateRangeSelect } from '@/components/DateRangeSelect';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -87,9 +37,10 @@ interface PfFiltersProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 /**
- * Date-range preset selector and income category multi-select filter.
+ * Date-range selector and income category multi-select filter.
  *
- * Filter state lives in URL search params via nuqs (D-11). Changing a filter
+ * The time scope is the shared {@link DateRangeSelect} (URL `from`/`to` via
+ * nuqs — D-11); category selection lives in `categoryIds`. Changing a filter
  * updates the URL, which re-renders the RSC page and re-fetches the summary.
  *
  * NOTE: nuqs hooks may only be called in client components (Pitfall 5).
@@ -98,29 +49,10 @@ interface PfFiltersProps {
 export function PfFilters({ categoryOptions = [] }: PfFiltersProps) {
   const router = useRouter();
 
-  const [from, setFrom] = useQueryState('from', parseAsString);
-  const [to, setTo] = useQueryState('to', parseAsString);
   const [selectedCategories, setSelectedCategories] = useQueryState(
     'categoryIds',
     parseAsArrayOf(parseAsString).withDefault([])
   );
-
-  function isPresetActive(label: string): boolean {
-    const preset = DATE_PRESETS.find((p) => p.label === label);
-    if (!preset) return false;
-    if (label === 'All Time') return !from && !to;
-    const range = preset.getRange();
-    return from === range.from && to === range.to;
-  }
-
-  async function selectPreset(label: string) {
-    const preset = DATE_PRESETS.find((p) => p.label === label);
-    if (!preset) return;
-    const range = preset.getRange();
-    await setFrom(range.from ?? null);
-    await setTo(range.to ?? null);
-    router.refresh();
-  }
 
   async function toggleCategory(id: string) {
     const current = selectedCategories ?? [];
@@ -130,20 +62,9 @@ export function PfFilters({ categoryOptions = [] }: PfFiltersProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {/* Date range preset buttons — Manila timezone (D-09) */}
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {DATE_PRESETS.map((preset) => (
-          <Button
-            key={preset.label}
-            variant={isPresetActive(preset.label) ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => void selectPreset(preset.label)}
-          >
-            {preset.label}
-          </Button>
-        ))}
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Time scope — shared select (presets + Custom range), Manila tz (D-09). */}
+      <DateRangeSelect />
 
       {/* Category multi-select sheet or empty-state */}
       {categoryOptions.length > 0 ? (

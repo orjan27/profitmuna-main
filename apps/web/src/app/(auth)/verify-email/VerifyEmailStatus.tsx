@@ -62,19 +62,21 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
 
   if (state === 'verifying') {
     return (
-      <div className="w-full max-w-sm">
-        <h1 className="text-xl font-semibold tracking-tight">Verifying…</h1>
-        <p className="mt-1 text-sm text-ink-soft">Hold on while we confirm your email.</p>
+      <div className="w-full">
+        <h1 className="text-3xl font-bold tracking-tight text-ink">Verifying…</h1>
+        <p className="mt-2 text-base text-ink-soft">Hold on while we confirm your email.</p>
       </div>
     );
   }
 
   if (state === 'success') {
     return (
-      <div className="w-full max-w-sm">
-        <h1 className="text-xl font-semibold tracking-tight">Email verified</h1>
-        <p className="mt-1 text-sm text-ink-soft">Your email is confirmed. You can sign in now.</p>
-        <Button asChild className="mt-8 w-full">
+      <div className="w-full">
+        <h1 className="text-3xl font-bold tracking-tight text-ink">Email verified</h1>
+        <p className="mt-2 text-base text-ink-soft">
+          Your email is confirmed. You can sign in now.
+        </p>
+        <Button asChild className="mt-8 h-11 w-full">
           <a href="/login">Go to login</a>
         </Button>
       </div>
@@ -82,18 +84,18 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
   }
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full">
       {state === 'failure' ? (
         <>
-          <h1 className="text-xl font-semibold tracking-tight">Verification failed</h1>
-          <p className="mt-1 text-sm text-ink-soft">
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Verification failed</h1>
+          <p className="mt-2 text-base text-ink-soft">
             That link is invalid or has expired. Enter your email to get a new one.
           </p>
         </>
       ) : (
         <>
-          <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
-          <p className="mt-1 text-sm text-ink-soft">
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Check your email</h1>
+          <p className="mt-2 text-base text-ink-soft">
             We sent you a verification link. Didn&apos;t get it? Resend below.
           </p>
         </>
@@ -106,12 +108,14 @@ export function VerifyEmailStatus({ token }: VerifyEmailStatusProps) {
             id="resend-email"
             type="email"
             autoComplete="email"
+            placeholder="you@profitmuna.com"
             value={resendEmail}
             onChange={(e) => setResendEmail(e.target.value)}
             required
+            className="h-11 bg-[oklch(0.972_0.005_85)]"
           />
         </div>
-        <Button type="submit" variant="outline" disabled={resending}>
+        <Button type="submit" variant="outline" disabled={resending} className="h-11 w-full">
           {resending ? 'Sending…' : 'Resend verification link'}
         </Button>
       </form>

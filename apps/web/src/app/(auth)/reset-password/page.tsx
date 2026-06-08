@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { BrandMark } from '@/components/BrandMark';
+import { AuthShell } from '@/components/AuthShell';
 import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm';
 
 interface ResetPasswordPageProps {
@@ -12,32 +12,26 @@ export default async function ResetPasswordPage({ searchParams }: ResetPasswordP
 
   if (!token) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
-        <Link href="/" aria-label="Profitmuna home" className="mb-10">
-          <BrandMark markClassName="h-12" />
-        </Link>
-        <div className="w-full max-w-sm">
-          <h1 className="text-xl font-semibold tracking-tight">Invalid reset link</h1>
-          <p className="mt-1 text-sm text-ink-soft">
+      <AuthShell>
+        <div className="w-full">
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Invalid reset link</h1>
+          <p className="mt-2 text-base text-ink-soft">
             This reset link is missing a token. Please request a new one.
           </p>
           <Link
             href="/forgot-password"
-            className="mt-6 inline-block text-sm text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline"
+            className="mt-6 inline-block text-sm font-medium text-[oklch(0.6_0.17_28)] underline-offset-4 transition-colors hover:text-[oklch(0.52_0.17_28)] hover:underline"
           >
             Request a new reset link
           </Link>
         </div>
-      </main>
+      </AuthShell>
     );
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-6 py-16">
-      <Link href="/" aria-label="Profitmuna home" className="mb-10">
-        <BrandMark markClassName="h-12" />
-      </Link>
+    <AuthShell>
       <ResetPasswordForm token={token} />
-    </main>
+    </AuthShell>
   );
 }

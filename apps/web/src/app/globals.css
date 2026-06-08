@@ -59,6 +59,8 @@
   /* Ease-out exponential only; no bounce, no elastic */
   --animate-rise: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-fill: fill 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* Jar liquid rising from the bottom (Profit First jars) — origin-bottom */
+  --animate-pour: pour 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 
   @keyframes rise {
     from {
@@ -77,6 +79,15 @@
     }
     to {
       transform: scaleX(1);
+    }
+  }
+
+  @keyframes pour {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
     }
   }
 }

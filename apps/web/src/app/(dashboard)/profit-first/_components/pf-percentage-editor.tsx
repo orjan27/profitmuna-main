@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { updatePercentagesAction } from '@/server/profit-first-actions';
 import type { PfAccount } from './pf-overview';
@@ -102,32 +103,47 @@ export function PfPercentageEditor({ accounts, onCancel }: PfPercentageEditorPro
       <Separator />
 
       {/* Rows */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-5">
         {rows.map((row) => (
-          <div key={row.id} className="flex items-center gap-3">
-            {/* Color dot */}
-            <span
-              className="h-3 w-3 rounded-full shrink-0"
-              style={{ backgroundColor: row.color }}
-              aria-hidden="true"
-            />
-            {/* Account name */}
-            <span className="flex-1 text-sm">{row.name}</span>
-            {/* Percent input */}
-            <div className="flex items-center gap-1.5">
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                value={row.displayPercent}
-                onChange={(e) => handleChange(row.id, e.target.value)}
-                className="w-20 text-right tabular-nums"
-                aria-label={`${row.name} percentage`}
-                disabled={submitting}
+          <div key={row.id} className="flex flex-col gap-2.5">
+            {/* Label line: color dot + name + percent input */}
+            <div className="flex items-center gap-3">
+              {/* Color dot */}
+              <span
+                className="h-3 w-3 rounded-full shrink-0"
+                style={{ backgroundColor: row.color }}
+                aria-hidden="true"
               />
-              <span className="text-sm text-muted-foreground w-4">%</span>
+              {/* Account name */}
+              <span className="flex-1 text-sm">{row.name}</span>
+              {/* Percent input */}
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={row.displayPercent}
+                  onChange={(e) => handleChange(row.id, e.target.value)}
+                  className="w-20 text-right tabular-nums"
+                  aria-label={`${row.name} percentage`}
+                  disabled={submitting}
+                />
+                <span className="text-sm text-muted-foreground w-4">%</span>
+              </div>
             </div>
+            {/* Slider — coarse adjust, synced with the input above */}
+            <Slider
+              value={[row.displayPercent]}
+              onValueChange={(values) => handleChange(row.id, String(values[0]))}
+              min={0}
+              max={100}
+              step={1}
+              disabled={submitting}
+              aria-label={`${row.name} percentage slider`}
+              style={{ '--slider-accent': row.color } as CSSProperties}
+              className="[&_[data-slot=slider-range]]:bg-[var(--slider-accent)] [&_[data-slot=slider-thumb]]:border-[var(--slider-accent)]"
+            />
           </div>
         ))}
       </div>

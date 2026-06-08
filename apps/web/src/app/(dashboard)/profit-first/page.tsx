@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 
+import { resolveOverviewRange } from '@/lib/overview-date-presets';
 import { PfContent } from './_components/pf-content';
 import { PfFilters, type CategoryOption } from './_components/pf-filters';
 
@@ -51,10 +52,15 @@ export default async function ProfitFirstPage({
   const cookieStore = await cookies();
   const accessToken = cookieStore.get('access_token')?.value;
 
-  // Build query string from URL search params
+  // Resolve the time scope the same way as the overview/ledgers: empty URL is
+  // the This Month default, ?from=all is All Time, any other pair is a custom
+  // range (DateRangeSelect drives these params).
+  const range = resolveOverviewRange(params.from, params.to);
+
+  // Build query string from the resolved range + category filter
   const query = new URLSearchParams();
-  if (params.from) query.set('from', params.from);
-  if (params.to) query.set('to', params.to);
+  if (range.from) query.set('from', range.from);
+  if (range.to) query.set('to', range.to);
   if (params.categoryIds) query.set('categoryIds', params.categoryIds);
   const qs = query.toString();
 
@@ -86,17 +92,28 @@ export default async function ProfitFirstPage({
     // Network error — page renders empty state; user can refresh
   }
 
+  const jarCount = accounts.length;
+
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-7">
-      {/* Page header — the hero number below carries the page, the title stays quiet */}
-      <h1 className="text-[20px] font-semibold leading-tight">Profit First</h1>
+    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      {/* Page header — title + jar metaphor tagline, with a live jar count pill */}
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Profit First</h1>
+          <p className="mt-1 text-sm text-ink-soft">Pour your income into jars</p>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs font-semibold text-ink-soft ring-1 ring-hairline">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-income" />
+          {jarCount} {jarCount === 1 ? 'jar' : 'jars'}
+        </span>
+      </header>
 
       {/* Filter bar — client component (nuqs hooks — Pitfall 5) */}
       <PfFilters categoryOptions={categoryOptions} />
 
       {/*
        * PfContent: client component that owns amount-visibility state and
-       * renders hero total → allocation bar → ledger with server-fetched data.
+       * renders hero total → row of jars → funded-status banner.
        */}
       <PfContent accounts={accounts} totalIncome={totalIncome} />
     </div>

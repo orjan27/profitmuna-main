@@ -63,9 +63,52 @@ export const DATE_PRESETS = [
  */
 export const ALL_TIME_SENTINEL = 'all';
 
+/** Label shown for an arbitrary range that matches no preset. */
+export const CUSTOM_LABEL = 'Custom';
+
+/** A preset label, or the Custom-range marker — the values DateRangeSelect drives. */
+export type PresetLabel = (typeof DATE_PRESETS)[number]['label'] | typeof CUSTOM_LABEL;
+
 /** Default overview period: This Month in Asia/Manila (D-08). */
 export function getDefaultOverviewRange(): { from: string; to: string } {
   return DATE_PRESETS[0].getRange();
+}
+
+/**
+ * Map the URL `from`/`to` params to the preset they represent — or
+ * {@link CUSTOM_LABEL} for an arbitrary range. Mirrors the resolution the
+ * server uses: an empty URL is the This Month default; `?from=all` is All Time.
+ */
+export function resolvePresetLabel(from?: string, to?: string): PresetLabel {
+  if (from === ALL_TIME_SENTINEL) return 'All Time';
+  if (!from && !to) return 'This Month';
+  for (const preset of DATE_PRESETS) {
+    if (preset.label === 'All Time') continue;
+    const range = preset.getRange();
+    if (range.from === from && range.to === to) return preset.label;
+  }
+  return CUSTOM_LABEL;
+}
+
+/**
+ * Resolve URL `from`/`to` params to the concrete bounds a page fetches with.
+ * An empty URL applies the This Month default (D-08); `?from=all` is the
+ * explicit All Time choice (both bounds undefined → unbounded). Any other
+ * pair is passed through verbatim (a Custom range).
+ */
+export function resolveOverviewRange(
+  from?: string,
+  to?: string
+): { from?: string; to?: string; allTime: boolean; hasUrlFilter: boolean } {
+  const allTime = from === ALL_TIME_SENTINEL;
+  const hasUrlFilter = Boolean(from || to);
+  const defaults = getDefaultOverviewRange();
+  return {
+    from: allTime ? undefined : (from ?? defaults.from),
+    to: allTime ? undefined : (to ?? defaults.to),
+    allTime,
+    hasUrlFilter,
+  };
 }
 
 // Sentence-case captions for the hero ("This month" reads as prose next to

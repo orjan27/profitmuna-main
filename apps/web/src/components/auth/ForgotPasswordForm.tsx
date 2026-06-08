@@ -46,9 +46,9 @@ export function ForgotPasswordForm() {
 
   if (submitted) {
     return (
-      <div className="w-full max-w-sm">
-        <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
-        <p className="mt-1 text-sm text-ink-soft">
+      <div className="w-full">
+        <h1 className="text-3xl font-bold tracking-tight text-ink">Check your email</h1>
+        <p className="mt-2 text-base text-ink-soft">
           If an account with that address exists, a reset link has been sent. Check your inbox.
         </p>
         <p className="mt-6 text-sm text-ink-faint">
@@ -67,9 +67,9 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div className="w-full max-w-sm">
-      <h1 className="text-xl font-semibold tracking-tight">Forgot your password?</h1>
-      <p className="mt-1 text-sm text-ink-soft">
+    <div className="w-full">
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Forgot your password?</h1>
+      <p className="mt-2 text-base text-ink-soft">
         Enter your email and we&apos;ll send you a reset link.
       </p>
 
@@ -80,13 +80,15 @@ export function ForgotPasswordForm() {
             id="forgot-email"
             type="email"
             autoComplete="email"
+            placeholder="you@profitmuna.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            className="h-11 bg-[oklch(0.972_0.005_85)]"
           />
           {emailError ? <p className="text-sm text-destructive">{emailError}</p> : null}
         </div>
-        <Button type="submit" disabled={submitting} className="max-sm:h-11">
+        <Button type="submit" disabled={submitting} className="h-11 w-full">
           {submitting ? 'Sending…' : 'Send reset link'}
         </Button>
       </form>
@@ -95,7 +97,7 @@ export function ForgotPasswordForm() {
         Remembered it?{' '}
         <Link
           href="/login"
-          className="text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline"
+          className="font-medium text-[oklch(0.6_0.17_28)] underline-offset-4 transition-colors hover:text-[oklch(0.52_0.17_28)] hover:underline"
         >
           Sign in
         </Link>

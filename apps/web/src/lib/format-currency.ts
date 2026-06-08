@@ -41,6 +41,48 @@ export function formatCurrency(cents: number, currency: CurrencyCode = 'PHP'): s
   })}`;
 }
 
+/** Currency split into display parts so the decimals can be styled apart. */
+export interface CurrencyParts {
+  /** Currency symbol with any leading sign — e.g. "₱" or "-₱". */
+  symbol: string;
+  /** Grouped integer portion — e.g. "88,447". */
+  whole: string;
+  /** Decimal separator + fraction digits — e.g. ".05". Empty for JPY. */
+  fraction: string;
+}
+
+/**
+ * Format an integer cent amount into locale-correct display parts so a hero
+ * figure can render the decimals in a quieter weight (e.g. ₱88,447 with a
+ * faint .05). Locale-safe: the integer/decimal split comes from
+ * Intl.NumberFormat parts, not a naive `.split('.')` (which breaks for
+ * comma-decimal locales like de-DE).
+ *
+ * @param cents - Amount in integer cents
+ * @param currency - ISO 4217 code from the supported list (default: 'PHP')
+ */
+export function formatCurrencyParts(cents: number, currency: CurrencyCode = 'PHP'): CurrencyParts {
+  const { locale, symbol } = CURRENCY_LOCALES[currency];
+  const fractionDigits = currency === 'JPY' ? 0 : 2;
+  const parts = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).formatToParts(Math.abs(cents) / 100);
+
+  const whole = parts
+    .filter((p) => p.type === 'integer' || p.type === 'group')
+    .map((p) => p.value)
+    .join('');
+  const decimal = parts.find((p) => p.type === 'decimal')?.value ?? '';
+  const fractionDigitsValue = parts.find((p) => p.type === 'fraction')?.value ?? '';
+
+  return {
+    symbol: `${cents < 0 ? '-' : ''}${symbol}`,
+    whole,
+    fraction: fractionDigitsValue ? `${decimal}${fractionDigitsValue}` : '',
+  };
+}
+
 /**
  * Convert a decimal amount input to integer cents for storage.
  * Uses Math.round to avoid floating-point precision issues (D-08).

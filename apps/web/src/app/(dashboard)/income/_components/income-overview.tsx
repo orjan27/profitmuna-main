@@ -19,9 +19,9 @@ import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/am
 import { StatTile } from '@/components/StatTile';
 import { MonthlyBars, type MonthlyBarDatum } from '@/components/MonthlyBars';
 import { SourceBreakdown } from '@/components/SourceBreakdown';
-import { PeriodControl } from '@/components/PeriodControl';
-import { StellaSprite } from '@/components/Stella';
-import { monthShortLabel, type LedgerPeriodKey } from '@/lib/ledger-period';
+import { DateRangeSelect } from '@/components/DateRangeSelect';
+import { monthShortLabel } from '@/lib/ledger-period';
+import type { PresetLabel } from '@/lib/overview-date-presets';
 import { nextDueDate } from '@/lib/recurrence';
 import { formatDate } from '@/lib/format-date';
 import type { Income, IncomeCategory } from '@/types/income';
@@ -47,8 +47,8 @@ interface IncomeOverviewProps {
   recurring: RecurringIncome[];
   /** Aggregate figures for the stat band and charts. */
   stats: LedgerStats;
-  /** Resolved period key (drives the period caption + the best-month star). */
-  periodKey: LedgerPeriodKey;
+  /** Resolved preset label (drives the period caption + the best-month star). */
+  periodLabel: PresetLabel;
   /** Resolved period bounds — keep load-more scoped to the same window. */
   from?: string;
   to?: string;
@@ -56,11 +56,13 @@ interface IncomeOverviewProps {
   statsDate: { year: string; month: string; prevMonth: string };
 }
 
-const PERIOD_CAPTION: Record<LedgerPeriodKey, string> = {
-  '30d': 'last 30 days',
-  month: 'this month',
-  year: 'this year',
-  all: 'all time',
+const PERIOD_CAPTION: Record<PresetLabel, string> = {
+  'This Month': 'this month',
+  'Last Month': 'last month',
+  'Last 3 Months': 'last 3 months',
+  'This Year': 'this year',
+  'All Time': 'all time',
+  Custom: 'selected range',
 };
 
 /** Monthly-equivalent contribution of a recurring template (null amount = skip). */
@@ -108,7 +110,7 @@ export function IncomeOverview({
   categories,
   recurring,
   stats,
-  periodKey,
+  periodLabel,
   from,
   to,
   statsDate,
@@ -133,7 +135,7 @@ export function IncomeOverview({
   const [receivingIncome, setReceivingIncome] = useState<Income | null>(null);
 
   // Secondary filters (search + status) live behind the Filter toggle; the
-  // primary time scope is the PeriodControl (URL `period`).
+  // primary time scope is the DateRangeSelect (URL `from`/`to`).
   const [search] = useQueryState('search', parseAsString.withDefault(''));
   const [moneyStatus] = useQueryState('moneyStatus', parseAsString.withDefault(''));
 
@@ -170,12 +172,12 @@ export function IncomeOverview({
 
   // ── Derived stat figures ────────────────────────────────────────────────
   const recordCount = stats.period.count;
-  const periodCaption = PERIOD_CAPTION[periodKey];
+  const periodCaption = PERIOD_CAPTION[periodLabel];
 
   // Best-month star: only when viewing the current month and it's the highest
   // single calendar month on record (truthful — never on multi-month views).
   const isBestMonth =
-    periodKey === 'month' &&
+    periodLabel === 'This Month' &&
     stats.thisMonthTotal > 0 &&
     stats.bestMonth !== null &&
     stats.thisMonthTotal >= stats.bestMonth.total;
@@ -201,7 +203,7 @@ export function IncomeOverview({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[22px] leading-tight font-semibold">Income</h1>
         <div className="flex items-center gap-1.5">
-          <PeriodControl className="max-md:hidden" />
+          <DateRangeSelect />
           <Button
             variant="ghost"
             size="sm"
@@ -239,21 +241,12 @@ export function IncomeOverview({
         </div>
       </div>
 
-      {/* Time scope — full-width segmented row on mobile (the header copy is
-          md+ only); the stat band and charts below render on every size. */}
-      <PeriodControl className="flex w-full justify-between overflow-x-auto md:hidden" />
-
       {/* Stat band — total spans full width on mobile, then the pair; three
           across on the web view. */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
         <StatTile
           className="col-span-2 md:col-span-1"
-          label={
-            <>
-              Total in view
-              {isBestMonth ? <StellaSprite mood="smiling" size={18} decorative /> : null}
-            </>
-          }
+          label="Total in view"
           caption={
             <>
               across {recordCount} record{recordCount !== 1 ? 's' : ''} ·{' '}

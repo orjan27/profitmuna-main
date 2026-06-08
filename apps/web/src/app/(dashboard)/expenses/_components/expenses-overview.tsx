@@ -17,8 +17,9 @@ import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/am
 import { StatTile } from '@/components/StatTile';
 import { MonthlyBars, type MonthlyBarDatum } from '@/components/MonthlyBars';
 import { SourceBreakdown } from '@/components/SourceBreakdown';
-import { PeriodControl } from '@/components/PeriodControl';
-import { monthShortLabel, type LedgerPeriodKey } from '@/lib/ledger-period';
+import { DateRangeSelect } from '@/components/DateRangeSelect';
+import { monthShortLabel } from '@/lib/ledger-period';
+import type { PresetLabel } from '@/lib/overview-date-presets';
 import { nextDueDate } from '@/lib/recurrence';
 import { formatDate } from '@/lib/format-date';
 import type { RecurringExpense } from '@/types/recurring';
@@ -58,8 +59,8 @@ interface ExpensesOverviewProps {
   recurring: RecurringExpense[];
   /** Aggregate figures for the stat band and charts. */
   stats: LedgerStats;
-  /** Resolved period key (drives the period caption). */
-  periodKey: LedgerPeriodKey;
+  /** Resolved preset label (drives the period caption). */
+  periodLabel: PresetLabel;
   /** Resolved period bounds — keep load-more / refresh scoped to the window. */
   from?: string;
   to?: string;
@@ -69,11 +70,13 @@ interface ExpensesOverviewProps {
 
 const PAGE_LIMIT = 20;
 
-const PERIOD_CAPTION: Record<LedgerPeriodKey, string> = {
-  '30d': 'last 30 days',
-  month: 'this month',
-  year: 'this year',
-  all: 'all time',
+const PERIOD_CAPTION: Record<PresetLabel, string> = {
+  'This Month': 'this month',
+  'Last Month': 'last month',
+  'Last 3 Months': 'last 3 months',
+  'This Year': 'this year',
+  'All Time': 'all time',
+  Custom: 'selected range',
 };
 
 /** Monthly-equivalent contribution of a recurring expense template. */
@@ -122,7 +125,7 @@ export function ExpensesOverview({
   defaultWalletId,
   recurring,
   stats,
-  periodKey,
+  periodLabel,
   from,
   to,
   statsDate,
@@ -167,7 +170,7 @@ export function ExpensesOverview({
 
   // ── Derived stat figures ────────────────────────────────────────────────
   const recordCount = stats.period.count;
-  const periodCaption = PERIOD_CAPTION[periodKey];
+  const periodCaption = PERIOD_CAPTION[periodLabel];
 
   // Month-over-month delta. For spending, up reads as expense (red) and down as
   // income (green) — less spending is the good direction.
@@ -190,7 +193,7 @@ export function ExpensesOverview({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[22px] leading-tight font-semibold">Expenses</h1>
         <div className="flex items-center gap-1.5">
-          <PeriodControl className="max-md:hidden" />
+          <DateRangeSelect />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -214,10 +217,6 @@ export function ExpensesOverview({
           </Button>
         </div>
       </div>
-
-      {/* Time scope — full-width segmented row on mobile (the header copy is
-          md+ only); the stat band and charts below render on every size. */}
-      <PeriodControl className="flex w-full justify-between overflow-x-auto md:hidden" />
 
       {/* Stat band — total spans full width on mobile, then the pair; three
           across on the web view. */}

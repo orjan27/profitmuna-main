@@ -5,11 +5,13 @@ import { apiFetch, ApiError } from '@/server/api';
 import type { IncomeListResponse, IncomeCategoryListResponse } from '@/types/income';
 import type { RecurringIncomeListResponse } from '@/types/recurring';
 import type { LedgerStatsResponse } from '@/types/stats';
-import { ledgerStatsDateParams, resolveLedgerPeriod } from '@/lib/ledger-period';
+import { ledgerStatsDateParams } from '@/lib/ledger-period';
+import { resolveOverviewRange, resolvePresetLabel } from '@/lib/overview-date-presets';
 import { IncomeOverview } from './_components/income-overview';
 
 interface SearchParams {
-  period?: string;
+  from?: string;
+  to?: string;
   search?: string;
   moneyStatus?: string;
 }
@@ -24,10 +26,12 @@ export default async function IncomePage({ searchParams }: Props) {
 
   const params = await searchParams;
 
-  // The segmented PeriodControl drives the time scope (URL `period`); the RSC
-  // resolves it to concrete bounds for both the ledger list and the stats
-  // aggregate. Search + status are secondary filters behind the Filter toggle.
-  const period = resolveLedgerPeriod(params.period);
+  // The DateRangeSelect drives the time scope (URL `from`/`to` + the `all`
+  // sentinel; empty = This Month default); the RSC resolves it to concrete
+  // bounds for both the ledger list and the stats aggregate. Search + status
+  // are secondary filters behind the Filter toggle.
+  const range = resolveOverviewRange(params.from, params.to);
+  const periodLabel = resolvePresetLabel(params.from, params.to);
   const statsDate = ledgerStatsDateParams();
 
   const listQs = new URLSearchParams({
@@ -35,16 +39,16 @@ export default async function IncomePage({ searchParams }: Props) {
     limit: '20',
     ...(params.search ? { search: params.search } : {}),
     ...(params.moneyStatus ? { moneyStatus: params.moneyStatus } : {}),
-    ...(period.from ? { from: period.from } : {}),
-    ...(period.to ? { to: period.to } : {}),
+    ...(range.from ? { from: range.from } : {}),
+    ...(range.to ? { to: range.to } : {}),
   }).toString();
 
   const statsQs = new URLSearchParams({
     year: statsDate.year,
     month: statsDate.month,
     prevMonth: statsDate.prevMonth,
-    ...(period.from ? { from: period.from } : {}),
-    ...(period.to ? { to: period.to } : {}),
+    ...(range.from ? { from: range.from } : {}),
+    ...(range.to ? { to: range.to } : {}),
   }).toString();
 
   let incomeData: IncomeListResponse;
@@ -70,14 +74,14 @@ export default async function IncomePage({ searchParams }: Props) {
     <div className="mx-auto w-full max-w-5xl">
       <IncomeOverview
         // Re-key per period so the client accumulator resets on scope change.
-        key={period.key}
+        key={`${range.from ?? 'all'}-${range.to ?? 'all'}`}
         initialData={incomeData.data}
         categories={categoriesData.data}
         recurring={recurringData.data}
         stats={statsData.data}
-        periodKey={period.key}
-        from={period.from}
-        to={period.to}
+        periodLabel={periodLabel}
+        from={range.from}
+        to={range.to}
         statsDate={statsDate}
       />
     </div>

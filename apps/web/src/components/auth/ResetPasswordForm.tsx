@@ -61,9 +61,9 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   }
 
   return (
-    <div className="w-full max-w-sm">
-      <h1 className="text-xl font-semibold tracking-tight">Set a new password</h1>
-      <p className="mt-1 text-sm text-ink-soft">
+    <div className="w-full">
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Set a new password</h1>
+      <p className="mt-2 text-base text-ink-soft">
         Choose a strong password of at least 8 characters.
       </p>
 
@@ -78,6 +78,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
+            className="h-11 bg-[oklch(0.972_0.005_85)]"
           />
           {fieldErrors.password ? (
             <p className="text-sm text-destructive">{fieldErrors.password}</p>
@@ -92,12 +93,13 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             required
+            className="h-11 bg-[oklch(0.972_0.005_85)]"
           />
           {fieldErrors.confirm ? (
             <p className="text-sm text-destructive">{fieldErrors.confirm}</p>
           ) : null}
         </div>
-        <Button type="submit" disabled={submitting} className="max-sm:h-11">
+        <Button type="submit" disabled={submitting} className="h-11 w-full">
           {submitting ? 'Saving…' : 'Set new password'}
         </Button>
       </form>

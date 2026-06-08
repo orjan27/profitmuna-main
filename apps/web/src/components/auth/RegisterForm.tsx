@@ -59,9 +59,9 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="w-full max-w-sm">
-      <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
-      <p className="mt-1 text-sm text-ink-soft">
+    <div className="w-full">
+      <h1 className="text-3xl font-bold tracking-tight text-ink">Create your account</h1>
+      <p className="mt-2 text-base text-ink-soft">
         Start allocating your income the Profit First way.
       </p>
 
@@ -72,9 +72,11 @@ export function RegisterForm() {
             id="register-email"
             type="email"
             autoComplete="email"
+            placeholder="you@profitmuna.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            className="h-11 bg-[oklch(0.972_0.005_85)]"
           />
           {fieldErrors.email ? (
             <p className="text-sm text-destructive">{fieldErrors.email}</p>
@@ -89,6 +91,7 @@ export function RegisterForm() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
+            className="h-11 bg-[oklch(0.972_0.005_85)]"
           />
           {fieldErrors.name ? <p className="text-sm text-destructive">{fieldErrors.name}</p> : null}
         </div>
@@ -102,12 +105,13 @@ export function RegisterForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
+            className="h-11 bg-[oklch(0.972_0.005_85)]"
           />
           {fieldErrors.password ? (
             <p className="text-sm text-destructive">{fieldErrors.password}</p>
           ) : null}
         </div>
-        <Button type="submit" disabled={submitting} className="max-sm:h-11">
+        <Button type="submit" disabled={submitting} className="mt-1 h-11 w-full">
           {submitting ? 'Creating account…' : 'Create account'}
         </Button>
       </form>
@@ -116,7 +120,7 @@ export function RegisterForm() {
         Already have an account?{' '}
         <Link
           href="/login"
-          className="text-ink-soft underline-offset-4 transition-colors hover:text-ink hover:underline"
+          className="font-medium text-[oklch(0.6_0.17_28)] underline-offset-4 transition-colors hover:text-[oklch(0.52_0.17_28)] hover:underline"
         >
           Sign in
         </Link>

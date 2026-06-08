@@ -72,9 +72,10 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
     e.preventDefault();
     if (submitting) return;
 
-    const parsed = parseFloat(targetPercent);
+    // Empty Target % defaults to 0% — account is created with no allocation
+    const parsed = targetPercent.trim() === '' ? 0 : parseFloat(targetPercent);
     if (!name.trim()) {
-      toast.error('Account name is required.');
+      toast.error('Jar name is required.');
       return;
     }
     if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
@@ -94,7 +95,7 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
           toast.error(result.message ?? 'Something went wrong. Please try again.');
           return;
         }
-        toast.success('Account updated.');
+        toast.success('Jar updated.');
       } else {
         const result = await createAccountAction({
           name: name.trim(),
@@ -105,7 +106,7 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
           toast.error(result.message ?? 'Something went wrong. Please try again.');
           return;
         }
-        toast.success('Account created.');
+        toast.success('Jar created.');
       }
       handleOpenChange(false);
       router.refresh();
@@ -120,13 +121,13 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Account' : 'Add Account'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit jar' : 'Add a jar'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* Account Name */}
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="pf-account-name">Account Name</Label>
+            <Label htmlFor="pf-account-name">Jar name</Label>
             <Input
               id="pf-account-name"
               type="text"
@@ -154,7 +155,6 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
                 className="w-24 text-right tabular-nums"
                 placeholder="0"
                 disabled={submitting}
-                required
               />
               <span className="text-sm text-muted-foreground">%</span>
             </div>

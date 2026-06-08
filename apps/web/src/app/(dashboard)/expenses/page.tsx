@@ -4,7 +4,8 @@ import { getSession } from '@/server/auth';
 import { apiFetch, ApiError } from '@/server/api';
 import type { RecurringExpenseListResponse } from '@/types/recurring';
 import type { LedgerStatsResponse } from '@/types/stats';
-import { ledgerStatsDateParams, resolveLedgerPeriod } from '@/lib/ledger-period';
+import { ledgerStatsDateParams } from '@/lib/ledger-period';
+import { resolveOverviewRange, resolvePresetLabel } from '@/lib/overview-date-presets';
 import { ExpensesOverview } from './_components/expenses-overview';
 
 interface ExpenseCategory {
@@ -40,7 +41,8 @@ interface WalletListItem {
 }
 
 interface SearchParams {
-  period?: string;
+  from?: string;
+  to?: string;
 }
 
 interface PageProps {
@@ -49,7 +51,7 @@ interface PageProps {
 
 /**
  * RSC for /expenses.
- * Resolves the URL `period` (PeriodControl) to date bounds for both the ledger
+ * Resolves the URL `from`/`to` (DateRangeSelect) to date bounds for both the ledger
  * list and the stats aggregate. Guards with getSession → redirect to /login
  * when unauthenticated.
  */
@@ -58,19 +60,20 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   if (!session) redirect('/login');
 
   const params = await searchParams;
-  const period = resolveLedgerPeriod(params.period);
+  const range = resolveOverviewRange(params.from, params.to);
+  const periodLabel = resolvePresetLabel(params.from, params.to);
   const statsDate = ledgerStatsDateParams();
 
   const listQs = new URLSearchParams({ page: '0', limit: '20' });
-  if (period.from) listQs.set('from', period.from);
-  if (period.to) listQs.set('to', period.to);
+  if (range.from) listQs.set('from', range.from);
+  if (range.to) listQs.set('to', range.to);
 
   const statsQs = new URLSearchParams({
     year: statsDate.year,
     month: statsDate.month,
     prevMonth: statsDate.prevMonth,
-    ...(period.from ? { from: period.from } : {}),
-    ...(period.to ? { to: period.to } : {}),
+    ...(range.from ? { from: range.from } : {}),
+    ...(range.to ? { to: range.to } : {}),
   }).toString();
 
   let expensesData: PaginatedExpenses;
@@ -101,16 +104,16 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
     <div className="mx-auto w-full max-w-5xl">
       <ExpensesOverview
         // Re-key per period so the client accumulator resets on scope change.
-        key={period.key}
+        key={`${range.from ?? 'all'}-${range.to ?? 'all'}`}
         initialData={expensesData}
         categories={categoriesData.data}
         wallets={wallets}
         defaultWalletId={defaultWalletId}
         recurring={recurringData.data}
         stats={statsData.data}
-        periodKey={period.key}
-        from={period.from}
-        to={period.to}
+        periodLabel={periodLabel}
+        from={range.from}
+        to={range.to}
         statsDate={statsDate}
       />
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQueryState, parseAsString } from 'nuqs';
 
 import { Input } from '@/components/ui/input';
@@ -19,11 +20,12 @@ interface IncomeFiltersProps {
 
 /**
  * Secondary income filters: free-text search and money status. The primary time
- * scope is the PeriodControl (URL `period`), so date range no longer lives here.
+ * scope is the DateRangeSelect (URL `from`/`to`), so date range no longer lives here.
  * Filter state lives in nuqs query params (survives refresh, shareable);
  * search is debounced ~300ms to avoid excessive re-fetches.
  */
 export function IncomeFilters({ onFilterChange }: IncomeFiltersProps): React.JSX.Element {
+  const router = useRouter();
   const [search, setSearch] = useQueryState('search', parseAsString.withDefault(''));
   const [moneyStatus, setMoneyStatus] = useQueryState('moneyStatus', parseAsString.withDefault(''));
 
@@ -35,6 +37,8 @@ export function IncomeFilters({ onFilterChange }: IncomeFiltersProps): React.JSX
     searchTimerRef.current = setTimeout(async () => {
       await setSearch(value || null);
       onFilterChange?.();
+      // nuqs updates the URL shallowly; refresh so the RSC re-fetches with the new param.
+      router.refresh();
     }, 300);
   }
 
@@ -49,6 +53,8 @@ export function IncomeFilters({ onFilterChange }: IncomeFiltersProps): React.JSX
     // 'all' sentinel clears the filter (Radix Select forbids value="").
     await setMoneyStatus(value === 'all' ? null : value || null);
     onFilterChange?.();
+    // nuqs updates the URL shallowly; refresh so the RSC re-fetches with the new param.
+    router.refresh();
   }
 
   return (
