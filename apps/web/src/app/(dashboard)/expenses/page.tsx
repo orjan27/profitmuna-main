@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/auth';
 import { apiFetch, ApiError } from '@/server/api';
+import type { RecurringExpenseListResponse } from '@/types/recurring';
 import { ExpensesOverview } from './_components/expenses-overview';
 
 interface ExpenseCategory {
@@ -62,11 +63,13 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   let expensesData: PaginatedExpenses;
   let categoriesData: { data: ExpenseCategory[] };
   let walletsData: { data: WalletListItem[] };
+  let recurringData: RecurringExpenseListResponse;
   try {
-    [expensesData, categoriesData, walletsData] = await Promise.all([
+    [expensesData, categoriesData, walletsData, recurringData] = await Promise.all([
       apiFetch<PaginatedExpenses>(`/api/expenses?${qs.toString()}`),
       apiFetch<{ data: ExpenseCategory[] }>('/api/expense-categories'),
       apiFetch<{ data: WalletListItem[] }>('/api/wallets'),
+      apiFetch<RecurringExpenseListResponse>('/api/recurring-expenses'),
     ]);
   } catch (err) {
     // A decodable-but-rejected token passes getSession but 401s at the API
@@ -86,6 +89,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
         categories={categoriesData.data}
         wallets={wallets}
         defaultWalletId={defaultWalletId}
+        recurring={recurringData.data}
       />
     </div>
   );

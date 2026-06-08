@@ -92,15 +92,27 @@ export async function deleteIncomeAction(id: number): Promise<{ error: string } 
 /**
  * Mark a PENDING income as RECEIVED with an optional backdated received date.
  * Does NOT change profitFirstAllocated (T-02-08 — API enforces this too).
+ *
+ * Optional amountPesos (decimal pesos, converted to cents here) sets the
+ * actual amount at receive time — required by the API when the stored amount
+ * is 0 (recurring "amount set on receive" incomes).
  */
 export async function receiveIncomeAction(
   id: number,
-  receivedDate?: string
+  receivedDate?: string,
+  amountPesos?: number
 ): Promise<{ error: string } | void> {
+  if (amountPesos !== undefined && (!Number.isFinite(amountPesos) || amountPesos <= 0)) {
+    return { error: 'invalid_amount' };
+  }
+
   try {
     await apiFetch(`/api/incomes/${id}/receive`, {
       method: 'PUT',
-      body: JSON.stringify({ receivedDate }),
+      body: JSON.stringify({
+        receivedDate,
+        ...(amountPesos !== undefined && { amount: toCents(amountPesos) }),
+      }),
     });
   } catch (err) {
     if (err instanceof ApiError) return { error: err.code };

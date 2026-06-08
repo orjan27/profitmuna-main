@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/server/auth';
 import { apiFetch, ApiError } from '@/server/api';
 import type { IncomeListResponse, IncomeCategoryListResponse } from '@/types/income';
+import type { RecurringIncomeListResponse } from '@/types/recurring';
 import { IncomeOverview } from './_components/income-overview';
 
 interface SearchParams {
@@ -32,10 +33,12 @@ export default async function IncomePage({ searchParams }: Props) {
 
   let incomeData: IncomeListResponse;
   let categoriesData: IncomeCategoryListResponse;
+  let recurringData: RecurringIncomeListResponse;
   try {
-    [incomeData, categoriesData] = await Promise.all([
+    [incomeData, categoriesData, recurringData] = await Promise.all([
       apiFetch<IncomeListResponse>(`/api/incomes?${qs}`),
       apiFetch<IncomeCategoryListResponse>('/api/income-categories'),
+      apiFetch<RecurringIncomeListResponse>('/api/recurring-incomes'),
     ]);
   } catch (err) {
     // A decodable-but-rejected token passes getSession but 401s at the API
@@ -47,7 +50,11 @@ export default async function IncomePage({ searchParams }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <IncomeOverview initialData={incomeData.data} categories={categoriesData.data} />
+      <IncomeOverview
+        initialData={incomeData.data}
+        categories={categoriesData.data}
+        recurring={recurringData.data}
+      />
     </div>
   );
 }

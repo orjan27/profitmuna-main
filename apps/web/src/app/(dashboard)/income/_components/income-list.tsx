@@ -122,14 +122,19 @@ export function IncomeList({ items, filtered, onEditRow, onReceiveRow }: IncomeL
                   ) : null}
 
                   <div className="shrink-0 text-right">
-                    <p
-                      className={cn(
-                        'text-sm font-semibold tabular-nums',
-                        income.moneyStatus === 'RECEIVED' ? 'text-income' : 'text-ink-soft'
-                      )}
-                    >
-                      +{formatCurrency(income.amount)}
-                    </p>
+                    {/* Amount 0 + PENDING = recurring "amount set on receive" income */}
+                    {income.amount === 0 && income.moneyStatus === 'PENDING' ? (
+                      <p className="text-xs text-ink-faint">Amount on receive</p>
+                    ) : (
+                      <p
+                        className={cn(
+                          'text-sm font-semibold tabular-nums',
+                          income.moneyStatus === 'RECEIVED' ? 'text-income' : 'text-ink-soft'
+                        )}
+                      >
+                        +{formatCurrency(income.amount)}
+                      </p>
+                    )}
                     {income.moneyStatus === 'PENDING' ? (
                       <p className="text-[11px] text-ink-faint">Pending</p>
                     ) : null}

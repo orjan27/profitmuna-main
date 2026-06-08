@@ -15,10 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
+import type { RecurringExpense } from '@/types/recurring';
 import { fetchExpensesAction } from './expense-actions';
 import { ExpenseList } from './expense-list';
 import type { ExpenseRow } from './edit-expense-dialog';
 import { ManageCategoriesDialog } from './manage-categories-dialog';
+import { RecurringExpenseList } from './recurring-list';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,8 @@ interface ExpensesOverviewProps {
   categories: ExpenseCategory[];
   wallets: WalletOption[];
   defaultWalletId: number | null;
+  /** Recurring expense templates for the "Recurring" section */
+  recurring: RecurringExpense[];
 }
 
 const PAGE_LIMIT = 20;
@@ -65,6 +69,7 @@ export function ExpensesOverview({
   categories,
   wallets,
   defaultWalletId,
+  recurring,
 }: ExpensesOverviewProps) {
   const { openRecordSheet } = useRecordSheet();
   // Shared visibility state (same localStorage key as Overview/Profit First)
@@ -271,6 +276,9 @@ export function ExpensesOverview({
           )}
         </div>
       ) : null}
+
+      {/* Recurring templates — renders nothing when the user has none */}
+      <RecurringExpenseList templates={recurring} categories={categories} wallets={wallets} />
 
       {/* Expense ledger */}
       <ExpenseList

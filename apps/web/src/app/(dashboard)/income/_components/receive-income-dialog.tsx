@@ -39,15 +39,28 @@ function todayLocal(): string {
  * Confirmation dialog for marking a PENDING income as RECEIVED (D-14 / INC-05).
  * Provides a date input defaulting to today; editable for backdating.
  * Only reachable from PENDING rows in the income list.
+ *
+ * Amount: prefilled and adjustable for normal incomes; empty and REQUIRED when
+ * the stored amount is 0 — recurring "amount set on receive" incomes.
  */
 export function ReceiveIncomeDialog({ income, open, onClose }: ReceiveIncomeDialogProps) {
   const formatCurrency = useFormatCurrency();
   const [receivedDate, setReceivedDate] = useState(todayLocal());
+  // Decimal pesos string; empty when the amount must be entered at receive time
+  const [amount, setAmount] = useState(income.amount > 0 ? (income.amount / 100).toFixed(2) : '');
   const [isPending, startTransition] = useTransition();
+
+  const amountRequired = income.amount === 0;
+  const parsedAmount = Number(amount);
+  const amountValid = amount !== '' && Number.isFinite(parsedAmount) && parsedAmount > 0;
 
   function handleConfirm() {
     startTransition(async () => {
-      const result = await receiveIncomeAction(income.id, receivedDate);
+      const result = await receiveIncomeAction(
+        income.id,
+        receivedDate,
+        amountValid ? parsedAmount : undefined
+      );
       if (result?.error) {
         toast.error('Failed to mark income as received. Please try again.');
         return;
@@ -71,10 +84,31 @@ export function ReceiveIncomeDialog({ income, open, onClose }: ReceiveIncomeDial
         <DialogHeader>
           <DialogTitle>Mark as Received</DialogTitle>
           <DialogDescription>
-            Confirm that {formatCurrency(income.amount)} ({income.categoryName}) has been received.
-            You can backdate the received date if needed.
+            {amountRequired
+              ? `Enter the amount you received for ${income.categoryName}. You can backdate the received date if needed.`
+              : `Confirm that ${formatCurrency(income.amount)} (${income.categoryName}) has been received. You can backdate the received date if needed.`}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="receive-amount">{amountRequired ? 'Amount received' : 'Amount'}</Label>
+          <Input
+            id="receive-amount"
+            type="number"
+            inputMode="decimal"
+            min="0.01"
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            aria-label="Amount received"
+          />
+          {amountRequired ? (
+            <p className="text-xs text-ink-faint">
+              This recurring income was created without an amount.
+            </p>
+          ) : null}
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="receive-date">Received Date</Label>
@@ -92,7 +126,7 @@ export function ReceiveIncomeDialog({ income, open, onClose }: ReceiveIncomeDial
           <Button variant="outline" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={isPending || !receivedDate}>
+          <Button onClick={handleConfirm} disabled={isPending || !receivedDate || !amountValid}>
             {isPending ? 'Confirming…' : 'Confirm'}
           </Button>
         </DialogFooter>

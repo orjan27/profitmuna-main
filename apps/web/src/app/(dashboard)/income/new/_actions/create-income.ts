@@ -37,6 +37,39 @@ export async function createIncomeAction(formData: FormData): Promise<{ error: s
     return { error: 'unknown' };
   }
 
+  // Optional recurrence (hidden RecurrenceFields inputs): create the template
+  // after the entry. Soft-fail — the recorded entry is never rolled back.
+  const recurrenceFrequency = formData.get('recurrenceFrequency') as string | null;
+  if (
+    recurrenceFrequency === 'WEEKLY' ||
+    recurrenceFrequency === 'BIWEEKLY' ||
+    recurrenceFrequency === 'MONTHLY'
+  ) {
+    const dayField = (name: string): number | null => {
+      const raw = formData.get(name) as string | null;
+      return raw ? Number(raw) : null;
+    };
+    try {
+      await apiFetch('/api/recurring-incomes', {
+        method: 'POST',
+        body: JSON.stringify({
+          categoryId: body.categoryId,
+          amount: body.amount,
+          description: body.description,
+          profitFirstAllocated: body.profitFirstAllocated,
+          frequency: recurrenceFrequency,
+          dayOfWeek: dayField('recurrenceDayOfWeek'),
+          dayOfMonth: dayField('recurrenceDayOfMonth'),
+          dayOfMonth2: dayField('recurrenceDayOfMonth2'),
+          // Prevent same-day double generation by the cron
+          lastGeneratedDate: body.incomeDate,
+        }),
+      });
+    } catch (err) {
+      console.error('createIncomeAction: recurring template creation failed:', { err });
+    }
+  }
+
   revalidatePath('/income');
   redirect('/income');
 }

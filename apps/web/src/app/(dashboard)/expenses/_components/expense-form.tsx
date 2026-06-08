@@ -15,6 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  RecurrenceFields,
+  NO_RECURRENCE,
+  recurrenceIsValid,
+  type RecurrenceValue,
+} from '@/components/RecurrenceFields';
 import { createExpenseCategoryAction } from './category-actions';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -123,9 +129,32 @@ export function ExpenseForm({
     });
   }
 
+  // Recurrence is create-time only — editing a past entry never creates a template
+  const isEditing = initialValues !== undefined;
+  const [recurrence, setRecurrence] = useState<RecurrenceValue>(NO_RECURRENCE);
+  // Controlled so RecurrenceFields can seed day defaults from the entry date
+  const [expenseDate, setExpenseDate] = useState(initialValues?.expenseDate ?? todayISO());
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!recurrenceIsValid(recurrence)) {
+      toast.error('Pick two different days for the bi-weekly repeat.');
+      return;
+    }
     const formData = new FormData(event.currentTarget);
+    // Inject recurrence as hidden fields — the create action reads these
+    if (!isEditing && recurrence.frequency !== 'NONE') {
+      formData.set('recurrenceFrequency', recurrence.frequency);
+      if (recurrence.dayOfWeek !== null) {
+        formData.set('recurrenceDayOfWeek', String(recurrence.dayOfWeek));
+      }
+      if (recurrence.dayOfMonth !== null) {
+        formData.set('recurrenceDayOfMonth', String(recurrence.dayOfMonth));
+      }
+      if (recurrence.dayOfMonth2 !== null) {
+        formData.set('recurrenceDayOfMonth2', String(recurrence.dayOfMonth2));
+      }
+    }
 
     startTransition(async () => {
       const result = await action(formData);
@@ -137,15 +166,13 @@ export function ExpenseForm({
       }
     });
   }
-
-  const defaultDate = initialValues?.expenseDate ?? todayISO();
   const defaultAmount = initialValues?.amount != null ? centsToDecimal(initialValues.amount) : '';
+  const defaultDescription = initialValues?.description ?? '';
   // "Paid with" preselects the row's wallet, falling back to Default (covers legacy NULL rows).
   const preselectedWalletId = initialValues?.walletId ?? defaultWalletId;
   const [selectedWalletId, setSelectedWalletId] = useState<string>(
     preselectedWalletId != null ? String(preselectedWalletId) : ''
   );
-  const defaultDescription = initialValues?.description ?? '';
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6 max-w-lg">
@@ -234,7 +261,8 @@ export function ExpenseForm({
           id="expenseDate"
           name="expenseDate"
           type="date"
-          defaultValue={defaultDate}
+          value={expenseDate}
+          onChange={(e) => setExpenseDate(e.target.value)}
           required
         />
       </div>
@@ -274,6 +302,17 @@ export function ExpenseForm({
           className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
         />
       </div>
+
+      {/* Repeat — create-time only; recurring templates are managed from the
+          Recurring section on the expenses page */}
+      {!isEditing ? (
+        <RecurrenceFields
+          value={recurrence}
+          onChange={setRecurrence}
+          referenceDate={expenseDate}
+          idPrefix="expense-recurrence"
+        />
+      ) : null}
 
       <FormActions variant={variant === 'dialog' ? 'overlay' : 'page'} className="md:justify-start">
         <Button type="submit" disabled={isPending}>

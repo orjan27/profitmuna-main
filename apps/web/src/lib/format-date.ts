@@ -41,3 +41,19 @@ export function formatDateGroup(iso: string): string {
 export function todayLocal(): string {
   return format(new Date(), 'yyyy-MM-dd');
 }
+
+/**
+ * Formats a day-of-month number as an ordinal string.
+ * Examples: 1 → "1st", 2 → "2nd", 3 → "3rd", 4 → "4th", 21 → "21st"
+ *
+ * @param n - Day of month (1–31)
+ * @returns Ordinal label
+ */
+export function formatOrdinal(n: number): string {
+  // 11th–13th are "th" despite ending in 1–3
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  const mod10 = n % 10;
+  const suffix = mod10 === 1 ? 'st' : mod10 === 2 ? 'nd' : mod10 === 3 ? 'rd' : 'th';
+  return `${n}${suffix}`;
+}

@@ -17,6 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  RecurrenceFields,
+  NO_RECURRENCE,
+  recurrenceIsValid,
+  type RecurrenceValue,
+} from '@/components/RecurrenceFields';
 import type { Income, IncomeCategory } from '@/types/income';
 import { createIncomeCategoryAction } from './category-actions';
 
@@ -60,6 +66,11 @@ export function IncomeForm({
   const [isPending, startTransition] = useTransition();
   // Pitfall 5: profitFirstAllocated defaults to true
   const [pfAllocated, setPfAllocated] = useState(initialValues?.profitFirstAllocated ?? true);
+  // Controlled so RecurrenceFields can seed day defaults from the entry date
+  const [incomeDate, setIncomeDate] = useState(initialValues?.incomeDate ?? todayLocal());
+  // Recurrence is create-time only — editing a past entry never creates a template
+  const isEditing = initialValues !== undefined;
+  const [recurrence, setRecurrence] = useState<RecurrenceValue>(NO_RECURRENCE);
 
   // Local categories copy so quick-add appears immediately without full page reload
   const [localCategories, setLocalCategories] = useState<IncomeCategory[]>(categories);
@@ -100,10 +111,27 @@ export function IncomeForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!recurrenceIsValid(recurrence)) {
+      toast.error('Pick two different days for the bi-weekly repeat.');
+      return;
+    }
     const form = e.currentTarget;
     const formData = new FormData(form);
     // Inject pfAllocated as string — action checks === 'true'
     formData.set('profitFirstAllocated', String(pfAllocated));
+    // Inject recurrence as hidden fields — the create action reads these
+    if (!isEditing && recurrence.frequency !== 'NONE') {
+      formData.set('recurrenceFrequency', recurrence.frequency);
+      if (recurrence.dayOfWeek !== null) {
+        formData.set('recurrenceDayOfWeek', String(recurrence.dayOfWeek));
+      }
+      if (recurrence.dayOfMonth !== null) {
+        formData.set('recurrenceDayOfMonth', String(recurrence.dayOfMonth));
+      }
+      if (recurrence.dayOfMonth2 !== null) {
+        formData.set('recurrenceDayOfMonth2', String(recurrence.dayOfMonth2));
+      }
+    }
 
     startTransition(async () => {
       const result = await action(formData);
@@ -221,7 +249,8 @@ export function IncomeForm({
           id="income-incomeDate"
           name="incomeDate"
           type="date"
-          defaultValue={initialValues?.incomeDate ?? todayLocal()}
+          value={incomeDate}
+          onChange={(e) => setIncomeDate(e.target.value)}
           required
         />
       </div>
@@ -248,6 +277,17 @@ export function IncomeForm({
           maxLength={500}
         />
       </div>
+
+      {/* Repeat — create-time only; recurring templates are managed from the
+          Recurring section on the income page */}
+      {!isEditing ? (
+        <RecurrenceFields
+          value={recurrence}
+          onChange={setRecurrence}
+          referenceDate={incomeDate}
+          idPrefix="income-recurrence"
+        />
+      ) : null}
 
       {/* Profit First Allocated switch — Pitfall 5: default true */}
       <div className="flex items-center justify-between rounded-lg border p-4">

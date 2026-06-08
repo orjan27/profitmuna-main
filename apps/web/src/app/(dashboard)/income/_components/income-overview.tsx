@@ -14,11 +14,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import type { Income, IncomeCategory } from '@/types/income';
+import type { RecurringIncome } from '@/types/recurring';
 import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
 import { IncomeFilters } from './income-filters';
 import { IncomeList } from './income-list';
 import { EditIncomeDialog } from './edit-income-dialog';
 import { ReceiveIncomeDialog } from './receive-income-dialog';
+import { RecurringIncomeList } from './recurring-list';
 import { fetchIncomesAction } from './income-actions';
 import { ManageCategoriesDialog } from './manage-categories-dialog';
 
@@ -30,6 +32,8 @@ interface IncomeOverviewProps {
     last: boolean;
   };
   categories: IncomeCategory[];
+  /** Recurring income templates for the "Recurring" section */
+  recurring: RecurringIncome[];
 }
 
 /**
@@ -38,7 +42,7 @@ interface IncomeOverviewProps {
  * row, and dialog open state for edit (D-05) and receive (D-14) flows.
  * Recording goes through the global Record sheet.
  */
-export function IncomeOverview({ initialData, categories }: IncomeOverviewProps) {
+export function IncomeOverview({ initialData, categories, recurring }: IncomeOverviewProps) {
   const { openRecordSheet } = useRecordSheet();
   // Shared visibility state (same localStorage key as Overview/Profit First)
   const { visible, toggle, mounted } = useAmountVisibility();
@@ -191,6 +195,9 @@ export function IncomeOverview({ initialData, categories }: IncomeOverviewProps)
 
       {/* Filters (URL-persisted, debounced search) — collapsed by default */}
       {filtersOpen ? <IncomeFilters onFilterChange={handleFilterChange} /> : null}
+
+      {/* Recurring templates — renders nothing when the user has none */}
+      <RecurringIncomeList templates={recurring} categories={categories} />
 
       {/* Income ledger */}
       <IncomeList

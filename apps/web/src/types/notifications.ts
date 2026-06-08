@@ -1,5 +1,8 @@
 /** Notification types produced by the cron handler (D-05). */
-export type NotificationType = 'INCOME_REMINDER' | 'PENDING_INCOME_DUE';
+export type NotificationType =
+  | 'INCOME_REMINDER'
+  | 'PENDING_INCOME_DUE'
+  | 'RECURRING_EXPENSE_RECORDED';
 
 /** Shape of a notification row returned by the notification API. */
 export interface Notification {

@@ -48,6 +48,39 @@ export async function createExpenseAction(
     return { error: 'Could not reach the server. Please try again.' };
   }
 
+  // Optional recurrence (hidden RecurrenceFields inputs): create the template
+  // after the entry. Soft-fail — the recorded entry is never rolled back.
+  const recurrenceFrequency = formData.get('recurrenceFrequency') as string | null;
+  if (
+    recurrenceFrequency === 'WEEKLY' ||
+    recurrenceFrequency === 'BIWEEKLY' ||
+    recurrenceFrequency === 'MONTHLY'
+  ) {
+    const dayField = (name: string): number | null => {
+      const raw = formData.get(name) as string | null;
+      return raw ? Number(raw) : null;
+    };
+    try {
+      await apiFetch('/api/recurring-expenses', {
+        method: 'POST',
+        body: JSON.stringify({
+          categoryId,
+          amount,
+          description,
+          walletId,
+          frequency: recurrenceFrequency,
+          dayOfWeek: dayField('recurrenceDayOfWeek'),
+          dayOfMonth: dayField('recurrenceDayOfMonth'),
+          dayOfMonth2: dayField('recurrenceDayOfMonth2'),
+          // Prevent same-day double generation by the cron
+          lastGeneratedDate: expenseDate,
+        }),
+      });
+    } catch (err) {
+      console.error('createExpenseAction: recurring template creation failed:', { err });
+    }
+  }
+
   revalidatePath('/expenses');
   redirect('/expenses');
 }
