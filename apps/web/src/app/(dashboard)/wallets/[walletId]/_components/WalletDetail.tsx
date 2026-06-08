@@ -45,9 +45,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 import {
   createTransactionAction,
+  createWalletIncomeAction,
   updateTransactionAction,
   deleteTransactionAction,
   restoreTransactionAction,
@@ -79,9 +87,9 @@ const ERROR_COPY: Record<string, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Money flowing INTO the wallet — deposits and auto-credited income */
+/** Money flowing INTO the wallet — deposits, auto-credited income, direct top-up income */
 function isMoneyIn(type: WalletTransaction['type']): boolean {
-  return type === 'DEPOSIT' || type === 'INCOME_AUTO';
+  return type === 'DEPOSIT' || type === 'INCOME_AUTO' || type === 'INCOME';
 }
 
 /** Plain-language activity row title, PF-aware for withdrawals */
@@ -93,6 +101,8 @@ function transactionTitle(tx: WalletTransaction, pfAccount: PfAccount | null): s
       return withdrawalLabel(pfAccount ? pfAccount.id : null, pfAccount?.accountType ?? null);
     case 'INCOME_AUTO':
       return 'Income allocation';
+    case 'INCOME':
+      return 'Income';
     case 'EXPENSE_AUTO':
       return 'Expense';
   }
@@ -255,6 +265,151 @@ function TxDialog({ open, mode, editTx, walletId, onClose }: TxDialogProps) {
   );
 }
 
+// ── Add Income Dialog (PF allocation wallets) ─────────────────────────────────
+
+interface AddIncomeDialogProps {
+  open: boolean;
+  walletId: number;
+  categories: IncomeCategory[];
+  onClose: () => void;
+}
+
+/**
+ * "Add money" for PF allocation wallets: records a real income with Profit First
+ * OFF, linked directly to this wallet. Credits the wallet without splitting across
+ * allocations. Editing/deleting these entries lives in the Income section.
+ */
+function AddIncomeDialog({ open, walletId, categories, onClose }: AddIncomeDialogProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const [amount, setAmount] = useState('');
+  const [categoryId, setCategoryId] = useState<string>(
+    categories.length > 0 ? String(categories[0].id) : ''
+  );
+  const [date, setDate] = useState(todayIso());
+  const [description, setDescription] = useState('');
+
+  function handleOpenChange(o: boolean) {
+    if (!o) onClose();
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const cents = toCents(Number(amount));
+    if (cents <= 0) {
+      toast.error('Enter an amount greater than zero.');
+      return;
+    }
+    if (!categoryId) {
+      toast.error('Choose a category.');
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await createWalletIncomeAction(walletId, {
+        categoryId: Number(categoryId),
+        amount: cents,
+        incomeDate: date,
+        description: description || undefined,
+      });
+
+      if (result?.error) {
+        toast.error('Something went wrong. Please try again.');
+        return;
+      }
+
+      toast.success('Income added.');
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add money</DialogTitle>
+          <DialogDescription>
+            Recorded as income for this wallet, excluded from Profit First allocations.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="inc-amount">Amount</Label>
+            <Input
+              id="inc-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="0.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              disabled={isPending}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="inc-category">Category</Label>
+            <Select
+              value={categoryId}
+              onValueChange={setCategoryId}
+              disabled={isPending || categories.length === 0}
+            >
+              <SelectTrigger id="inc-category">
+                <SelectValue
+                  placeholder={categories.length === 0 ? 'No categories' : 'Select a category'}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="inc-date">Date</Label>
+            <Input
+              id="inc-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              disabled={isPending}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="inc-description">Description</Label>
+            <Input
+              id="inc-description"
+              type="text"
+              placeholder="Optional note"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={isPending}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isPending}>
+              Close
+            </Button>
+            <Button type="submit" disabled={isPending || categories.length === 0}>
+              {isPending ? 'Adding…' : 'Add money'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Delete Transaction Dialog ─────────────────────────────────────────────────
 
 interface DeleteTxDialogProps {
@@ -377,6 +532,8 @@ export function WalletDetail({
   >(null);
   const [editTx, setEditTx] = useState<WalletTransaction | null>(null);
   const [deleteTx, setDeleteTx] = useState<WalletTransaction | null>(null);
+  // "Add money" on a PF allocation wallet records a direct income (PF off)
+  const [incomeDialogOpen, setIncomeDialogOpen] = useState(false);
 
   // Edit wallet dialog state — ?edit=1 (from the list's Edit action) opens it on load
   const [editWalletOpen, setEditWalletOpen] = useState(initialEditOpen);
@@ -417,11 +574,12 @@ export function WalletDetail({
     });
   }
 
-  // Blocking hints mirror the server's assertCanInsertTransaction exactly —
+  // PF allocation wallets "Add money" as a direct income (PF off) — never blocked.
+  // Income-mapped (non-PF) wallets still block manual deposits to avoid double-count;
   // mapping PRESENCE blocks, not amounts (a mapped category with zero spend still blocks).
   const isPfWallet = wallet.profitFirstAccountId != null;
-  const depositBlocked = isPfWallet || wallet.incomeCategoryIds.length > 0;
-  const depositBlockReason = isPfWallet ? BLOCKING_COPY.pf_deposit : BLOCKING_COPY.income_mapped;
+  const depositBlocked = !isPfWallet && wallet.incomeCategoryIds.length > 0;
+  const depositBlockReason = BLOCKING_COPY.income_mapped;
 
   // Withdrawals are allowed on all wallets — the expense-mapping guard was dropped.
 
@@ -429,7 +587,10 @@ export function WalletDetail({
 
   // Money in / money out summary tiles, derived from the same breakdown D-02 exposes
   const moneyInCents =
-    breakdown.pfAllocationCents + breakdown.mappedIncomeCents + breakdown.depositsCents;
+    breakdown.pfAllocationCents +
+    breakdown.mappedIncomeCents +
+    breakdown.depositsCents +
+    breakdown.directIncomeCents;
   const moneyOutCents = breakdown.mappedExpensesCents + breakdown.withdrawalsCents;
   const hasActivity = moneyInCents !== 0 || moneyOutCents !== 0;
 
@@ -516,9 +677,15 @@ export function WalletDetail({
           icon={<Plus aria-hidden="true" className="size-4.5" />}
           label="Add money"
           blocked={depositBlocked}
-          onClick={() =>
-            depositBlocked ? toast.error(depositBlockReason) : setTxDialogMode('add-deposit')
-          }
+          onClick={() => {
+            if (isPfWallet) {
+              setIncomeDialogOpen(true);
+            } else if (depositBlocked) {
+              toast.error(depositBlockReason);
+            } else {
+              setTxDialogMode('add-deposit');
+            }
+          }}
         />
         <ActionTile
           icon={<ArrowDownToLine aria-hidden="true" className="size-4.5" />}
@@ -608,6 +775,14 @@ export function WalletDetail({
                   <span className="text-ink-soft">Mapped income</span>
                   <span className="tabular-nums">
                     {formatCurrency(breakdown.mappedIncomeCents)}
+                  </span>
+                </div>
+              )}
+              {breakdown.directIncomeCents !== 0 && (
+                <div className="flex justify-between">
+                  <span className="text-ink-soft">Income</span>
+                  <span className="tabular-nums">
+                    {formatCurrency(breakdown.directIncomeCents)}
                   </span>
                 </div>
               )}
@@ -778,6 +953,16 @@ export function WalletDetail({
             setTxDialogMode(null);
             setEditTx(null);
           }}
+        />
+      )}
+
+      {/* Add Income Dialog — PF allocation wallets record a direct income (PF off) */}
+      {incomeDialogOpen && (
+        <AddIncomeDialog
+          open={incomeDialogOpen}
+          walletId={wallet.id}
+          categories={incomeCategories}
+          onClose={() => setIncomeDialogOpen(false)}
         />
       )}
 

@@ -13,6 +13,9 @@ export const createIncomeSchema = z.object({
     .optional()
     .nullable(),
   profitFirstAllocated: z.boolean().default(true),
+  // Direct wallet top-up: when set, the income is added straight to this wallet
+  // (service forces profitFirstAllocated=false). Omitted for normal income.
+  walletId: z.number().int().positive().optional().nullable(),
 });
 
 /** Schema for partial updates — all fields optional. */

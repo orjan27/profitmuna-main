@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { schema } from '@app/db';
 
 import { createWalletService } from '@/services/wallet-service';
+import { createIncomeService } from '@/services/income-service';
 import { createTestDb, seedUser } from './helpers/db';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1097,6 +1098,101 @@ describe('wallets service', () => {
 
       // total reflects the true count
       expect(detail.pagination.total).toBe(10);
+    });
+  });
+
+  // ─── WAL: direct wallet income (PF allocation top-up) ───────────────────────
+  describe('WAL: direct wallet income (PF allocation top-up)', () => {
+    it('records a PF-wallet top-up as income with Profit First forced off', async () => {
+      const { db, dbD1 } = createTestDb();
+      const user = seedUser(db, { email: 'wdi-a@test.com', name: 'User A', emailVerified: true });
+      const pf = seedPfAccount(db, user.id, { targetPercentage: 500 });
+      const cat = seedIncomeCategory(db, user.id, 'Bonus');
+      const walletSvc = createWalletService(dbD1);
+      const incomeSvc = createIncomeService(dbD1);
+
+      const wallet = await walletSvc.create(user.id, {
+        name: 'Profit',
+        profitFirstAccountId: pf.id,
+      });
+
+      // Caller passes profitFirstAllocated:true — the service must force it off.
+      const income = await incomeSvc.create(user.id, {
+        categoryId: cat.id,
+        amount: 100000,
+        incomeDate: '2026-03-01',
+        moneyStatus: 'RECEIVED',
+        profitFirstAllocated: true,
+        walletId: wallet.id,
+      });
+
+      expect(income.profitFirstAllocated).toBe(false);
+      expect(income.walletId).toBe(wallet.id);
+      expect(income.walletName).toBe('Profit');
+    });
+
+    it('credits the PF wallet as Income without splitting across allocations', async () => {
+      const { db, dbD1 } = createTestDb();
+      const user = seedUser(db, { email: 'wdi-b@test.com', name: 'User B', emailVerified: true });
+      const pf = seedPfAccount(db, user.id, { targetPercentage: 500 });
+      const cat = seedIncomeCategory(db, user.id, 'Bonus');
+      const walletSvc = createWalletService(dbD1);
+      const incomeSvc = createIncomeService(dbD1);
+
+      const wallet = await walletSvc.create(user.id, {
+        name: 'Profit',
+        profitFirstAccountId: pf.id,
+      });
+      await incomeSvc.create(user.id, {
+        categoryId: cat.id,
+        amount: 100000,
+        incomeDate: '2026-03-01',
+        moneyStatus: 'RECEIVED',
+        walletId: wallet.id,
+      });
+
+      const detail = await walletSvc.getById(wallet.id, user.id, { page: 0, size: 20 });
+
+      // Full amount lands in this wallet; PF allocation pool stays 0 (income is PF-off).
+      expect(detail.breakdown.directIncomeCents).toBe(100000);
+      expect(detail.breakdown.pfAllocationCents).toBe(0);
+      expect(detail.wallet.balanceCents).toBe(100000);
+
+      const incomeRows = detail.transactions.filter((t) => t.type === 'INCOME');
+      expect(incomeRows).toHaveLength(1);
+      expect(incomeRows[0]!.amount).toBe(100000);
+    });
+
+    it('does not double-count wallet-linked income into a category-mapped wallet', async () => {
+      const { db, dbD1 } = createTestDb();
+      const user = seedUser(db, { email: 'wdi-c@test.com', name: 'User C', emailVerified: true });
+      const pf = seedPfAccount(db, user.id, { targetPercentage: 500 });
+      const cat = seedIncomeCategory(db, user.id, 'Bonus');
+      const walletSvc = createWalletService(dbD1);
+      const incomeSvc = createIncomeService(dbD1);
+
+      const pfWallet = await walletSvc.create(user.id, {
+        name: 'Profit',
+        profitFirstAccountId: pf.id,
+      });
+      // Standalone wallet mapped to the SAME category the top-up uses.
+      const mapped = await walletSvc.create(user.id, {
+        name: 'Mapped',
+        incomeCategoryIds: [cat.id],
+      });
+
+      await incomeSvc.create(user.id, {
+        categoryId: cat.id,
+        amount: 100000,
+        incomeDate: '2026-03-01',
+        moneyStatus: 'RECEIVED',
+        walletId: pfWallet.id,
+      });
+
+      const wallets = await walletSvc.list(user.id);
+      const mappedBalance = wallets.find((w) => w.id === mapped.id)!.balanceCents;
+      // The wallet-linked income belongs to the PF wallet only — not the mapped wallet.
+      expect(mappedBalance).toBe(0);
     });
   });
 });

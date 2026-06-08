@@ -26,8 +26,11 @@ export interface WalletListItem {
 
 export interface WalletTransaction {
   id: number;
-  /** merged view — INCOME_AUTO and EXPENSE_AUTO are auto-generated entries */
-  type: WalletTransactionType | 'INCOME_AUTO' | 'EXPENSE_AUTO';
+  /**
+   * merged view — INCOME_AUTO (allocation) and EXPENSE_AUTO are auto-generated;
+   * INCOME is a direct wallet top-up income (incomes.walletId set, PF off)
+   */
+  type: WalletTransactionType | 'INCOME_AUTO' | 'EXPENSE_AUTO' | 'INCOME';
   amount: number;
   description: string | null;
   transactionDate: string;
@@ -44,6 +47,7 @@ export interface WalletDetailResponse {
     mappedExpensesCents: number;
     depositsCents: number;
     withdrawalsCents: number;
+    directIncomeCents: number;
   };
   transactions: WalletTransaction[];
   pagination: { page: number; size: number; total: number; totalPages: number };

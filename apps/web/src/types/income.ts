@@ -10,6 +10,9 @@ export interface Income {
   expectedReleaseDate: string | null;
   receivedDate: string | null;
   profitFirstAllocated: boolean;
+  /** Direct wallet top-up: set when this income was added straight to a wallet (PF off). */
+  walletId: number | null;
+  walletName: string | null;
   userId: number;
   createdAt: string | null;
   updatedAt: string | null;

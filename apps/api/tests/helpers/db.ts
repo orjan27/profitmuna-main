@@ -75,6 +75,8 @@ CREATE TABLE incomes (
   expected_release_date TEXT,
   received_date TEXT,
   profit_first_allocated INTEGER NOT NULL DEFAULT 1,
+  wallet_id INTEGER REFERENCES wallets(id),
+  wallet_name TEXT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   pending_due_notified_at TEXT,
   created_at TEXT,
@@ -84,6 +86,7 @@ CREATE INDEX incomes_user_status_idx ON incomes (user_id, money_status);
 CREATE INDEX incomes_user_date_idx ON incomes (user_id, income_date);
 CREATE INDEX incomes_user_status_pf_idx ON incomes (user_id, money_status, profit_first_allocated);
 CREATE INDEX incomes_user_category_idx ON incomes (user_id, category_id);
+CREATE INDEX incomes_user_wallet_idx ON incomes (user_id, wallet_id);
 
 CREATE TABLE expense_categories (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

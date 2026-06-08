@@ -110,6 +110,12 @@ export const incomes = sqliteTable(
     profitFirstAllocated: integer('profit_first_allocated', { mode: 'boolean' })
       .notNull()
       .default(true),
+    // Direct wallet top-up: non-null = income added straight to this wallet (PF off,
+    // RECEIVED), counted in that wallet's balance/activity and excluded from
+    // category-mapping aggregation. Lazy arrow ref (wallets declared later). No cascade.
+    walletId: integer('wallet_id').references(() => wallets.id),
+    // Denormalized wallet name so soft-deleted wallet names render without a join.
+    walletName: text('wallet_name'),
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -125,6 +131,7 @@ export const incomes = sqliteTable(
     index('incomes_user_date_idx').on(t.userId, t.incomeDate),
     index('incomes_user_status_pf_idx').on(t.userId, t.moneyStatus, t.profitFirstAllocated),
     index('incomes_user_category_idx').on(t.userId, t.categoryId),
+    index('incomes_user_wallet_idx').on(t.userId, t.walletId),
   ]
 );
 
