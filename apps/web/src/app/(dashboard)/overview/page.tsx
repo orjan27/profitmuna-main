@@ -5,7 +5,7 @@ import { getSession } from '@/server/auth';
 import { apiFetch } from '@/server/api';
 import type { DashboardSummary } from '@/types/dashboard';
 import type { UserProfile } from '@/types/user';
-import { ALL_TIME_SENTINEL, getDefaultOverviewRange } from '@/lib/overview-date-presets';
+import { ALL_TIME_SENTINEL, getDefaultOverviewHeroRange } from '@/lib/overview-date-presets';
 import { OverviewContent } from './_components/overview-content';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -30,8 +30,9 @@ function greetingForNow(): string {
  * recent-transactions feed — all from one summary endpoint (DASH-01).
  *
  * The date filter lives in the URL (?from/?to, nuqs in the client component —
- * Pitfall 2: no nuqs here). Empty URL applies the This Month Manila default
- * (D-08); ?from=all marks an explicit All Time choice.
+ * Pitfall 2: no nuqs here). Empty URL applies the Quarter to Date Manila
+ * default (the Profit First distribution window); ?from=all marks an explicit
+ * All Time choice.
  */
 export default async function OverviewPage({
   searchParams,
@@ -44,7 +45,7 @@ export default async function OverviewPage({
   const params = await searchParams;
   const hasUrlFilter = Boolean(params.from || params.to);
   const allTime = params.from === ALL_TIME_SENTINEL;
-  const defaults = getDefaultOverviewRange();
+  const defaults = getDefaultOverviewHeroRange();
   const from = allTime ? undefined : (params.from ?? defaults.from);
   const to = allTime ? undefined : (params.to ?? defaults.to);
 

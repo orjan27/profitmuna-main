@@ -15,6 +15,7 @@ import {
   type DateRange,
   type AccountSummaryItem,
 } from '@/services/profit-first-service';
+import { createWalletService } from '@/services/wallet-service';
 import { getManilaParts } from '@/lib/manila-time';
 
 import type { AnyColumn } from 'drizzle-orm';
@@ -66,6 +67,12 @@ export type DashboardSummary = {
   netIncomeCents: number;
   /** Period-scoped sum across all wallets (NOT the all-time wallet list balance) */
   totalWalletBalanceCents: number;
+  /**
+   * All-time balance of the wallet linked to the PROFIT account — the "Profit
+   * set aside" hero. Deliberately NOT date-scoped (it's a standing reserve).
+   * null when no wallet is linked to the user's Profit account.
+   */
+  profitWalletBalanceCents: number | null;
   /** Total received + allocated income in cents (PF summary passthrough) */
   totalIncome: number;
   profitFirstAccounts: AccountSummaryItem[];
@@ -341,6 +348,32 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
   }
 
   /**
+   * All-time balance of the wallet linked to the user's PROFIT account.
+   *
+   * Reuses wallet-service's list() so the figure matches the Wallets page
+   * exactly, then picks the wallet bound to the PROFIT-type PF account. NOT
+   * date-scoped — the Profit reserve is a standing balance, independent of the
+   * overview's period filter. Returns null when no wallet is linked yet.
+   */
+  async function getProfitWalletBalance(userId: number): Promise<number | null> {
+    const [walletList, profitAccountRows] = await Promise.all([
+      createWalletService(db).list(userId),
+      db
+        .select({ id: profitFirstAccounts.id })
+        .from(profitFirstAccounts)
+        .where(
+          and(eq(profitFirstAccounts.userId, userId), eq(profitFirstAccounts.accountType, 'PROFIT'))
+        ),
+    ]);
+
+    const profitAccountId = profitAccountRows[0]?.id;
+    if (profitAccountId == null) return null;
+
+    const profitWallet = walletList.find((w) => w.profitFirstAccountId === profitAccountId);
+    return profitWallet ? profitWallet.balanceCents : null;
+  }
+
+  /**
    * Unified recent-transactions feed: income + expense + wallet tx merged,
    * sorted date DESC then id DESC, paginated.
    *
@@ -515,6 +548,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
         expenseTotal,
         pfSummary,
         walletBalance,
+        profitWalletBalance,
         feed,
         nextPendingIncome,
         previousBalance,
@@ -523,6 +557,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
         getExpenseTotal(userId, dateRange),
         createProfitFirstService(db).getSummary(userId, dateRange),
         getPeriodScopedWalletBalance(userId, dateRange),
+        getProfitWalletBalance(userId),
         getRecentTransactions(userId, dateRange, feedPage, feedSize),
         getNextPendingIncome(userId, getManilaParts(now).dateStr),
         prevRange
@@ -536,6 +571,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
         totalExpensesCents: expenseTotal,
         netIncomeCents: incomeTotals.received - expenseTotal,
         totalWalletBalanceCents: walletBalance,
+        profitWalletBalanceCents: profitWalletBalance,
         totalIncome: pfSummary.totalIncome,
         profitFirstAccounts: pfSummary.accounts,
         recentTransactions: feed.transactions,
