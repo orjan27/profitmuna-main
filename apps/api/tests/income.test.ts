@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { format } from 'date-fns';
 import { incomeCategories } from '@app/db/schema';
 import { createTestDb, seedUser } from './helpers/db';
 import { createIncomeService } from '../src/services/income-service';
@@ -8,8 +9,11 @@ import { createIncomeService } from '../src/services/income-service';
 const USER_A_EMAIL = 'user-a@test.com';
 const USER_B_EMAIL = 'user-b@test.com';
 
+// Mirror the service's default-receivedDate basis exactly: format(new Date())
+// is system-local (runtime TZ is Asia/Manila), NOT UTC. Using toISOString()
+// here drifted by a day during the UTC-evening / Manila-next-day window.
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return format(new Date(), 'yyyy-MM-dd');
 }
 
 // ─── INC-01: Create income ────────────────────────────────────────────────────
