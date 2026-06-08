@@ -60,3 +60,55 @@ export function lastDayOfMonth(year: number, month0: number): number {
   // Date(year, month1, 0) gives the last day of the previous month (i.e. month0)
   return new Date(year, month0 + 1, 0).getDate();
 }
+
+/** Recurrence frequency shared by reminders and recurring income/expense templates. */
+export type RecurFrequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+
+export interface ScheduleSpec {
+  frequency: RecurFrequency;
+  /** 0–6 (Sun–Sat); required for WEEKLY */
+  dayOfWeek: number | null;
+  /** 1–31; required for MONTHLY and BIWEEKLY */
+  dayOfMonth: number | null;
+  /** 1–31; second day for BIWEEKLY */
+  dayOfMonth2: number | null;
+}
+
+/**
+ * Returns true when the given schedule fires on the Manila day in `parts`.
+ *
+ * Day-of-month values above the current month's length clamp to its last day
+ * (Pitfall 6: a day-30 schedule fires on Feb 28/29). Pure day matching only —
+ * callers own any enabled/hour gating.
+ *
+ * @param spec  The frequency + day fields (unused days may be null)
+ * @param parts Manila time parts for "today"
+ */
+export function scheduleMatchesToday(spec: ScheduleSpec, parts: ManilaParts): boolean {
+  const clampToMonth = (day: number): number => {
+    const manilaDate = new Date(parts.dateStr + 'T00:00:00Z');
+    return Math.min(day, lastDayOfMonth(manilaDate.getUTCFullYear(), manilaDate.getUTCMonth()));
+  };
+
+  switch (spec.frequency) {
+    case 'WEEKLY':
+      return spec.dayOfWeek === parts.dayOfWeek;
+
+    case 'BIWEEKLY': {
+      // Twice a month: due when either configured day matches today
+      if (spec.dayOfMonth === null || spec.dayOfMonth2 === null) return false;
+      return (
+        clampToMonth(spec.dayOfMonth) === parts.dayOfMonth ||
+        clampToMonth(spec.dayOfMonth2) === parts.dayOfMonth
+      );
+    }
+
+    case 'MONTHLY': {
+      if (spec.dayOfMonth === null) return false;
+      return clampToMonth(spec.dayOfMonth) === parts.dayOfMonth;
+    }
+
+    default:
+      return false;
+  }
+}

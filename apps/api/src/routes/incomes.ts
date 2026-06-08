@@ -70,10 +70,10 @@ incomesRouter.put(
   }),
   async (c) => {
     const { id } = c.req.valid('param');
-    const { receivedDate } = c.req.valid('json');
+    const { receivedDate, amount } = c.req.valid('json');
     const userId = c.get('userId');
     const svc = createIncomeService(createDb(c.env.DB));
-    const result = await svc.receive(id, userId, receivedDate);
+    const result = await svc.receive(id, userId, receivedDate, amount);
     return c.json({ data: result });
   }
 );

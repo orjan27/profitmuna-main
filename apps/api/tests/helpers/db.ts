@@ -15,6 +15,7 @@ CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'USER',
   password_hash TEXT,
   email_verified INTEGER NOT NULL DEFAULT 0,
   verified_at TEXT,
@@ -182,6 +183,60 @@ CREATE TABLE notifications (
 );
 CREATE INDEX notif_user_read_created_idx ON notifications (user_id, read, created_at);
 CREATE INDEX notif_user_read_idx ON notifications (user_id, read);
+
+-- Phase 7: Recurring income/expense templates
+CREATE TABLE recurring_incomes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id INTEGER NOT NULL REFERENCES income_categories(id),
+  category_name TEXT NOT NULL,
+  amount INTEGER,
+  description TEXT,
+  frequency TEXT NOT NULL,
+  day_of_week INTEGER,
+  day_of_month INTEGER,
+  day_of_month_2 INTEGER,
+  profit_first_allocated INTEGER NOT NULL DEFAULT 1,
+  active INTEGER NOT NULL DEFAULT 1,
+  last_generated_date TEXT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX recurring_incomes_user_idx ON recurring_incomes (user_id);
+CREATE INDEX recurring_incomes_active_idx ON recurring_incomes (active);
+
+CREATE TABLE recurring_expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category_id INTEGER NOT NULL REFERENCES expense_categories(id),
+  category_name TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  description TEXT,
+  wallet_id INTEGER NOT NULL REFERENCES wallets(id),
+  wallet_name TEXT,
+  frequency TEXT NOT NULL,
+  day_of_week INTEGER,
+  day_of_month INTEGER,
+  day_of_month_2 INTEGER,
+  active INTEGER NOT NULL DEFAULT 1,
+  last_generated_date TEXT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT,
+  updated_at TEXT
+);
+CREATE INDEX recurring_expenses_user_idx ON recurring_expenses (user_id);
+CREATE INDEX recurring_expenses_active_idx ON recurring_expenses (active);
+
+-- Phase 7: cron run tracking (one row per job, overwritten each run)
+CREATE TABLE cron_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job TEXT NOT NULL UNIQUE,
+  ran_at TEXT NOT NULL,
+  "trigger" TEXT NOT NULL,
+  generated_incomes INTEGER NOT NULL DEFAULT 0,
+  generated_expenses INTEGER NOT NULL DEFAULT 0,
+  pending_due_notifications INTEGER NOT NULL DEFAULT 0,
+  reminder_emails INTEGER NOT NULL DEFAULT 0
+);
 `;
 
 function makeStatement(sqlite: SqliteDb, query: string, params: unknown[]) {

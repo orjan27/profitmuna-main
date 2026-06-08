@@ -1,4 +1,4 @@
-import { eq, and, isNull, sql, desc } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, gte, asc, sql, desc } from 'drizzle-orm';
 
 import { createDb } from '@app/db';
 import {
@@ -15,6 +15,7 @@ import {
   type DateRange,
   type AccountSummaryItem,
 } from '@/services/profit-first-service';
+import { getManilaParts } from '@/lib/manila-time';
 
 import type { AnyColumn } from 'drizzle-orm';
 
@@ -41,6 +42,22 @@ export type FeedPagination = {
   hasMore: boolean;
 };
 
+/** The user's next upcoming pending income — "payday" for the overview hero. */
+export type NextPendingIncome = {
+  /** ISO YYYY-MM-DD */
+  expectedReleaseDate: string;
+  amountCents: number;
+  categoryName: string;
+};
+
+/** Wallet balance of the previous adjacent equal-length period (trend badge). */
+export type BalanceComparison = {
+  previousPeriodBalanceCents: number;
+  /** ISO YYYY-MM-DD bounds of the previous window */
+  prevFrom: string;
+  prevTo: string;
+};
+
 export type DashboardSummary = {
   totalIncomeReceivedCents: number;
   totalIncomePendingCents: number;
@@ -54,6 +71,10 @@ export type DashboardSummary = {
   profitFirstAccounts: AccountSummaryItem[];
   recentTransactions: RecentTransaction[];
   feedPagination: FeedPagination;
+  /** Earliest PENDING income due today or later (Manila) — null when none */
+  nextPendingIncome: NextPendingIncome | null;
+  /** Previous adjacent equal-length period — null for open-ended/all-time ranges */
+  balanceComparison: BalanceComparison | null;
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -89,6 +110,24 @@ function dateConditions(column: AnyColumn, dateRange?: DateRange): ReturnType<ty
     conditions.push(sql`${column} <= ${dateRange.to}` as ReturnType<typeof eq>);
   }
   return conditions;
+}
+
+/**
+ * Previous adjacent window of equal length for a closed [from, to] range:
+ * prevTo = from − 1 day, prevFrom = prevTo − (to − from). Pure UTC-midnight
+ * string math on Zod-validated YYYY-MM-DD values — no timezone parsing.
+ */
+function previousPeriodRange(from: string, to: string): { prevFrom: string; prevTo: string } {
+  const toUtcMidnight = (s: string): number => {
+    const [year, month, day] = s.split('-').map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  const toDateStr = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+  const DAY_MS = 86_400_000;
+  const lengthMs = toUtcMidnight(to) - toUtcMidnight(from);
+  const prevToMs = toUtcMidnight(from) - DAY_MS;
+  return { prevFrom: toDateStr(prevToMs - lengthMs), prevTo: toDateStr(prevToMs) };
 }
 
 // ─── Factory ───────────────────────────────────────────────────────────────
@@ -413,24 +452,82 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
     };
   }
 
+  /**
+   * Earliest PENDING income with an expected release date today or later
+   * (Manila). Deliberately NOT period-filtered — "payday" is about the
+   * future regardless of the selected overview range.
+   */
+  async function getNextPendingIncome(
+    userId: number,
+    todayStr: string
+  ): Promise<NextPendingIncome | null> {
+    const rows = await db
+      .select({
+        expectedReleaseDate: incomes.expectedReleaseDate,
+        amountCents: incomes.amount,
+        categoryName: incomes.categoryName,
+      })
+      .from(incomes)
+      .where(
+        and(
+          eq(incomes.userId, userId),
+          eq(incomes.moneyStatus, 'PENDING'),
+          isNotNull(incomes.expectedReleaseDate),
+          gte(incomes.expectedReleaseDate, todayStr)
+        )
+      )
+      .orderBy(asc(incomes.expectedReleaseDate), asc(incomes.id))
+      .limit(1);
+
+    const row = rows[0];
+    if (!row?.expectedReleaseDate) return null;
+    return {
+      expectedReleaseDate: row.expectedReleaseDate,
+      amountCents: row.amountCents,
+      categoryName: row.categoryName,
+    };
+  }
+
   return {
     /**
      * Returns the full dashboard summary: stat totals, PF account balances,
      * period-scoped wallet balance, and the unified recent-transactions feed —
      * all restricted to the optional from/to range and scoped to userId.
+     * nextPendingIncome is the lone range-independent field (upcoming payday).
+     *
+     * @param now  Injectable clock (cron-service pattern) — tests pass a fixed
+     *             instant so the Manila "today" cutoff is deterministic.
      */
     async getSummary(
       userId: number,
       dateRange?: DateRange,
       feedPage = 0,
-      feedSize = 20
+      feedSize = 20,
+      now: Date = new Date()
     ): Promise<DashboardSummary> {
-      const [incomeTotals, expenseTotal, pfSummary, walletBalance, feed] = await Promise.all([
+      // Trend comparison only makes sense for a closed range — the previous
+      // window of an open-ended/all-time range is undefined.
+      const prevRange =
+        dateRange?.from && dateRange?.to ? previousPeriodRange(dateRange.from, dateRange.to) : null;
+
+      const [
+        incomeTotals,
+        expenseTotal,
+        pfSummary,
+        walletBalance,
+        feed,
+        nextPendingIncome,
+        previousBalance,
+      ] = await Promise.all([
         getIncomeTotals(userId, dateRange),
         getExpenseTotal(userId, dateRange),
         createProfitFirstService(db).getSummary(userId, dateRange),
         getPeriodScopedWalletBalance(userId, dateRange),
         getRecentTransactions(userId, dateRange, feedPage, feedSize),
+        getNextPendingIncome(userId, getManilaParts(now).dateStr),
+        prevRange
+          ? getPeriodScopedWalletBalance(userId, { from: prevRange.prevFrom, to: prevRange.prevTo })
+          : Promise.resolve(null),
       ]);
 
       return {
@@ -443,6 +540,15 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
         profitFirstAccounts: pfSummary.accounts,
         recentTransactions: feed.transactions,
         feedPagination: feed.pagination,
+        nextPendingIncome,
+        balanceComparison:
+          prevRange && previousBalance !== null
+            ? {
+                previousPeriodBalanceCents: previousBalance,
+                prevFrom: prevRange.prevFrom,
+                prevTo: prevRange.prevTo,
+              }
+            : null,
       };
     },
   };

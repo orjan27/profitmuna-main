@@ -402,4 +402,61 @@ describe('income service — INC-05 receive', () => {
       message: 'not_found',
     });
   });
+
+  it('updates the amount when provided at receive time, leaving profitFirstAllocated untouched', async () => {
+    const { db } = createTestDb();
+    const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
+
+    const [cat] = await db
+      .insert(incomeCategories)
+      .values({ name: 'Estimate Cat', system: false, userId: userA.id })
+      .returning();
+
+    const svc = createIncomeService(db);
+    const created = await svc.create(userA.id, {
+      categoryId: cat!.id,
+      amount: 100000, // estimated
+      incomeDate: today(),
+      moneyStatus: 'PENDING',
+      profitFirstAllocated: true,
+    });
+
+    const received = await svc.receive(created.id, userA.id, today(), 123456);
+
+    expect(received.moneyStatus).toBe('RECEIVED');
+    expect(received.amount).toBe(123456);
+    expect(received.profitFirstAllocated).toBe(true);
+  });
+
+  it('throws 422 amount_required when receiving a 0-amount income without an amount', async () => {
+    const { db, sqlite } = createTestDb();
+    const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
+
+    const [cat] = await db
+      .insert(incomeCategories)
+      .values({ name: 'Recurring Cat', system: false, userId: userA.id })
+      .returning();
+
+    // Recurring "amount set on receive" income — amount 0 bypasses the create
+    // schema (positive int) by design, so seed the row directly.
+    sqlite
+      .prepare(
+        `INSERT INTO incomes (category_id, category_name, amount, income_date, money_status, profit_first_allocated, user_id)
+         VALUES (?, ?, 0, ?, 'PENDING', 1, ?)`
+      )
+      .run(cat!.id, cat!.name, today(), userA.id);
+    const row = sqlite.prepare('SELECT id FROM incomes WHERE amount = 0').get() as { id: number };
+
+    const svc = createIncomeService(db);
+
+    await expect(svc.receive(row.id, userA.id, today())).rejects.toMatchObject({
+      status: 422,
+      message: 'amount_required',
+    });
+
+    // Providing the amount succeeds
+    const received = await svc.receive(row.id, userA.id, today(), 75000);
+    expect(received.amount).toBe(75000);
+    expect(received.moneyStatus).toBe('RECEIVED');
+  });
 });

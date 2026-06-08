@@ -239,8 +239,17 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
     /**
      * INC-05: Mark income as received. Does NOT modify profitFirstAllocated (T-02-08).
      * Uses provided receivedDate or defaults to today.
+     *
+     * Optional `amount` updates the stored amount at receive time; it is
+     * REQUIRED when the stored amount is 0 — recurring "amount set on receive"
+     * incomes — since a 0 income can't be meaningfully received.
      */
-    async receive(id: number, userId: number, receivedDate?: string): Promise<IncomeRecord> {
+    async receive(
+      id: number,
+      userId: number,
+      receivedDate?: string,
+      amount?: number
+    ): Promise<IncomeRecord> {
       const existing = await db.query.incomes.findFirst({
         where: and(eq(incomes.id, id), eq(incomes.userId, userId)),
       });
@@ -249,12 +258,21 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
         throw new HTTPException(404, { message: 'not_found' });
       }
 
+      if (existing.amount === 0 && amount === undefined) {
+        throw new HTTPException(422, { message: 'amount_required' });
+      }
+
       const date = receivedDate ?? format(new Date(), 'yyyy-MM-dd');
 
-      // T-02-08: Only set moneyStatus + receivedDate — never touch profitFirstAllocated
+      // T-02-08: Only set moneyStatus + receivedDate (+ amount when provided) —
+      // never touch profitFirstAllocated
       const [updated] = await db
         .update(incomes)
-        .set({ moneyStatus: 'RECEIVED', receivedDate: date })
+        .set({
+          moneyStatus: 'RECEIVED',
+          receivedDate: date,
+          ...(amount !== undefined && { amount }),
+        })
         .where(and(eq(incomes.id, id), eq(incomes.userId, userId)))
         .returning();
 

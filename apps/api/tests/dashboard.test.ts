@@ -31,6 +31,7 @@ function seedIncome(
     incomeDate: string;
     moneyStatus?: 'RECEIVED' | 'PENDING';
     profitFirstAllocated?: boolean;
+    expectedReleaseDate?: string | null;
   }
 ) {
   const [row] = db
@@ -42,6 +43,7 @@ function seedIncome(
       incomeDate: input.incomeDate,
       moneyStatus: input.moneyStatus ?? 'RECEIVED',
       profitFirstAllocated: input.profitFirstAllocated ?? true,
+      expectedReleaseDate: input.expectedReleaseDate ?? null,
       userId: input.userId,
     })
     .returning()
@@ -609,5 +611,236 @@ describe('dashboard service — getSummary', () => {
         (t) => t.label.includes('Intruder') || t.amountCents > 10_000
       )
     ).toBe(false);
+  });
+});
+
+describe('dashboard service — balanceComparison', () => {
+  it('returns null when no date range is given (all-time)', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'cmp-alltime@dash.test', name: 'Cmp AllTime' });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id);
+
+    expect(summary.balanceComparison).toBeNull();
+  });
+
+  it('returns null when the range is open-ended (missing to)', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'cmp-open@dash.test', name: 'Cmp Open' });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, {
+      from: '2026-06-01',
+    });
+
+    expect(summary.balanceComparison).toBeNull();
+  });
+
+  it('computes prevFrom/prevTo as the adjacent equal-length window', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'cmp-bounds@dash.test', name: 'Cmp Bounds' });
+
+    // 30-day June window → previous window is the 30 days ending 2026-05-31
+    const summary = await createDashboardService(dbD1).getSummary(user.id, {
+      from: '2026-06-01',
+      to: '2026-06-30',
+    });
+
+    expect(summary.balanceComparison).toEqual({
+      previousPeriodBalanceCents: 0,
+      prevFrom: '2026-05-02',
+      prevTo: '2026-05-31',
+    });
+  });
+
+  it('handles a year boundary in the previous window', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'cmp-year@dash.test', name: 'Cmp Year' });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, {
+      from: '2026-01-01',
+      to: '2026-01-31',
+    });
+
+    expect(summary.balanceComparison?.prevFrom).toBe('2025-12-01');
+    expect(summary.balanceComparison?.prevTo).toBe('2025-12-31');
+  });
+
+  it('sums only data dated inside the previous window into previousPeriodBalanceCents', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'cmp-balance@dash.test', name: 'Cmp Balance' });
+    const wallet = seedWallet(db, { userId: user.id, name: 'Cash' });
+
+    // Inside the previous window (2026-05-02 – 2026-05-31)
+    seedWalletTx(db, {
+      userId: user.id,
+      walletId: wallet.id,
+      type: 'DEPOSIT',
+      amount: 8_000,
+      transactionDate: '2026-05-15',
+    });
+    seedWalletTx(db, {
+      userId: user.id,
+      walletId: wallet.id,
+      type: 'WITHDRAWAL',
+      amount: 3_000,
+      transactionDate: '2026-05-20',
+    });
+    // Before the previous window — must not count
+    seedWalletTx(db, {
+      userId: user.id,
+      walletId: wallet.id,
+      type: 'DEPOSIT',
+      amount: 99_999,
+      transactionDate: '2026-05-01',
+    });
+    // Inside the current window — counts toward current, not previous
+    seedWalletTx(db, {
+      userId: user.id,
+      walletId: wallet.id,
+      type: 'DEPOSIT',
+      amount: 4_000,
+      transactionDate: '2026-06-10',
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, {
+      from: '2026-06-01',
+      to: '2026-06-30',
+    });
+
+    expect(summary.totalWalletBalanceCents).toBe(4_000);
+    expect(summary.balanceComparison?.previousPeriodBalanceCents).toBe(8_000 - 3_000);
+  });
+});
+
+describe('dashboard service — nextPendingIncome', () => {
+  // 01:00 UTC = 09:00 Manila on 2026-06-10 — fixed clock per testing.md
+  const NOW = new Date('2026-06-10T01:00:00.000Z');
+
+  it('returns null when the user has no pending incomes', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'nopending@dash.test', name: 'No Pending' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 10_000,
+      incomeDate: '2026-06-01',
+      moneyStatus: 'RECEIVED',
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toBeNull();
+  });
+
+  it('returns the earliest upcoming pending income by expectedReleaseDate', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'payday@dash.test', name: 'Payday User' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 50_000,
+      incomeDate: '2026-06-01',
+      moneyStatus: 'PENDING',
+      expectedReleaseDate: '2026-07-07',
+    });
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 30_000,
+      incomeDate: '2026-06-01',
+      moneyStatus: 'PENDING',
+      expectedReleaseDate: '2026-06-15',
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toEqual({
+      expectedReleaseDate: '2026-06-15',
+      amountCents: 30_000,
+      categoryName: 'Salary',
+    });
+  });
+
+  it('ignores pending incomes whose expectedReleaseDate is in the past or missing', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'stale@dash.test', name: 'Stale Pending' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 20_000,
+      incomeDate: '2026-05-01',
+      moneyStatus: 'PENDING',
+      expectedReleaseDate: '2026-06-09', // yesterday in Manila
+    });
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 10_000,
+      incomeDate: '2026-05-01',
+      moneyStatus: 'PENDING',
+      expectedReleaseDate: null, // no date at all
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toBeNull();
+  });
+
+  it('includes a pending income due today (Manila) and ignores the period filter', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'today@dash.test', name: 'Today User' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 40_000,
+      incomeDate: '2026-05-20',
+      moneyStatus: 'PENDING',
+      expectedReleaseDate: '2026-06-10', // today in Manila
+    });
+
+    // Date range that excludes the income's incomeDate — payday must still surface
+    const summary = await createDashboardService(dbD1).getSummary(
+      user.id,
+      { from: '2026-06-01', to: '2026-06-30' },
+      0,
+      20,
+      NOW
+    );
+
+    expect(summary.nextPendingIncome).toEqual({
+      expectedReleaseDate: '2026-06-10',
+      amountCents: 40_000,
+      categoryName: 'Salary',
+    });
+  });
+
+  it("never surfaces another user's pending income", async () => {
+    const { db, dbD1 } = createTestDb();
+    const userA = seedUser(db, { email: 'mine@dash.test', name: 'User A' });
+    const userB = seedUser(db, { email: 'theirs@dash.test', name: 'User B' });
+    const catB = seedIncomeCategory(db, userB.id, 'Intruder Salary');
+    seedIncome(db, {
+      userId: userB.id,
+      categoryId: catB.id,
+      categoryName: catB.name,
+      amount: 99_999,
+      incomeDate: '2026-06-01',
+      moneyStatus: 'PENDING',
+      expectedReleaseDate: '2026-06-20',
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(userA.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toBeNull();
   });
 });

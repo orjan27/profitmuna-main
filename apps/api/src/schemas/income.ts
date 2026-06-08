@@ -18,12 +18,17 @@ export const createIncomeSchema = z.object({
 /** Schema for partial updates — all fields optional. */
 export const updateIncomeSchema = createIncomeSchema.partial();
 
-/** Schema for marking income as received (receivedDate only — T-02-08). */
+/**
+ * Schema for marking income as received (never touches profitFirstAllocated — T-02-08).
+ * amount (integer cents) is optional: required by the service when the stored
+ * amount is 0 (recurring "amount set on receive" incomes).
+ */
 export const receiveIncomeSchema = z.object({
   receivedDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  amount: z.number().int().positive().optional(),
 });
 
 /** Schema for creating an income category. Does NOT expose system — seeder controls that field. */

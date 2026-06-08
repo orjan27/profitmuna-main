@@ -8,7 +8,7 @@ import type { notificationQuerySchema } from '@/schemas/notifications';
 type ListParams = z.infer<typeof notificationQuerySchema>;
 
 /** Notification type enum — mirrors the DB schema column enum (D-05). */
-type NotificationType = 'INCOME_REMINDER' | 'PENDING_INCOME_DUE';
+type NotificationType = 'INCOME_REMINDER' | 'PENDING_INCOME_DUE' | 'RECURRING_EXPENSE_RECORDED';
 
 /**
  * Factory for notification service methods.

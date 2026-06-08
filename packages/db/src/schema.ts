@@ -4,6 +4,10 @@ export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
+  // Phase 7: ADMIN unlocks user management and manual cron triggers
+  role: text('role', { enum: ['ADMIN', 'USER'] })
+    .notNull()
+    .default('USER'),
   // Nullable — Google-only users have no password
   passwordHash: text('password_hash'),
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
@@ -303,7 +307,9 @@ export const notifications = sqliteTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    type: text('type', { enum: ['INCOME_REMINDER', 'PENDING_INCOME_DUE'] }).notNull(),
+    type: text('type', {
+      enum: ['INCOME_REMINDER', 'PENDING_INCOME_DUE', 'RECURRING_EXPENSE_RECORDED'],
+    }).notNull(),
     title: text('title').notNull(),
     message: text('message').notNull(),
     link: text('link'),
@@ -317,3 +323,106 @@ export const notifications = sqliteTable(
     index('notif_user_read_idx').on(table.userId, table.read),
   ]
 );
+
+// ─── Phase 7: Recurring income & expense templates ───────────────────────────
+//
+// Templates the hourly cron reads to auto-generate income/expense rows on
+// their due day (Manila time). Day fields follow the users.reminder* pattern:
+// only the columns the frequency needs are non-null.
+
+export const recurringIncomes = sqliteTable(
+  'recurring_incomes',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => incomeCategories.id),
+    // Denormalized category name for cascade-rename consistency (D-13)
+    categoryName: text('category_name').notNull(),
+    // Nullable: an estimate, or null = "amount set on receive" — the generated
+    // PENDING income gets amount 0 and receive requires the actual amount
+    amount: integer('amount'),
+    description: text('description'),
+    frequency: text('frequency', { enum: ['WEEKLY', 'BIWEEKLY', 'MONTHLY'] }).notNull(),
+    // 0–6 (Sun–Sat); null unless WEEKLY
+    dayOfWeek: integer('day_of_week'),
+    // 1–31 (clamped to last day of short months at generation); null unless MONTHLY/BIWEEKLY
+    dayOfMonth: integer('day_of_month'),
+    // 1–31; second day for BIWEEKLY; null otherwise
+    dayOfMonth2: integer('day_of_month_2'),
+    profitFirstAllocated: integer('profit_first_allocated', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    // Pause/resume without losing the schedule
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    // YYYY-MM-DD dedup guard — set when the cron generates for that date; also
+    // seeded to the entry date when created alongside a recorded entry
+    lastGeneratedDate: text('last_generated_date'),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at')
+      .$defaultFn(() => new Date().toISOString())
+      .$onUpdate(() => new Date().toISOString()),
+  },
+  (t) => [
+    index('recurring_incomes_user_idx').on(t.userId),
+    // Cron scans active templates across all users
+    index('recurring_incomes_active_idx').on(t.active),
+  ]
+);
+
+export const recurringExpenses = sqliteTable(
+  'recurring_expenses',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => expenseCategories.id),
+    // Denormalized category name for cascade-rename consistency (D-13)
+    categoryName: text('category_name').notNull(),
+    // Required: auto-record needs an exact amount (integer cents, D-08)
+    amount: integer('amount').notNull(),
+    description: text('description'),
+    // Wallet the generated expense is paid from; re-validated at generation
+    walletId: integer('wallet_id')
+      .notNull()
+      .references(() => wallets.id),
+    walletName: text('wallet_name'),
+    frequency: text('frequency', { enum: ['WEEKLY', 'BIWEEKLY', 'MONTHLY'] }).notNull(),
+    dayOfWeek: integer('day_of_week'),
+    dayOfMonth: integer('day_of_month'),
+    dayOfMonth2: integer('day_of_month_2'),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    lastGeneratedDate: text('last_generated_date'),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: text('created_at').$defaultFn(() => new Date().toISOString()),
+    updatedAt: text('updated_at')
+      .$defaultFn(() => new Date().toISOString())
+      .$onUpdate(() => new Date().toISOString()),
+  },
+  (t) => [
+    index('recurring_expenses_user_idx').on(t.userId),
+    index('recurring_expenses_active_idx').on(t.active),
+  ]
+);
+
+/**
+ * One row per cron job, overwritten on every run — powers the Settings
+ * "Scheduled Jobs" last-run display. Deliberately NOT a history table: the
+ * hourly cron would grow it by ~8.7k rows/year for no UI benefit.
+ */
+export const cronRuns = sqliteTable('cron_runs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  // Job identifier — currently only 'cron' (the hourly worker)
+  job: text('job').notNull().unique(),
+  ranAt: text('ran_at').notNull(),
+  trigger: text('trigger', { enum: ['SCHEDULED', 'MANUAL'] }).notNull(),
+  generatedIncomes: integer('generated_incomes').notNull().default(0),
+  generatedExpenses: integer('generated_expenses').notNull().default(0),
+  pendingDueNotifications: integer('pending_due_notifications').notNull().default(0),
+  reminderEmails: integer('reminder_emails').notNull().default(0),
+});
