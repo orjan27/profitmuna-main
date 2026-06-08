@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { CircleUser, LogOut, Settings } from 'lucide-react';
+import { CircleUser, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -85,6 +85,15 @@ export function UserMenu({ user }: UserMenuProps): React.JSX.Element {
             <DropdownMenuSeparator />
           </>
         )}
+        {/* Admin entry — ADMIN role only; the API enforces the same gate (403) */}
+        {user?.role === 'ADMIN' ? (
+          <DropdownMenuItem asChild>
+            <Link href="/admin">
+              <ShieldCheck className="size-4" />
+              Admin
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem asChild>
           <Link href="/settings">
             <Settings className="size-4" />

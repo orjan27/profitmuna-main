@@ -3,4 +3,6 @@ export interface UserProfile {
   id: number;
   name: string;
   email: string;
+  /** ADMIN unlocks the Admin page and manual cron triggers */
+  role: 'ADMIN' | 'USER';
 }

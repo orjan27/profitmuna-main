@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatOrdinal } from '@/lib/format-date';
 import type { UserSettings, CurrencyCode } from '@/types/settings';
 
 interface SettingsFormProps {
@@ -55,15 +56,6 @@ function formatHour(hour: number): string {
 }
 
 /**
- * Formats a day-of-month number as an ordinal string.
- * Examples: 1 → "1st", 2 → "2nd", 3 → "3rd", 4 → "4th"
- */
-function formatOrdinal(n: number): string {
-  const suffix = n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
-  return `${n}${suffix}`;
-}
-
-/**
  * Client component for the settings form.
  * Two card sections: Display Currency and Income Reminders.
  * Submits via PUT /api/settings; fires success/error toasts; calls router.refresh().
@@ -94,7 +86,11 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
   const [reminderHour, setReminderHour] = useState<number>(initialSettings.reminderHour ?? 9);
 
   async function handleSave() {
-    if (reminderEnabled && reminderFrequency === 'BIWEEKLY' && reminderDayOfMonth === reminderDayOfMonth2) {
+    if (
+      reminderEnabled &&
+      reminderFrequency === 'BIWEEKLY' &&
+      reminderDayOfMonth === reminderDayOfMonth2
+    ) {
       toast.error('Bi-weekly reminder days must be two different days.');
       return;
     }
