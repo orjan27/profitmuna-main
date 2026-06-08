@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { StellaSprite } from '@/components/Stella';
 import { WalletFab } from '@/components/WalletFab';
 import type { WalletListItem, PfAccount } from '@/types/wallet';
-import { WalletRow } from './_components/WalletRow';
+import { WalletCard } from './_components/WalletCard';
 import { WalletsTotal } from './_components/WalletsTotal';
 
 type WalletListResponse = {
@@ -44,6 +44,9 @@ export default async function WalletsPage() {
   );
   const unlinkedPfAccounts = pfAccounts.filter((a) => !linkedPfAccountIds.has(a.id));
 
+  // Card footers show the linked account's name and allocation percentage
+  const pfAccountById = new Map(pfAccounts.map((a) => [a.id, a]));
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-7">
       {/* Page header */}
@@ -66,10 +69,20 @@ export default async function WalletsPage() {
       </div>
 
       {wallets.length > 0 ? (
-        /* Ledger rows — sorted by sortOrder (server already returns them in order) */
-        <ul className="divide-y divide-hairline/60">
+        /* Stacked card deck — sorted by sortOrder (server already returns them
+           in order). Each card after the first pulls up over the previous one;
+           later DOM order paints on top, so only the last card shows in full. */
+        <ul className="mx-auto w-full max-w-md [&>li+li]:-mt-11">
           {wallets.map((wallet) => (
-            <WalletRow key={wallet.id} wallet={wallet} />
+            <WalletCard
+              key={wallet.id}
+              wallet={wallet}
+              pfAccount={
+                wallet.profitFirstAccountId != null
+                  ? (pfAccountById.get(wallet.profitFirstAccountId) ?? null)
+                  : null
+              }
+            />
           ))}
         </ul>
       ) : (
