@@ -4,6 +4,7 @@ import { TZDate } from '@date-fns/tz';
 import { getSession } from '@/server/auth';
 import { apiFetch } from '@/server/api';
 import type { DashboardSummary } from '@/types/dashboard';
+import type { UserProfile } from '@/types/user';
 import { ALL_TIME_SENTINEL, getDefaultOverviewRange } from '@/lib/overview-date-presets';
 import { OverviewContent } from './_components/overview-content';
 
@@ -53,17 +54,23 @@ export default async function OverviewPage({
 
   // One aggregate call replaces the old four-endpoint fan-out. On failure the
   // content renders zeroed figures rather than blanking the page (D-12).
-  const summary = await apiFetch<{ data: DashboardSummary }>(
-    `/api/dashboard/summary?${query.toString()}`
-  )
-    .then((res) => res.data)
-    .catch(() => null);
+  // The profile fetch personalizes the greeting; null falls back to a
+  // name-less greeting (layout.tsx pattern — the page never crashes on it).
+  const [summary, user] = await Promise.all([
+    apiFetch<{ data: DashboardSummary }>(`/api/dashboard/summary?${query.toString()}`)
+      .then((res) => res.data)
+      .catch(() => null),
+    apiFetch<{ data: UserProfile }>('/api/auth/me')
+      .then((res) => res.data)
+      .catch(() => null),
+  ]);
 
   return (
     <OverviewContent
       // Re-key per period so the client feed state resets on filter change
       key={`${from ?? 'all'}-${to ?? 'all'}`}
       greeting={greetingForNow()}
+      userName={user?.name ?? null}
       summary={summary}
       from={from}
       to={to}

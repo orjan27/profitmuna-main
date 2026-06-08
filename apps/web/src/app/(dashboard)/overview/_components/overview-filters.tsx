@@ -2,16 +2,24 @@
 
 import { useRouter } from 'next/navigation';
 import { parseAsString, useQueryState } from 'nuqs';
+import { Check, ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { ALL_TIME_SENTINEL, DATE_PRESETS } from '@/lib/overview-date-presets';
+import { ALL_TIME_SENTINEL, DATE_PRESETS, getPeriodCaption } from '@/lib/overview-date-presets';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 /**
- * Date-range preset selector for the Overview page.
+ * Date-range preset selector for the Overview page — a single pill button
+ * (sitting in the hero card) that opens a dropdown of presets, keeping the
+ * page clean instead of laying every filter out as a row of pills.
  *
  * Filter state lives in URL search params via nuqs (D-07). Changing a preset
  * updates the URL, which re-renders the RSC page and re-fetches the summary.
- * Quiet text affordances match the adopted monochrome idiom — no boxes.
  *
  * NOTE: nuqs hooks may only be called in client components (Pitfall 2).
  * page.tsx reads searchParams directly; the preset/range definitions live in
@@ -47,29 +55,40 @@ export function OverviewFilters(): React.JSX.Element {
     router.refresh();
   }
 
+  // Sentence-case label on the pill ("This month" reads as prose in the hero);
+  // custom URL ranges that match no preset fall back to "Custom range".
+  const activePreset = DATE_PRESETS.find((p) => isPresetActive(p.label));
+  const pillLabel = activePreset
+    ? activePreset.label === 'All Time'
+      ? 'All time'
+      : (getPeriodCaption(activePreset.getRange().from ?? '', activePreset.getRange().to ?? '') ??
+        activePreset.label)
+    : 'Custom range';
+
   return (
-    <div
-      role="group"
-      aria-label="Date range"
-      className="flex flex-wrap items-center gap-x-4 gap-y-1.5"
-    >
-      {DATE_PRESETS.map((preset) => {
-        const active = isPresetActive(preset.label);
-        return (
-          <button
-            key={preset.label}
-            type="button"
-            aria-pressed={active}
-            onClick={() => void selectPreset(preset.label)}
-            className={cn(
-              'text-sm transition-colors',
-              active ? 'font-medium text-ink' : 'text-ink-faint hover:text-ink'
-            )}
-          >
-            {preset.label}
-          </button>
-        );
-      })}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={`Date range: ${pillLabel}`}
+        className="flex items-center gap-1 rounded-full border border-hairline bg-paper/70 py-1 pr-2 pl-3 text-sm font-semibold text-ink transition-colors hover:bg-paper data-[state=open]:bg-paper"
+      >
+        {pillLabel}
+        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-ink-soft" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-44 rounded-2xl">
+        {DATE_PRESETS.map((preset) => {
+          const active = isPresetActive(preset.label);
+          return (
+            <DropdownMenuItem
+              key={preset.label}
+              onSelect={() => void selectPreset(preset.label)}
+              className={cn('rounded-xl', active && 'font-semibold')}
+            >
+              {preset.label}
+              {active ? <Check aria-hidden="true" className="ml-auto h-4 w-4" /> : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

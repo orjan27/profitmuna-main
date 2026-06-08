@@ -67,3 +67,26 @@ export const ALL_TIME_SENTINEL = 'all';
 export function getDefaultOverviewRange(): { from: string; to: string } {
   return DATE_PRESETS[0].getRange();
 }
+
+// Sentence-case captions for the hero ("This month" reads as prose next to
+// the trend badge; the filter pills keep their Title Case labels).
+const PERIOD_CAPTIONS: Record<string, string> = {
+  'This Month': 'This month',
+  'Last Month': 'Last month',
+  'Last 3 Months': 'Last 3 months',
+  'This Year': 'This year',
+};
+
+/**
+ * Friendly caption for a resolved closed period — "This month" when the
+ * range matches a preset, null for custom ranges (caller formats the dates).
+ */
+export function getPeriodCaption(from: string, to: string): string | null {
+  for (const preset of DATE_PRESETS) {
+    const range = preset.getRange();
+    if (range.from === from && range.to === to) {
+      return PERIOD_CAPTIONS[preset.label] ?? preset.label;
+    }
+  }
+  return null;
+}
