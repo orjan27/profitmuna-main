@@ -408,18 +408,20 @@ export type UserProfile = {
   id: number;
   name: string;
   email: string;
+  role: 'ADMIN' | 'USER';
 };
 
 /**
- * Returns the authenticated user's display profile (id, name, email) for the
- * account menu in the web shell. Never exposes passwordHash or token fields.
+ * Returns the authenticated user's display profile (id, name, email, role) for
+ * the account menu in the web shell — role gates the Admin menu entry. Never
+ * exposes passwordHash or token fields.
  *
  * @throws HTTPException 404 not_found if the user row no longer exists
  */
 export async function getUserProfile(d1: D1Database, userId: number): Promise<UserProfile> {
   const db = createDb(d1);
   const rows = await db
-    .select({ id: users.id, name: users.name, email: users.email })
+    .select({ id: users.id, name: users.name, email: users.email, role: users.role })
     .from(users)
     .where(eq(users.id, userId));
   const user = rows[0];

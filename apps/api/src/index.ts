@@ -3,12 +3,15 @@ import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 
 import { securityHeaders } from '@/middleware/security-headers';
-import { requireAuth } from '@/middleware/auth';
+import { requireAuth, requireAdmin } from '@/middleware/auth';
 import { authRouter } from '@/routes/auth';
 import { incomesRouter } from '@/routes/incomes';
 import { incomeCategoriesRouter } from '@/routes/income-categories';
 import { expensesRouter } from '@/routes/expenses';
 import { expenseCategoriesRouter } from '@/routes/expense-categories';
+import { recurringIncomesRouter } from '@/routes/recurring-incomes';
+import { recurringExpensesRouter } from '@/routes/recurring-expenses';
+import { adminRouter } from '@/routes/admin';
 import { profitFirstRouter } from '@/routes/profit-first';
 import { walletsRouter } from '@/routes/wallets';
 import { dashboardRouter } from '@/routes/dashboard';
@@ -72,6 +75,17 @@ app.route('/api/expenses', expensesRouter);
 
 app.use('/api/expense-categories/*', requireAuth);
 app.route('/api/expense-categories', expenseCategoriesRouter);
+
+// Recurring template routes — guarded by requireAuth
+app.use('/api/recurring-incomes/*', requireAuth);
+app.route('/api/recurring-incomes', recurringIncomesRouter);
+
+app.use('/api/recurring-expenses/*', requireAuth);
+app.route('/api/recurring-expenses', recurringExpensesRouter);
+
+// Admin routes — auth + ADMIN role required on every endpoint
+app.use('/api/admin/*', requireAuth, requireAdmin);
+app.route('/api/admin', adminRouter);
 
 // Profit First allocation routes — auth guard applied inside profitFirstRouter via .use('/*', requireAuth)
 app.route('/api/profit-first', profitFirstRouter);
