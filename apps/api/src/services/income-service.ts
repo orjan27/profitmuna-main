@@ -3,7 +3,7 @@ import { eq, and, desc, like, or, sql } from 'drizzle-orm';
 import { format } from 'date-fns';
 
 import { createDb } from '@app/db';
-import { incomes, incomeCategories } from '@app/db/schema';
+import { incomes, incomeCategories, wallets } from '@app/db/schema';
 
 // ─── Input types ─────────────────────────────────────────────────────────────
 
@@ -15,6 +15,8 @@ export interface CreateIncomeInput {
   moneyStatus: 'RECEIVED' | 'PENDING';
   expectedReleaseDate?: string | null;
   profitFirstAllocated?: boolean;
+  /** Direct wallet top-up: when set, income is added straight to this wallet (PF forced off). */
+  walletId?: number | null;
 }
 
 export interface UpdateIncomeInput {
@@ -83,6 +85,8 @@ export interface IncomeRecord {
   expectedReleaseDate: string | null;
   receivedDate: string | null;
   profitFirstAllocated: boolean;
+  walletId: number | null;
+  walletName: string | null;
   userId: number;
   createdAt: string | null;
   updatedAt: string | null;
@@ -100,6 +104,8 @@ function toRecord(row: typeof incomes.$inferSelect): IncomeRecord {
     expectedReleaseDate: row.expectedReleaseDate ?? null,
     receivedDate: row.receivedDate ?? null,
     profitFirstAllocated: !!row.profitFirstAllocated,
+    walletId: row.walletId ?? null,
+    walletName: row.walletName ?? null,
     userId: row.userId,
     createdAt: row.createdAt ?? null,
     updatedAt: row.updatedAt ?? null,
@@ -249,6 +255,23 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
         throw new HTTPException(400, { message: 'invalid_category' });
       }
 
+      // Direct wallet top-up: validate wallet ownership and force PF off so the
+      // amount credits this wallet directly instead of feeding the allocation pool.
+      let walletId: number | null = null;
+      let walletName: string | null = null;
+      let profitFirstAllocated = input.profitFirstAllocated ?? true;
+      if (input.walletId != null) {
+        const wallet = await db.query.wallets.findFirst({
+          where: and(eq(wallets.id, input.walletId), eq(wallets.userId, userId)),
+        });
+        if (!wallet) {
+          throw new HTTPException(400, { message: 'invalid_wallet' });
+        }
+        walletId = wallet.id;
+        walletName = wallet.name;
+        profitFirstAllocated = false;
+      }
+
       const [inserted] = await db
         .insert(incomes)
         .values({
@@ -260,7 +283,9 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
           moneyStatus: input.moneyStatus,
           expectedReleaseDate: input.expectedReleaseDate ?? null,
           receivedDate: input.moneyStatus === 'RECEIVED' ? input.incomeDate : null,
-          profitFirstAllocated: input.profitFirstAllocated ?? true,
+          profitFirstAllocated,
+          walletId,
+          walletName,
           userId,
         })
         .returning();

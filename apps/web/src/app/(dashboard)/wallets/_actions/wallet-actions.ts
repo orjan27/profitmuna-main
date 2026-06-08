@@ -94,6 +94,37 @@ export async function createTransactionAction(
 }
 
 /**
+ * Adds money to a PF allocation wallet as a real income record with Profit First
+ * OFF (profitFirstAllocated=false) and linked directly to the wallet (walletId).
+ * The amount credits this wallet only and is never split across allocations.
+ * Caller converts pesos → cents via toCents before passing input.amount.
+ */
+export async function createWalletIncomeAction(
+  walletId: number,
+  input: { categoryId: number; amount: number; incomeDate: string; description?: string }
+): Promise<{ error: string } | undefined> {
+  try {
+    await apiFetch('/api/incomes', {
+      method: 'POST',
+      body: JSON.stringify({
+        categoryId: input.categoryId,
+        amount: input.amount,
+        incomeDate: input.incomeDate,
+        description: input.description,
+        moneyStatus: 'RECEIVED',
+        profitFirstAllocated: false,
+        walletId,
+      }),
+    });
+  } catch (err) {
+    if (err instanceof ApiError) return { error: err.code };
+    return { error: 'unknown' };
+  }
+  revalidatePath(`/wallets/${walletId}`);
+  revalidatePath('/income');
+}
+
+/**
  * Updates a manual transaction's mutable fields.
  * Returns raw error code on ApiError.
  */

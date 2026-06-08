@@ -45,22 +45,27 @@ export async function seedDefaultWallet(
   await db.insert(wallets).values({ ...DEFAULT_WALLET, userId });
 }
 
-/** Balance formula (locked): pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals */
+/**
+ * Balance formula: pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals + directIncome
+ * directIncome = RECEIVED income added straight to this wallet (incomes.walletId set, PF off).
+ */
 function computeBalanceCents({
   pfAllocation,
   mappedIncome,
   mappedExpenses,
   deposits,
   withdrawals,
+  directIncome,
 }: {
   pfAllocation: number;
   mappedIncome: number;
   mappedExpenses: number;
   deposits: number;
   withdrawals: number;
+  directIncome: number;
 }): number {
   // Never clamp — D-13 negative balances are valid
-  return pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals;
+  return pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals + directIncome;
 }
 
 /**
@@ -198,6 +203,8 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
 
   /**
    * Returns sum of received income amounts by income category id.
+   * Excludes wallet-linked income (walletId set) — that belongs to its specific
+   * wallet via directIncome, not to category-mapped wallets (avoids double-count).
    */
   async function getReceivedIncomeByCategoryCents(userId: number): Promise<Map<number, number>> {
     const rows = await db
@@ -206,12 +213,45 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         total: sql<number>`COALESCE(SUM(${incomes.amount}), 0)`,
       })
       .from(incomes)
-      .where(and(eq(incomes.userId, userId), eq(incomes.moneyStatus, 'RECEIVED')))
+      .where(
+        and(
+          eq(incomes.userId, userId),
+          eq(incomes.moneyStatus, 'RECEIVED'),
+          isNull(incomes.walletId)
+        )
+      )
       .groupBy(incomes.categoryId);
 
     const result = new Map<number, number>();
     for (const row of rows) {
       result.set(row.categoryId, Number(row.total ?? 0));
+    }
+    return result;
+  }
+
+  /**
+   * Returns sum of RECEIVED income added directly to each wallet (incomes.walletId set),
+   * grouped by walletId. Mirrors getExpensesByWalletCents.
+   */
+  async function getDirectIncomeByWalletCents(userId: number): Promise<Map<number, number>> {
+    const rows = await db
+      .select({
+        walletId: incomes.walletId,
+        total: sql<number>`COALESCE(SUM(${incomes.amount}), 0)`,
+      })
+      .from(incomes)
+      .where(
+        and(
+          eq(incomes.userId, userId),
+          eq(incomes.moneyStatus, 'RECEIVED'),
+          sql`${incomes.walletId} IS NOT NULL`
+        )
+      )
+      .groupBy(incomes.walletId);
+
+    const result = new Map<number, number>();
+    for (const row of rows) {
+      if (row.walletId != null) result.set(row.walletId, Number(row.total ?? 0));
     }
     return result;
   }
@@ -333,6 +373,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         mappingsByWallet,
         incomeByCategory,
         expenseByWallet,
+        directIncomeByWallet,
         pfAccountRows,
       ] = await Promise.all([
         db
@@ -345,6 +386,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         getMappingsByWallet(userId),
         getReceivedIncomeByCategoryCents(userId),
         getExpensesByWalletCents(userId),
+        getDirectIncomeByWalletCents(userId),
         db.select().from(profitFirstAccounts).where(eq(profitFirstAccounts.userId, userId)),
       ]);
 
@@ -378,12 +420,16 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         // mappedExpenses: sum of non-deleted expenses assigned to this wallet
         const mappedExpenses = expenseByWallet.get(wallet.id) ?? 0;
 
+        // directIncome: RECEIVED income added straight to this wallet (PF off)
+        const directIncome = directIncomeByWallet.get(wallet.id) ?? 0;
+
         const balanceCents = computeBalanceCents({
           pfAllocation,
           mappedIncome,
           mappedExpenses,
           deposits: txImpact.deposits,
           withdrawals: txImpact.withdrawals,
+          directIncome,
         });
 
         const mappingCount = mappings.incomeCategoryIds.length;
@@ -614,6 +660,19 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       const expenseByWallet = await getExpensesByWalletCents(userId);
       const mappedExpensesCents = expenseByWallet.get(walletId) ?? 0;
 
+      // directIncomeCents: RECEIVED income added straight to this wallet (PF off)
+      const directIncomeSumRows = await db
+        .select({ total: sql<number>`COALESCE(SUM(${incomes.amount}), 0)` })
+        .from(incomes)
+        .where(
+          and(
+            eq(incomes.userId, userId),
+            eq(incomes.walletId, walletId),
+            eq(incomes.moneyStatus, 'RECEIVED')
+          )
+        );
+      const directIncomeCents = Number(directIncomeSumRows[0]?.total ?? 0);
+
       // depositsCents + withdrawalsCents: non-deleted manual transactions for this wallet
       const txSumRows = await db
         .select({
@@ -665,7 +724,10 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
             and(
               eq(incomes.userId, userId),
               inArray(incomes.categoryId, incomeCatIds),
-              eq(incomes.moneyStatus, 'RECEIVED')
+              eq(incomes.moneyStatus, 'RECEIVED'),
+              // wallet-linked income is shown under its own wallet (see directIncomeEntries),
+              // never under a category-mapped wallet
+              isNull(incomes.walletId)
             )
           )
           .orderBy(desc(incomes.incomeDate), desc(incomes.id))
@@ -681,6 +743,47 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
             source: 'income',
           });
         }
+      }
+
+      // Direct income entries: RECEIVED income added straight to this wallet (PF off).
+      // Labeled "Income" in the UI (distinct from INCOME_AUTO allocation rows).
+      const directIncomeEntries: Array<{
+        id: number;
+        type: 'INCOME';
+        amount: number;
+        description: string | null;
+        transactionDate: string;
+        deletedAt: null;
+        source: 'income';
+      }> = [];
+
+      const directIncomeRows = await db
+        .select({
+          id: incomes.id,
+          amount: incomes.amount,
+          description: incomes.description,
+          transactionDate: incomes.incomeDate,
+        })
+        .from(incomes)
+        .where(
+          and(
+            eq(incomes.userId, userId),
+            eq(incomes.walletId, walletId),
+            eq(incomes.moneyStatus, 'RECEIVED')
+          )
+        )
+        .orderBy(desc(incomes.incomeDate), desc(incomes.id))
+        .limit(fetchLimit);
+      for (const row of directIncomeRows) {
+        directIncomeEntries.push({
+          id: row.id,
+          type: 'INCOME',
+          amount: row.amount,
+          description: row.description ?? null,
+          transactionDate: row.transactionDate,
+          deletedAt: null,
+          source: 'income',
+        });
       }
 
       // Auto-expense entries: non-deleted expenses assigned to this wallet (by walletId)
@@ -755,7 +858,8 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
               and(
                 eq(incomes.userId, userId),
                 inArray(incomes.categoryId, incomeCatIds),
-                eq(incomes.moneyStatus, 'RECEIVED')
+                eq(incomes.moneyStatus, 'RECEIVED'),
+                isNull(incomes.walletId)
               )
             )
             .then((r) => Number(r[0]?.count ?? 0))
@@ -763,6 +867,21 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       } else {
         countPromises.push(Promise.resolve(0));
       }
+
+      // Direct income count: RECEIVED income added straight to this wallet
+      countPromises.push(
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(incomes)
+          .where(
+            and(
+              eq(incomes.userId, userId),
+              eq(incomes.walletId, walletId),
+              eq(incomes.moneyStatus, 'RECEIVED')
+            )
+          )
+          .then((r) => Number(r[0]?.count ?? 0))
+      );
 
       countPromises.push(
         db
@@ -789,11 +908,18 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           .then((r) => Number(r[0]?.count ?? 0))
       );
 
-      const [incomeCount, expenseCount, manualCount] = await Promise.all(countPromises);
-      const total = (incomeCount ?? 0) + (expenseCount ?? 0) + (manualCount ?? 0);
+      const [incomeCount, directIncomeCount, expenseCount, manualCount] =
+        await Promise.all(countPromises);
+      const total =
+        (incomeCount ?? 0) + (directIncomeCount ?? 0) + (expenseCount ?? 0) + (manualCount ?? 0);
 
       // Merge + sort by transactionDate DESC, then id DESC (RESEARCH Pattern 5)
-      const merged = [...incomeEntries, ...expenseEntries, ...manualEntries];
+      const merged = [
+        ...incomeEntries,
+        ...directIncomeEntries,
+        ...expenseEntries,
+        ...manualEntries,
+      ];
       merged.sort((a, b) => {
         if (a.transactionDate < b.transactionDate) return 1;
         if (a.transactionDate > b.transactionDate) return -1;
@@ -810,6 +936,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         mappedExpenses: mappedExpensesCents,
         deposits: depositsCents,
         withdrawals: withdrawalsCents,
+        directIncome: directIncomeCents,
       });
 
       return {
@@ -827,6 +954,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           mappedExpensesCents,
           depositsCents,
           withdrawalsCents,
+          directIncomeCents,
         },
         transactions: content,
         pagination: { page, size, total, totalPages },
