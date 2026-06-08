@@ -13,12 +13,16 @@ import {
   CUSTOM_LABEL,
   DATE_PRESETS,
   resolvePresetLabel,
+  type PresetLabel,
 } from '@/lib/overview-date-presets';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface DateRangeSelectProps {
   className?: string;
+  /** Preset an empty URL resolves to. Ledgers use This Month (default); the
+   * overview hero passes 'Quarter to Date' so the pill matches its data. */
+  defaultPreset?: PresetLabel;
 }
 
 /** `yyyy-MM-dd` → local Date (parseISO keeps date-only strings in local time). */
@@ -45,7 +49,10 @@ function customLabel(from: string | null, to: string | null): string {
  * NOTE: nuqs hooks are client-only — the matching RSC reads `searchParams`
  * directly and resolves bounds in @/lib/overview-date-presets.
  */
-export function DateRangeSelect({ className }: DateRangeSelectProps): React.JSX.Element {
+export function DateRangeSelect({
+  className,
+  defaultPreset = 'This Month',
+}: DateRangeSelectProps): React.JSX.Element {
   const router = useRouter();
   const [from, setFrom] = useQueryState('from', parseAsString);
   const [to, setTo] = useQueryState('to', parseAsString);
@@ -57,7 +64,7 @@ export function DateRangeSelect({ className }: DateRangeSelectProps): React.JSX.
   // so we hold the in-progress selection locally and commit once both ends exist.
   const [draft, setDraft] = useState<DateRange | undefined>(undefined);
 
-  const activeLabel = resolvePresetLabel(from ?? undefined, to ?? undefined);
+  const activeLabel = resolvePresetLabel(from ?? undefined, to ?? undefined, defaultPreset);
 
   const triggerLabel =
     activeLabel === 'All Time'

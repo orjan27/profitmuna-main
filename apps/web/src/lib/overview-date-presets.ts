@@ -1,4 +1,12 @@
-import { endOfMonth, endOfYear, format, startOfMonth, startOfYear, subMonths } from 'date-fns';
+import {
+  endOfMonth,
+  endOfYear,
+  format,
+  startOfMonth,
+  startOfQuarter,
+  startOfYear,
+  subMonths,
+} from 'date-fns';
 import { TZDate } from '@date-fns/tz';
 
 // Shared between the overview RSC (page.tsx computes the default range) and
@@ -16,6 +24,12 @@ function nowManila(): TZDate {
 
 function fmt(date: Date | TZDate): string {
   return format(date, 'yyyy-MM-dd');
+}
+
+/** Current calendar quarter's start through today (Asia/Manila) — the Profit
+ * First quarterly distribution window the overview hero defaults to. */
+function quarterToDateRange(): { from: string; to: string } {
+  return { from: fmt(startOfQuarter(nowManila())), to: fmt(nowManila()) };
 }
 
 // ── Date presets ─────────────────────────────────────────────────────────────
@@ -41,6 +55,10 @@ export const DATE_PRESETS = [
       from: fmt(startOfMonth(subMonths(nowManila(), 2))),
       to: fmt(endOfMonth(nowManila())),
     }),
+  },
+  {
+    label: 'Quarter to Date',
+    getRange: () => quarterToDateRange(),
   },
   {
     label: 'This Year',
@@ -69,19 +87,32 @@ export const CUSTOM_LABEL = 'Custom';
 /** A preset label, or the Custom-range marker — the values DateRangeSelect drives. */
 export type PresetLabel = (typeof DATE_PRESETS)[number]['label'] | typeof CUSTOM_LABEL;
 
-/** Default overview period: This Month in Asia/Manila (D-08). */
+/** Default overview period: This Month in Asia/Manila (D-08). Still the default
+ * for the dashboard ledgers (income, expenses, profit-first). */
 export function getDefaultOverviewRange(): { from: string; to: string } {
   return DATE_PRESETS[0].getRange();
+}
+
+/** Overview hero default: Quarter to Date — the Profit First distribution
+ * window, so "ready to distribute this quarter" reads true out of the box. */
+export function getDefaultOverviewHeroRange(): { from: string; to: string } {
+  return quarterToDateRange();
 }
 
 /**
  * Map the URL `from`/`to` params to the preset they represent — or
  * {@link CUSTOM_LABEL} for an arbitrary range. Mirrors the resolution the
- * server uses: an empty URL is the This Month default; `?from=all` is All Time.
+ * server uses: `?from=all` is All Time and an empty URL is the surface's
+ * default (`emptyDefault`, This Month for ledgers, Quarter to Date for the
+ * overview hero).
  */
-export function resolvePresetLabel(from?: string, to?: string): PresetLabel {
+export function resolvePresetLabel(
+  from?: string,
+  to?: string,
+  emptyDefault: PresetLabel = 'This Month'
+): PresetLabel {
   if (from === ALL_TIME_SENTINEL) return 'All Time';
-  if (!from && !to) return 'This Month';
+  if (!from && !to) return emptyDefault;
   for (const preset of DATE_PRESETS) {
     if (preset.label === 'All Time') continue;
     const range = preset.getRange();
@@ -117,6 +148,7 @@ const PERIOD_CAPTIONS: Record<string, string> = {
   'This Month': 'This month',
   'Last Month': 'Last month',
   'Last 3 Months': 'Last 3 months',
+  'Quarter to Date': 'Quarter to date',
   'This Year': 'This year',
 };
 

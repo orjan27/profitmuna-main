@@ -844,3 +844,70 @@ describe('dashboard service — nextPendingIncome', () => {
     expect(summary.nextPendingIncome).toBeNull();
   });
 });
+
+describe('dashboard service — profitWalletBalanceCents', () => {
+  it('is null when no wallet is linked to the Profit account', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'nopfwallet@dash.test', name: 'No PF Wallet' });
+    await seedProfitFirstAccounts(dbD1, user.id);
+    // A standalone wallet exists, but none is linked to the Profit account
+    seedWallet(db, { userId: user.id, name: 'Cash' });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id);
+
+    expect(summary.profitWalletBalanceCents).toBeNull();
+  });
+
+  it("reflects the linked Profit wallet's all-time balance, independent of the period filter", async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'pfwallet@dash.test', name: 'PF Wallet User' });
+    await seedProfitFirstAccounts(dbD1, user.id);
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+
+    const pfAccounts = db
+      .select()
+      .from(schema.profitFirstAccounts)
+      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .all();
+    const profitAccount = pfAccounts.find((a) => a.accountType === 'PROFIT');
+    expect(profitAccount).toBeDefined();
+
+    const profitWallet = seedWallet(db, {
+      userId: user.id,
+      name: 'Profit Vault',
+      profitFirstAccountId: profitAccount!.id,
+    });
+
+    // Profit allocation = 5% (500 bp) of 100,000 received+allocated income = 5,000
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 100_000,
+      incomeDate: '2026-06-10',
+      moneyStatus: 'RECEIVED',
+      profitFirstAllocated: true,
+    });
+    // A withdrawal off the Profit wallet (allowed on PF wallets) → 5,000 - 1,000
+    seedWalletTx(db, {
+      userId: user.id,
+      walletId: profitWallet.id,
+      type: 'WITHDRAWAL',
+      amount: 1_000,
+      transactionDate: '2026-06-16',
+    });
+
+    const svc = createDashboardService(dbD1);
+    const ALL_TIME_PROFIT = 5_000 - 1_000;
+
+    // In-range query: the Profit reserve matches the all-time wallet balance
+    const june = await svc.getSummary(user.id, { from: '2026-06-01', to: '2026-06-30' });
+    expect(june.profitWalletBalanceCents).toBe(ALL_TIME_PROFIT);
+
+    // Out-of-range query: the period-scoped total drops to 0, but the Profit
+    // reserve is all-time and must stay put — proving it ignores the filter.
+    const july = await svc.getSummary(user.id, { from: '2026-07-01', to: '2026-07-31' });
+    expect(july.totalWalletBalanceCents).toBe(0);
+    expect(july.profitWalletBalanceCents).toBe(ALL_TIME_PROFIT);
+  });
+});

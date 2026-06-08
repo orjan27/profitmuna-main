@@ -2,18 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  Check,
-  Clock,
-  Plus,
-  Target,
-  TrendingDown,
-  TrendingUp,
-} from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Check, Clock, Plus, Target } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { endOfQuarter, format } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
 
 import { cn } from '@/lib/utils';
@@ -22,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
 import { StellaSprite, type StellaMood } from '@/components/Stella';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
-import type { BalanceComparison, DashboardSummary, RecentTransaction } from '@/types/dashboard';
+import type { DashboardSummary, RecentTransaction } from '@/types/dashboard';
 import { DateRangeSelect } from '@/components/DateRangeSelect';
 import { StellaMessages } from './stella-messages';
 
@@ -77,30 +68,19 @@ function paydayMessage(days: number): string {
   return `${days} days until payday.`;
 }
 
-// ── Trend badge ───────────────────────────────────────────────────────────────
+// ── Stella's profit-distribution countdown ────────────────────────────────────
 
-/**
- * Percent delta of the current balance vs the previous equal-length period,
- * plus a friendly label ("vs May" when the previous window sits in one month,
- * "vs previous period" otherwise). Null when there's nothing to compare
- * against — a zero previous balance makes any percent meaningless.
- */
-function trendFromComparison(
-  currentCents: number,
-  comparison: BalanceComparison | null
-): { deltaPercent: number; label: string } | null {
-  if (!comparison || comparison.previousPeriodBalanceCents === 0) return null;
+/** End of the current calendar quarter (Asia/Manila) as YYYY-MM-DD — the
+ * Profit First quarterly distribution anchor. */
+function quarterEndManila(): string {
+  return format(endOfQuarter(new TZDate(new Date(), 'Asia/Manila')), 'yyyy-MM-dd');
+}
 
-  const prev = comparison.previousPeriodBalanceCents;
-  const deltaPercent = Math.round(((currentCents - prev) / Math.abs(prev)) * 100);
-
-  const [year, month] = comparison.prevFrom.split('-').map(Number);
-  const sameMonth = comparison.prevFrom.slice(0, 7) === comparison.prevTo.slice(0, 7);
-  const label = sameMonth
-    ? `vs ${format(new Date(year, month - 1, 1), 'MMM')}`
-    : 'vs previous period';
-
-  return { deltaPercent, label };
+/** Caption line for the quarterly profit distribution (Profit First cadence). */
+function distributionMessage(days: number): string {
+  if (days <= 0) return "It's profit distribution day!";
+  if (days === 1) return '1 day until your profit distribution.';
+  return `${days} days until your profit distribution.`;
 }
 
 // ── Savings donut ─────────────────────────────────────────────────────────────
@@ -180,6 +160,14 @@ export function OverviewContent({
   const receivedCents = summary?.totalIncomeReceivedCents ?? 0;
   const pendingCents = summary?.totalIncomePendingCents ?? 0;
 
+  // Hero: the all-time balance of the wallet linked to the Profit account —
+  // a standing reserve, NOT period-scoped (the filter below governs the rest).
+  // null = the user hasn't linked a wallet to their Profit account yet.
+  const hasProfitWallet = summary?.profitWalletBalanceCents != null;
+  const profitSetAsideCents = summary?.profitWalletBalanceCents ?? 0;
+  // Mike's rule: distribute half the Profit account each quarter.
+  const profitDistributionCents = Math.round(profitSetAsideCents / 2);
+
   // Stella's mood is a readout of the period's financial state. Priority:
   // privacy (eyes closed) > trouble (teary) > quiet period (asleep) > healthy.
   // Her expression never carries the meaning alone — the caption does.
@@ -201,13 +189,15 @@ export function OverviewContent({
   }
 
   // Stella's message pool: mood caption first (stable across SSR/hydration),
-  // then the payday countdown when a pending income has an upcoming date.
+  // then the payday countdown when a pending income has an upcoming date, then
+  // the quarterly profit-distribution countdown (always — it's a standing cadence).
   const stellaMessages: string[] = [stellaCaption];
   if (summary?.nextPendingIncome) {
     stellaMessages.push(
       paydayMessage(daysUntilManila(summary.nextPendingIncome.expectedReleaseDate))
     );
   }
+  stellaMessages.push(distributionMessage(daysUntilManila(quarterEndManila())));
 
   // First-run welcome: the default period is effectively empty and the user
   // hasn't filtered. PF accounts are seeded at registration, so account count
@@ -265,7 +255,6 @@ export function OverviewContent({
     );
   }
 
-  const trend = trendFromComparison(walletBalanceCents, summary?.balanceComparison ?? null);
   // Donut share of received income kept as savings — clamped so a negative
   // net or rounding never breaks the ring.
   const savingsRate =
@@ -283,9 +272,10 @@ export function OverviewContent({
         onAdd={() => openRecordSheet('income')}
       />
 
-      {/* Hero card: where the money stands for the selected period */}
+      {/* Hero card: the Profit First wallet's standing balance — "take your
+          profit first". All-time, NOT governed by the period filter below. */}
       <section
-        aria-label="Available balance"
+        aria-label="Profit set aside"
         className="relative mt-6 rounded-3xl bg-gradient-to-br from-tint-income via-tint-income/60 to-tint-income/20 p-6"
       >
         {/* Decorative star peeking over the corner (mockup) — Stella in the
@@ -297,46 +287,48 @@ export function OverviewContent({
           className="absolute -top-5 -right-1 rotate-12"
         />
         <p className="text-xs font-semibold tracking-[0.14em] text-ink-faint uppercase">
-          Available balance
+          Profit set aside
         </p>
         <div className="mt-2 flex items-center gap-2">
           <MaskedAmount
-            cents={walletBalanceCents}
+            cents={profitSetAsideCents}
             visible={visible}
             mounted={mounted}
-            className={cn(
-              'text-4xl leading-none font-bold tracking-tight tabular-nums',
-              walletBalanceCents < 0 && 'text-expense'
-            )}
+            className="text-4xl leading-none font-bold tracking-tight tabular-nums"
           />
           <AmountToggle visible={visible} toggle={toggle} />
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          {trend ? (
-            <span
-              className={cn(
-                'flex items-center gap-1 rounded-full bg-paper/70 px-3 py-1 text-sm font-semibold tabular-nums',
-                trend.deltaPercent >= 0 ? 'text-income' : 'text-expense'
-              )}
-            >
-              {trend.deltaPercent >= 0 ? (
-                <TrendingUp aria-hidden="true" className="h-4 w-4" />
-              ) : (
-                <TrendingDown aria-hidden="true" className="h-4 w-4" />
-              )}
-              {trend.deltaPercent >= 0 ? '+' : ''}
-              {trend.deltaPercent}% {trend.label}
-            </span>
-          ) : null}
-          {/* D-02: the wallet balance is period-scoped — the pill names the
-              period AND opens the preset picker (one date filter governs
-              every figure and the feed, D-07/D-08). */}
-          <DateRangeSelect />
-        </div>
+        {hasProfitWallet ? (
+          /* Mike's quarterly distribution: half the Profit wallet is yours to take */
+          <p className="mt-3 text-sm font-medium text-ink-soft">
+            ≈{' '}
+            <MaskedAmount
+              cents={profitDistributionCents}
+              visible={visible}
+              mounted={mounted}
+              className="font-bold tabular-nums"
+            />{' '}
+            ready to distribute this quarter (50%)
+          </p>
+        ) : (
+          <p className="mt-3 text-sm font-medium text-ink-soft">
+            <Link href="/wallets" className="font-semibold text-income hover:underline">
+              Link a wallet
+            </Link>{' '}
+            to your Profit account to start setting profit aside.
+          </p>
+        )}
       </section>
 
+      {/* Period filter — governs every figure below; the Profit hero above is
+          all-time. Defaults to Quarter to Date (the PF distribution window). */}
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-ink-soft">This period</h2>
+        <DateRangeSelect defaultPreset="Quarter to Date" />
+      </div>
+
       {/* Income / Expenses pair — each card navigates to its ledger */}
-      <section aria-label="Period totals" className="mt-5 grid grid-cols-2 gap-3 sm:gap-4">
+      <section aria-label="Period totals" className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
         <Link
           href="/income"
           className="rounded-3xl bg-tint-income p-5 transition-opacity hover:opacity-90"

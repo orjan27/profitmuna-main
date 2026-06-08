@@ -60,6 +60,7 @@ const PERIOD_CAPTION: Record<PresetLabel, string> = {
   'This Month': 'this month',
   'Last Month': 'last month',
   'Last 3 Months': 'last 3 months',
+  'Quarter to Date': 'quarter to date',
   'This Year': 'this year',
   'All Time': 'all time',
   Custom: 'selected range',

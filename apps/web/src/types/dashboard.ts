@@ -48,6 +48,11 @@ export interface DashboardSummary {
   netIncomeCents: number;
   /** Period-scoped sum across all wallets for the active date range */
   totalWalletBalanceCents: number;
+  /**
+   * All-time balance of the wallet linked to the PROFIT account — the "Profit
+   * set aside" hero. NOT date-scoped; null when no wallet is linked yet.
+   */
+  profitWalletBalanceCents: number | null;
   /** Total received + allocated income in cents (PF summary passthrough) */
   totalIncome: number;
   profitFirstAccounts: PfAccount[];
