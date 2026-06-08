@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start --port 3006",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@date-fns/tz": "^1.4.1",

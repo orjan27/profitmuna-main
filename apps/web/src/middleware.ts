@@ -17,6 +17,39 @@ const PUBLIC_ROUTES = new Set([
   '/reset-password',
 ]);
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+/**
+ * Per-request Content-Security-Policy.
+ *
+ * Next.js bootstraps and streams (RSC/Flight) via inline <script> tags, so a
+ * static `script-src 'self'` blocks hydration → blank page. In production we
+ * emit a fresh nonce per request and pair it with 'strict-dynamic' (scripts the
+ * nonce'd bootstrap loads are trusted; 'self' is the legacy-browser fallback).
+ * Dev keeps 'unsafe-inline'/'unsafe-eval' for the HMR runtime.
+ *
+ * The nonce is propagated on the *request* CSP header (see middleware) so Next's
+ * renderer stamps it onto its own inline scripts.
+ */
+function buildCsp(nonce: string): string {
+  const scriptSrc = IS_PRODUCTION
+    ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+  return [
+    "default-src 'self'",
+    scriptSrc,
+    // 'unsafe-inline' for styles is required by Tailwind's injected styles
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    // Browser only talks to the same-origin BFF — never the Workers API
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
+}
+
 /**
  * Auth gate + silent token refresh.
  *
@@ -36,9 +69,24 @@ const PUBLIC_ROUTES = new Set([
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  // Allow public routes through unconditionally
+  // Fresh nonce per request. The CSP is carried on the request headers so Next's
+  // renderer applies the nonce to its inline bootstrap/streaming scripts, and on
+  // the response so the browser enforces it.
+  const nonce = btoa(crypto.randomUUID());
+  const csp = buildCsp(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('content-security-policy', csp);
+
+  const passThrough = (): NextResponse => {
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set('content-security-policy', csp);
+    return response;
+  };
+
+  // Allow public routes through unconditionally (still nonce'd)
   if (PUBLIC_ROUTES.has(pathname)) {
-    return NextResponse.next();
+    return passThrough();
   }
 
   const accessToken = request.cookies.get('access_token')?.value;
@@ -67,10 +115,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
           // Rewrite the request Cookie header so the downstream RSC render of
           // THIS request reads the fresh token via cookies().
-          const requestHeaders = new Headers(request.headers);
           requestHeaders.set('cookie', rewriteCookieHeader(request.headers.get('cookie'), updates));
 
           const response = NextResponse.next({ request: { headers: requestHeaders } });
+          response.headers.set('content-security-policy', csp);
           // Persist the rotated cookies in the browser — append() never set()
           for (const cookie of setCookies) {
             response.headers.append('Set-Cookie', cookie);
@@ -83,7 +131,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.next();
+  return passThrough();
 }
 
 export const config = {
