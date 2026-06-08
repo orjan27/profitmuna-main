@@ -21,6 +21,24 @@ export const createExpenseCategorySchema = z.object({
 /** Schema for renaming an expense category. */
 export const updateExpenseCategorySchema = createExpenseCategorySchema;
 
+/**
+ * Query params for the expense analytics aggregate. `from`/`to` scope the
+ * in-view period; `year`/`month`/`prevMonth` are resolved Asia/Manila-side.
+ */
+export const expenseStatsQuerySchema = z.object({
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  year: z.string().regex(/^\d{4}$/),
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  prevMonth: z.string().regex(/^\d{4}-\d{2}$/),
+});
+
 /** Query schema for listing expenses with pagination and optional date range. */
 export const expenseQuerySchema = z.object({
   page: z.coerce.number().int().min(0).default(0),

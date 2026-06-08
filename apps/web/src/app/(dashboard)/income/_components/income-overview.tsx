@@ -2,9 +2,10 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import { useQueryState, parseAsString } from 'nuqs';
-import { MoreHorizontal, Plus, SlidersHorizontal } from 'lucide-react';
+import { MoreHorizontal, Plus, SlidersHorizontal, TrendingDown, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,9 +14,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
+import { useFormatCurrency } from '@/components/CurrencyProvider';
+import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
+import { StatTile } from '@/components/StatTile';
+import { MonthlyBars, type MonthlyBarDatum } from '@/components/MonthlyBars';
+import { SourceBreakdown } from '@/components/SourceBreakdown';
+import { PeriodControl } from '@/components/PeriodControl';
+import { StellaSprite } from '@/components/Stella';
+import { monthShortLabel, type LedgerPeriodKey } from '@/lib/ledger-period';
+import { nextDueDate } from '@/lib/recurrence';
+import { formatDate } from '@/lib/format-date';
 import type { Income, IncomeCategory } from '@/types/income';
 import type { RecurringIncome } from '@/types/recurring';
-import { AmountToggle, MaskedAmount, useAmountVisibility } from '@/components/amount-visibility';
+import type { LedgerStats } from '@/types/stats';
 import { IncomeFilters } from './income-filters';
 import { IncomeList } from './income-list';
 import { EditIncomeDialog } from './edit-income-dialog';
@@ -32,19 +43,78 @@ interface IncomeOverviewProps {
     last: boolean;
   };
   categories: IncomeCategory[];
-  /** Recurring income templates for the "Recurring" section */
+  /** Recurring income templates for the "Recurring" section + monthly stat. */
   recurring: RecurringIncome[];
+  /** Aggregate figures for the stat band and charts. */
+  stats: LedgerStats;
+  /** Resolved period key (drives the period caption + the best-month star). */
+  periodKey: LedgerPeriodKey;
+  /** Resolved period bounds — keep load-more scoped to the same window. */
+  from?: string;
+  to?: string;
+  /** Asia/Manila-resolved date keys for the monthly bar series. */
+  statsDate: { year: string; month: string; prevMonth: string };
+}
+
+const PERIOD_CAPTION: Record<LedgerPeriodKey, string> = {
+  '30d': 'last 30 days',
+  month: 'this month',
+  year: 'this year',
+  all: 'all time',
+};
+
+/** Monthly-equivalent contribution of a recurring template (null amount = skip). */
+function monthlyEquivalent(template: RecurringIncome): number {
+  if (template.amount === null || !template.active) return 0;
+  switch (template.frequency) {
+    case 'WEEKLY':
+      return template.amount * 4;
+    case 'BIWEEKLY':
+      return template.amount * 2;
+    case 'MONTHLY':
+      return template.amount;
+    default:
+      return 0;
+  }
 }
 
 /**
- * Client-side orchestrator for the income ledger page.
- * Manages accumulated items state (load-more / D-06), the collapsed filter
- * row, and dialog open state for edit (D-05) and receive (D-14) flows.
- * Recording goes through the global Record sheet.
+ * Build the monthly bar series for the current year: Jan through the current
+ * month, zero-filled, with the current month flagged for the money tone.
  */
-export function IncomeOverview({ initialData, categories, recurring }: IncomeOverviewProps) {
+function buildMonthlyBars(stats: LedgerStats, year: string, month: string): MonthlyBarDatum[] {
+  const currentMonthNum = Number(month.slice(5, 7));
+  const byYm = new Map(stats.monthly.map((m) => [m.ym, m.total]));
+  const bars: MonthlyBarDatum[] = [];
+  for (let m = 1; m <= currentMonthNum; m++) {
+    const ym = `${year}-${String(m).padStart(2, '0')}`;
+    bars.push({
+      label: monthShortLabel(ym),
+      total: byYm.get(ym) ?? 0,
+      current: m === currentMonthNum,
+    });
+  }
+  return bars;
+}
+
+/**
+ * Client orchestrator for the income ledger. Mobile keeps a lean hero (the
+ * in-view total + records); the web view (md+) adds the period control, a
+ * three-tile stat band, and the monthly / by-source charts. Recording goes
+ * through the global Record sheet; the FAB carries it on mobile.
+ */
+export function IncomeOverview({
+  initialData,
+  categories,
+  recurring,
+  stats,
+  periodKey,
+  from,
+  to,
+  statsDate,
+}: IncomeOverviewProps): React.JSX.Element {
   const { openRecordSheet } = useRecordSheet();
-  // Shared visibility state (same localStorage key as Overview/Profit First)
+  const formatCurrency = useFormatCurrency();
   const { visible, toggle, mounted } = useAmountVisibility();
 
   const [items, setItems] = useState<Income[]>(initialData.content);
@@ -52,55 +122,33 @@ export function IncomeOverview({ initialData, categories, recurring }: IncomeOve
   const [isLast, setIsLast] = useState(initialData.last);
   const [isPending, startTransition] = useTransition();
 
-  // Re-sync accumulator when the RSC parent re-fetches after router.refresh()
-  // (e.g. after a create via the Record sheet). useState ignores prop changes
-  // after initial mount, so an effect is needed to pick up the new initialData.
+  // Re-sync the accumulator when the RSC re-fetches (record sheet → refresh).
   useEffect(() => {
     setItems(initialData.content);
     setCurrentPage(initialData.page);
     setIsLast(initialData.last);
   }, [initialData]);
 
-  // Edit dialog state
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
-  // Receive dialog state
   const [receivingIncome, setReceivingIncome] = useState<Income | null>(null);
 
-  // Filter state from URL (nuqs — survives navigation, shareable link)
+  // Secondary filters (search + status) live behind the Filter toggle; the
+  // primary time scope is the PeriodControl (URL `period`).
   const [search] = useQueryState('search', parseAsString.withDefault(''));
   const [moneyStatus] = useQueryState('moneyStatus', parseAsString.withDefault(''));
-  const [from] = useQueryState('from', parseAsString.withDefault(''));
-  const [to] = useQueryState('to', parseAsString.withDefault(''));
 
-  const activeFilterCount = [search, moneyStatus, from, to].filter(Boolean).length;
-  // Filters stay collapsed until asked for — but a shared/refreshed URL with
-  // filters applied opens them so the state is visible.
+  const activeFilterCount = [search, moneyStatus].filter(Boolean).length;
   const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0);
-  // Manage categories lives in the header's overflow menu (controlled dialog)
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
-  // One primary action per view: when the ledger is truly empty (no records,
-  // no filters narrowing things), the empty state's CTA is the only action —
-  // header controls would be three buttons doing the same job.
-  const showHeaderControls = items.length > 0 || activeFilterCount > 0;
-
-  /** Total value of all loaded income items (display only — not a server aggregate). */
-  const loadedTotal = items.reduce((sum, i) => sum + i.amount, 0);
-
-  /**
-   * Called by IncomeFilters whenever a filter changes.
-   * Resets the accumulated list; Next.js re-renders the RSC parent with new URL params,
-   * which provides a fresh initialData on the next render cycle.
-   */
-  function handleFilterChange() {
-    // Reset accumulator — RSC will re-fetch with the updated URL search params
+  /** Reset the accumulator on filter change; the RSC re-fetches page 0. */
+  function handleFilterChange(): void {
     setCurrentPage(0);
     setIsLast(false);
     setItems([]);
   }
 
-  /** Append the next page of results (D-06 load-more pattern). */
-  function handleLoadMore() {
+  function handleLoadMore(): void {
     startTransition(async () => {
       try {
         const nextPage = currentPage + 1;
@@ -108,8 +156,8 @@ export function IncomeOverview({ initialData, categories, recurring }: IncomeOve
           page: nextPage,
           search: search || undefined,
           moneyStatus: moneyStatus || undefined,
-          from: from || undefined,
-          to: to || undefined,
+          from,
+          to,
         });
         setItems((prev) => [...prev, ...result.content]);
         setCurrentPage(result.page);
@@ -120,70 +168,200 @@ export function IncomeOverview({ initialData, categories, recurring }: IncomeOve
     });
   }
 
+  // ── Derived stat figures ────────────────────────────────────────────────
+  const recordCount = stats.period.count;
+  const periodCaption = PERIOD_CAPTION[periodKey];
+
+  // Best-month star: only when viewing the current month and it's the highest
+  // single calendar month on record (truthful — never on multi-month views).
+  const isBestMonth =
+    periodKey === 'month' &&
+    stats.thisMonthTotal > 0 &&
+    stats.bestMonth !== null &&
+    stats.thisMonthTotal >= stats.bestMonth.total;
+
+  // Month-over-month delta for the "This month" tile.
+  const prevTotal = stats.prevMonthTotal;
+  const monthDelta =
+    prevTotal > 0 ? Math.round(((stats.thisMonthTotal - prevTotal) / prevTotal) * 100) : null;
+  const prevMonthLabel = monthShortLabel(statsDate.prevMonth);
+
+  // Recurring monthly equivalent + the top contributor's next occurrence.
+  const activeRecurring = recurring.filter((r) => r.active);
+  const recurringMonthly = activeRecurring.reduce((sum, r) => sum + monthlyEquivalent(r), 0);
+  const topRecurring = activeRecurring
+    .slice()
+    .sort((a, b) => monthlyEquivalent(b) - monthlyEquivalent(a))[0];
+
+  const monthlyBars = buildMonthlyBars(stats, statsDate.year, statsDate.month);
+
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-6">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[20px] leading-tight font-semibold">Income</h1>
-          {items.length > 0 ? (
-            <>
-              {/* Same display scale as the Overview hero — money reads at one
-                  size across pages, eye toggle anchored to the total it masks */}
-              <div className="mt-3 flex items-center gap-2">
-                <MaskedAmount
-                  cents={loadedTotal}
-                  visible={visible}
-                  mounted={mounted}
-                  className="text-[34px] leading-none font-semibold tracking-tight tabular-nums"
-                />
-                <AmountToggle visible={visible} toggle={toggle} />
-              </div>
-              <p className="mt-1.5 text-sm text-ink-faint">
-                across {items.length} record{items.length !== 1 ? 's' : ''} in view
-              </p>
-            </>
-          ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[22px] leading-tight font-semibold">Income</h1>
+        <div className="flex items-center gap-1.5">
+          <PeriodControl className="max-md:hidden" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
+          >
+            <SlidersHorizontal aria-hidden="true" />
+            Filter
+            {activeFilterCount > 0 ? (
+              <span className="tabular-nums">· {activeFilterCount}</span>
+            ) : null}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="More actions"
+                className="text-ink-soft"
+              >
+                <MoreHorizontal aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setCategoriesOpen(true)}>
+                Manage categories
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button size="sm" className="max-md:hidden" onClick={() => openRecordSheet('income')}>
+            <Plus aria-hidden="true" />
+            Record income
+          </Button>
         </div>
-        {showHeaderControls ? (
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setFiltersOpen((v) => !v)}
-              aria-expanded={filtersOpen}
-              className={activeFilterCount > 0 ? 'text-ink' : 'text-ink-soft'}
-            >
-              <SlidersHorizontal aria-hidden="true" />
-              Filter
-              {activeFilterCount > 0 ? (
-                <span className="tabular-nums">· {activeFilterCount}</span>
-              ) : null}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="More actions"
-                  className="text-ink-soft"
-                >
-                  <MoreHorizontal aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setCategoriesOpen(true)}>
-                  Manage categories
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {/* Hidden on mobile: RecordFab is the record affordance there. */}
-            <Button size="sm" className="max-md:hidden" onClick={() => openRecordSheet('income')}>
-              <Plus aria-hidden="true" />
-              Record income
-            </Button>
+      </div>
+
+      {/* Time scope — full-width segmented row on mobile (the header copy is
+          md+ only); the stat band and charts below render on every size. */}
+      <PeriodControl className="flex w-full justify-between overflow-x-auto md:hidden" />
+
+      {/* Stat band — total spans full width on mobile, then the pair; three
+          across on the web view. */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+        <StatTile
+          className="col-span-2 md:col-span-1"
+          label={
+            <>
+              Total in view
+              {isBestMonth ? <StellaSprite mood="smiling" size={18} decorative /> : null}
+            </>
+          }
+          caption={
+            <>
+              across {recordCount} record{recordCount !== 1 ? 's' : ''} ·{' '}
+              {isBestMonth ? 'all-time best month' : periodCaption}
+            </>
+          }
+        >
+          <div className="flex items-center gap-2">
+            <MaskedAmount
+              cents={stats.period.total}
+              visible={visible}
+              mounted={mounted}
+              className="text-[30px] leading-none font-semibold tracking-tight tabular-nums sm:text-[32px]"
+            />
+            <AmountToggle visible={visible} toggle={toggle} />
           </div>
-        ) : null}
+        </StatTile>
+
+        <StatTile
+          label="This month"
+          caption={
+            monthDelta !== null ? (
+              <span className="inline-flex items-center gap-1">
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-0.5 font-semibold tabular-nums',
+                    monthDelta >= 0 ? 'text-income' : 'text-expense'
+                  )}
+                >
+                  {monthDelta >= 0 ? (
+                    <TrendingUp aria-hidden="true" className="h-4 w-4" />
+                  ) : (
+                    <TrendingDown aria-hidden="true" className="h-4 w-4" />
+                  )}
+                  {monthDelta >= 0 ? '+' : ''}
+                  {monthDelta}%
+                </span>
+                <span>
+                  vs {formatCurrency(prevTotal)} in {prevMonthLabel}
+                </span>
+              </span>
+            ) : stats.thisMonthTotal > 0 ? (
+              'First month with income'
+            ) : (
+              'Nothing yet this month'
+            )
+          }
+        >
+          <MaskedAmount
+            cents={stats.thisMonthTotal}
+            visible={visible}
+            mounted={mounted}
+            className="text-[22px] leading-none font-semibold tracking-tight tabular-nums sm:text-[28px]"
+          />
+        </StatTile>
+
+        <StatTile
+          label="Recurring / month"
+          caption={
+            topRecurring
+              ? `${topRecurring.categoryName} · next ${formatDate(nextDueDate(topRecurring))}`
+              : 'None set up'
+          }
+        >
+          <MaskedAmount
+            cents={recurringMonthly}
+            visible={visible}
+            mounted={mounted}
+            className="text-[22px] leading-none font-semibold tracking-tight tabular-nums sm:text-[28px]"
+          />
+        </StatTile>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section aria-labelledby="income-monthly-heading" className="rounded-3xl bg-card p-6">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 id="income-monthly-heading" className="text-base font-semibold">
+              Monthly income
+            </h2>
+            <span className="text-xs text-ink-faint">{statsDate.year} · by month</span>
+          </div>
+          <div className="mt-6">
+            <MonthlyBars data={monthlyBars} tone="income" formatCurrency={formatCurrency} />
+          </div>
+        </section>
+
+        <section aria-labelledby="income-source-heading" className="rounded-3xl bg-card p-6">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 id="income-source-heading" className="text-base font-semibold">
+              Income by source
+            </h2>
+            <span className="text-xs text-ink-faint">{periodCaption}</span>
+          </div>
+          <div className="mt-5">
+            {stats.bySource.length > 0 ? (
+              <SourceBreakdown
+                data={stats.bySource}
+                tone="income"
+                total={stats.period.total}
+                unitLabel="income"
+                formatCurrency={formatCurrency}
+              />
+            ) : (
+              <p className="py-6 text-center text-sm text-ink-faint">No income in this period.</p>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* Manage categories dialog — opened from the overflow menu */}
@@ -193,30 +371,35 @@ export function IncomeOverview({ initialData, categories, recurring }: IncomeOve
         onOpenChange={setCategoriesOpen}
       />
 
-      {/* Filters (URL-persisted, debounced search) — collapsed by default */}
+      {/* Secondary filters (search + status) — collapsed by default */}
       {filtersOpen ? <IncomeFilters onFilterChange={handleFilterChange} /> : null}
 
-      {/* Recurring templates — renders nothing when the user has none */}
-      <RecurringIncomeList templates={recurring} categories={categories} />
+      {/* Records */}
+      <section aria-label="Records" className="mt-1 flex flex-col gap-5">
+        <h2 className="text-xs font-semibold tracking-[0.12em] text-ink-faint uppercase max-md:sr-only">
+          Records
+        </h2>
 
-      {/* Income ledger */}
-      <IncomeList
-        items={items}
-        filtered={activeFilterCount > 0}
-        onEditRow={(income) => setEditingIncome(income)}
-        onReceiveRow={(income) => setReceivingIncome(income)}
-      />
+        {/* Recurring templates — renders nothing when the user has none */}
+        <RecurringIncomeList templates={recurring} categories={categories} />
 
-      {/* Load more (D-06 — append on demand, NOT numbered pages) */}
+        <IncomeList
+          items={items}
+          filtered={activeFilterCount > 0}
+          onEditRow={(income) => setEditingIncome(income)}
+          onReceiveRow={(income) => setReceivingIncome(income)}
+        />
+      </section>
+
+      {/* Load more (D-06 — append on demand) */}
       {!isLast && items.length > 0 ? (
-        <div className="flex justify-center pt-2">
+        <div className="flex justify-center pt-1">
           <Button variant="ghost" onClick={handleLoadMore} disabled={isPending}>
             {isPending ? 'Loading…' : 'Load more'}
           </Button>
         </div>
       ) : null}
 
-      {/* Edit income dialog (D-05) */}
       {editingIncome ? (
         <EditIncomeDialog
           income={editingIncome}
@@ -226,7 +409,6 @@ export function IncomeOverview({ initialData, categories, recurring }: IncomeOve
         />
       ) : null}
 
-      {/* Receive income dialog (D-14) */}
       {receivingIncome ? (
         <ReceiveIncomeDialog
           income={receivingIncome}

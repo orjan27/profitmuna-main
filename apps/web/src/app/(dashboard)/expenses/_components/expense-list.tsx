@@ -1,15 +1,21 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Plus, RotateCcw } from 'lucide-react';
+import { ArrowUpRight, MoreHorizontal, Plus, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { StellaSprite } from '@/components/Stella';
 import { useRecordSheet } from '@/components/RecordSheetProvider';
 import { useFormatCurrency } from '@/components/CurrencyProvider';
 import { formatDateGroup } from '@/lib/format-date';
-import { restoreExpenseAction } from './expense-actions';
+import { deleteExpenseAction, restoreExpenseAction } from './expense-actions';
 import { EditExpenseDialog, type ExpenseRow } from './edit-expense-dialog';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -67,7 +73,7 @@ interface DeletedRowProps {
   onMutated: () => void;
 }
 
-function DeletedExpenseRow({ expense, onMutated }: DeletedRowProps) {
+function DeletedExpenseRow({ expense, onMutated }: DeletedRowProps): React.JSX.Element {
   const formatCurrency = useFormatCurrency();
   const [isPending, startTransition] = useTransition();
 
@@ -84,7 +90,13 @@ function DeletedExpenseRow({ expense, onMutated }: DeletedRowProps) {
   }
 
   return (
-    <li className="flex items-center gap-4 py-3 opacity-60">
+    <li className="flex items-center gap-3.5 py-3 opacity-60">
+      <span
+        aria-hidden="true"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-raised text-ink-faint"
+      >
+        <ArrowUpRight className="h-5 w-5" />
+      </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-ink-soft line-through">
           {expense.categoryName}
@@ -126,18 +138,31 @@ function ActiveExpenseRow({
   wallets,
   defaultWalletId,
   onMutated,
-}: ActiveRowProps) {
+}: ActiveRowProps): React.JSX.Element {
   const formatCurrency = useFormatCurrency();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isDeleting, startDelete] = useTransition();
 
   // Second line: description and wallet name as quiet text (walletName is
-  // denormalized, so it renders even when the wallet has been soft-deleted)
+  // denormalized, so it renders even when the wallet has been soft-deleted).
   const detail = [expense.description, expense.walletName].filter(Boolean).join(' · ');
+
+  function handleDelete() {
+    startDelete(async () => {
+      const result = await deleteExpenseAction(expense.id);
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        toast.success('Expense deleted.');
+        onMutated();
+      }
+    });
+  }
 
   return (
     <li>
       <div
-        className="group -mx-3 flex cursor-pointer items-center gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-raised/40"
+        className="group -mx-3 flex items-center gap-3.5 rounded-2xl px-3 py-3 transition-colors hover:bg-raised/40"
         onClick={() => setDialogOpen(true)}
         role="button"
         tabIndex={0}
@@ -149,13 +174,48 @@ function ActiveExpenseRow({
           }
         }}
       >
+        <span
+          aria-hidden="true"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-tint-expense text-expense"
+        >
+          <ArrowUpRight className="h-5 w-5" />
+        </span>
+
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{expense.categoryName}</p>
           {detail ? <p className="mt-0.5 truncate text-xs text-ink-faint">{detail}</p> : null}
         </div>
+
         <span className="shrink-0 text-sm font-semibold text-expense tabular-nums">
           −{formatCurrency(expense.amount)}
         </span>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Actions for ${expense.categoryName}`}
+              className="shrink-0 text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 max-md:opacity-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setDialogOpen(true)}>Edit</DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={isDeleting}
+              onSelect={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <EditExpenseDialog
@@ -174,10 +234,10 @@ function ActiveExpenseRow({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 /**
- * The expense ledger: borderless rows grouped under date headings, amounts in
- * the expense color always paired with the − sign. Active rows open the edit
- * dialog (EXP-03); soft-deleted rows surface below with a restore affordance
- * (EXP-04).
+ * The expense ledger: rows grouped under date headings, amounts in the expense
+ * color always paired with the − sign. Active rows open the edit dialog (EXP-03)
+ * and carry an Edit / Delete overflow; soft-deleted rows surface below with a
+ * restore affordance (EXP-04).
  */
 export function ExpenseList({
   expenses,
@@ -186,16 +246,13 @@ export function ExpenseList({
   wallets,
   defaultWalletId,
   onMutated,
-}: ExpenseListProps) {
+}: ExpenseListProps): React.JSX.Element {
   const { openRecordSheet } = useRecordSheet();
 
   const activeExpenses = expenses.filter((e) => e.deletedAt === null);
   const deletedExpenses = expenses.filter((e) => e.deletedAt !== null);
 
   if (activeExpenses.length === 0 && deletedExpenses.length === 0) {
-    // Filtered-empty is not first-run: the records exist, the filters hide
-    // them. Say so instead of the teach copy, and offer no competing CTA —
-    // the filter row sits right above.
     if (filtered) {
       return (
         <div className="py-16 text-center">
@@ -219,13 +276,13 @@ export function ExpenseList({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-7">
       {groupByDate(activeExpenses).map((group) => (
         <section key={group.label} aria-label={group.label}>
           <h2 className="text-xs font-medium tracking-[0.12em] text-ink-faint uppercase">
             {group.label}
           </h2>
-          <ul className="mt-1 divide-y divide-hairline/60">
+          <ul className="mt-1.5 flex flex-col">
             {group.items.map((expense) => (
               <ActiveExpenseRow
                 key={expense.id}
@@ -252,7 +309,7 @@ export function ExpenseList({
           <h2 className="text-xs font-medium tracking-[0.12em] text-ink-faint uppercase">
             Deleted ({deletedExpenses.length})
           </h2>
-          <ul className="mt-1 divide-y divide-hairline/60">
+          <ul className="mt-1.5 divide-y divide-hairline/60">
             {deletedExpenses.map((expense) => (
               <DeletedExpenseRow key={expense.id} expense={expense} onMutated={onMutated} />
             ))}

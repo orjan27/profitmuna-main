@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/server/auth';
 import { apiFetch, ApiError } from '@/server/api';
 import type { RecurringExpenseListResponse } from '@/types/recurring';
+import type { LedgerStatsResponse } from '@/types/stats';
+import { ledgerStatsDateParams, resolveLedgerPeriod } from '@/lib/ledger-period';
 import { ExpensesOverview } from './_components/expenses-overview';
 
 interface ExpenseCategory {
@@ -38,8 +40,7 @@ interface WalletListItem {
 }
 
 interface SearchParams {
-  from?: string;
-  to?: string;
+  period?: string;
 }
 
 interface PageProps {
@@ -48,28 +49,42 @@ interface PageProps {
 
 /**
  * RSC for /expenses.
- * Reads searchParams for SSR date filter.
- * Guards with getSession → redirect to /login when unauthenticated.
+ * Resolves the URL `period` (PeriodControl) to date bounds for both the ledger
+ * list and the stats aggregate. Guards with getSession → redirect to /login
+ * when unauthenticated.
  */
 export default async function ExpensesPage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect('/login');
 
   const params = await searchParams;
-  const qs = new URLSearchParams({ page: '0', limit: '20' });
-  if (params.from) qs.set('from', params.from);
-  if (params.to) qs.set('to', params.to);
+  const period = resolveLedgerPeriod(params.period);
+  const statsDate = ledgerStatsDateParams();
+
+  const listQs = new URLSearchParams({ page: '0', limit: '20' });
+  if (period.from) listQs.set('from', period.from);
+  if (period.to) listQs.set('to', period.to);
+
+  const statsQs = new URLSearchParams({
+    year: statsDate.year,
+    month: statsDate.month,
+    prevMonth: statsDate.prevMonth,
+    ...(period.from ? { from: period.from } : {}),
+    ...(period.to ? { to: period.to } : {}),
+  }).toString();
 
   let expensesData: PaginatedExpenses;
   let categoriesData: { data: ExpenseCategory[] };
   let walletsData: { data: WalletListItem[] };
   let recurringData: RecurringExpenseListResponse;
+  let statsData: LedgerStatsResponse;
   try {
-    [expensesData, categoriesData, walletsData, recurringData] = await Promise.all([
-      apiFetch<PaginatedExpenses>(`/api/expenses?${qs.toString()}`),
+    [expensesData, categoriesData, walletsData, recurringData, statsData] = await Promise.all([
+      apiFetch<PaginatedExpenses>(`/api/expenses?${listQs.toString()}`),
       apiFetch<{ data: ExpenseCategory[] }>('/api/expense-categories'),
       apiFetch<{ data: WalletListItem[] }>('/api/wallets'),
       apiFetch<RecurringExpenseListResponse>('/api/recurring-expenses'),
+      apiFetch<LedgerStatsResponse>(`/api/expenses/stats?${statsQs}`),
     ]);
   } catch (err) {
     // A decodable-but-rejected token passes getSession but 401s at the API
@@ -83,13 +98,20 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   const defaultWalletId = walletsData.data.find((w) => w.isDefault)?.id ?? null;
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-5xl">
       <ExpensesOverview
+        // Re-key per period so the client accumulator resets on scope change.
+        key={period.key}
         initialData={expensesData}
         categories={categoriesData.data}
         wallets={wallets}
         defaultWalletId={defaultWalletId}
         recurring={recurringData.data}
+        stats={statsData.data}
+        periodKey={period.key}
+        from={period.from}
+        to={period.to}
+        statsDate={statsDate}
       />
     </div>
   );

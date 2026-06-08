@@ -4,13 +4,14 @@ import { getSession } from '@/server/auth';
 import { apiFetch, ApiError } from '@/server/api';
 import type { IncomeListResponse, IncomeCategoryListResponse } from '@/types/income';
 import type { RecurringIncomeListResponse } from '@/types/recurring';
+import type { LedgerStatsResponse } from '@/types/stats';
+import { ledgerStatsDateParams, resolveLedgerPeriod } from '@/lib/ledger-period';
 import { IncomeOverview } from './_components/income-overview';
 
 interface SearchParams {
+  period?: string;
   search?: string;
   moneyStatus?: string;
-  from?: string;
-  to?: string;
 }
 
 interface Props {
@@ -22,23 +23,40 @@ export default async function IncomePage({ searchParams }: Props) {
   if (!session) redirect('/login');
 
   const params = await searchParams;
-  const qs = new URLSearchParams({
+
+  // The segmented PeriodControl drives the time scope (URL `period`); the RSC
+  // resolves it to concrete bounds for both the ledger list and the stats
+  // aggregate. Search + status are secondary filters behind the Filter toggle.
+  const period = resolveLedgerPeriod(params.period);
+  const statsDate = ledgerStatsDateParams();
+
+  const listQs = new URLSearchParams({
     page: '0',
     limit: '20',
     ...(params.search ? { search: params.search } : {}),
     ...(params.moneyStatus ? { moneyStatus: params.moneyStatus } : {}),
-    ...(params.from ? { from: params.from } : {}),
-    ...(params.to ? { to: params.to } : {}),
+    ...(period.from ? { from: period.from } : {}),
+    ...(period.to ? { to: period.to } : {}),
+  }).toString();
+
+  const statsQs = new URLSearchParams({
+    year: statsDate.year,
+    month: statsDate.month,
+    prevMonth: statsDate.prevMonth,
+    ...(period.from ? { from: period.from } : {}),
+    ...(period.to ? { to: period.to } : {}),
   }).toString();
 
   let incomeData: IncomeListResponse;
   let categoriesData: IncomeCategoryListResponse;
   let recurringData: RecurringIncomeListResponse;
+  let statsData: LedgerStatsResponse;
   try {
-    [incomeData, categoriesData, recurringData] = await Promise.all([
-      apiFetch<IncomeListResponse>(`/api/incomes?${qs}`),
+    [incomeData, categoriesData, recurringData, statsData] = await Promise.all([
+      apiFetch<IncomeListResponse>(`/api/incomes?${listQs}`),
       apiFetch<IncomeCategoryListResponse>('/api/income-categories'),
       apiFetch<RecurringIncomeListResponse>('/api/recurring-incomes'),
+      apiFetch<LedgerStatsResponse>(`/api/incomes/stats?${statsQs}`),
     ]);
   } catch (err) {
     // A decodable-but-rejected token passes getSession but 401s at the API
@@ -49,11 +67,18 @@ export default async function IncomePage({ searchParams }: Props) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-5xl">
       <IncomeOverview
+        // Re-key per period so the client accumulator resets on scope change.
+        key={period.key}
         initialData={incomeData.data}
         categories={categoriesData.data}
         recurring={recurringData.data}
+        stats={statsData.data}
+        periodKey={period.key}
+        from={period.from}
+        to={period.to}
+        statsDate={statsDate}
       />
     </div>
   );

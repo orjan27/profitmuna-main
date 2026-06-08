@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, isNull, gte, lte, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 
 import { createDb } from '@app/db';
@@ -62,6 +62,34 @@ interface ListParams {
   limit: number;
   from?: string;
   to?: string;
+}
+
+/**
+ * Inputs for the expense analytics aggregate. Date math (period bounds and the
+ * YYYY[-MM] keys) is resolved Asia/Manila-side in the web layer and passed down
+ * as concrete strings, keeping this service timezone-agnostic.
+ */
+export interface ExpenseStatsParams {
+  from?: string;
+  to?: string;
+  /** Calendar year for the monthly bar series, `YYYY`. */
+  year: string;
+  /** Current calendar month, `YYYY-MM`. */
+  month: string;
+  /** Previous calendar month, `YYYY-MM`. */
+  prevMonth: string;
+}
+
+/** Aggregate figures backing the expense analytics band and charts. */
+export interface ExpenseStats {
+  /** Total + record count within the active period (active rows only). */
+  period: { total: number; count: number };
+  thisMonthTotal: number;
+  prevMonthTotal: number;
+  /** Highest single calendar month all-time, or null when there are no records. */
+  bestMonth: { ym: string; total: number } | null;
+  monthly: { ym: string; total: number }[];
+  bySource: { categoryName: string; total: number; count: number }[];
 }
 
 function toResponse(row: ExpenseRow): ExpenseResponse {
@@ -152,6 +180,88 @@ export function createExpenseService(db: Db) {
         page,
         last: !hasMore,
         totalElements,
+      };
+    },
+
+    /**
+     * Analytics aggregate for the expense ledger. Mirrors the income stats but
+     * counts ACTIVE (non-soft-deleted) rows only, so restored/deleted expenses
+     * never skew the figures or charts.
+     */
+    async stats(userId: number, params: ExpenseStatsParams): Promise<ExpenseStats> {
+      const { from, to, year, month, prevMonth } = params;
+      const active = isNull(expenses.deletedAt);
+      const ym = sql<string>`substr(${expenses.expenseDate}, 1, 7)`;
+
+      const periodConds = [eq(expenses.userId, userId), active];
+      if (from) periodConds.push(gte(expenses.expenseDate, from));
+      if (to) periodConds.push(lte(expenses.expenseDate, to));
+
+      const [periodRow] = await db
+        .select({
+          total: sql<number>`coalesce(sum(${expenses.amount}), 0)`,
+          count: sql<number>`count(*)`,
+        })
+        .from(expenses)
+        .where(and(...periodConds));
+
+      const bySourceRows = await db
+        .select({
+          categoryName: expenses.categoryName,
+          total: sql<number>`coalesce(sum(${expenses.amount}), 0)`,
+          count: sql<number>`count(*)`,
+        })
+        .from(expenses)
+        .where(and(...periodConds))
+        .groupBy(expenses.categoryName)
+        .orderBy(desc(sql`sum(${expenses.amount})`));
+
+      const monthlyRows = await db
+        .select({ ym, total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
+        .from(expenses)
+        .where(
+          and(
+            eq(expenses.userId, userId),
+            active,
+            sql`substr(${expenses.expenseDate}, 1, 4) = ${year}`
+          )
+        )
+        .groupBy(ym)
+        .orderBy(ym);
+
+      const [bestRow] = await db
+        .select({ ym, total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
+        .from(expenses)
+        .where(and(eq(expenses.userId, userId), active))
+        .groupBy(ym)
+        .orderBy(desc(sql`sum(${expenses.amount})`))
+        .limit(1);
+
+      const monthTotal = async (key: string): Promise<number> => {
+        const [row] = await db
+          .select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)` })
+          .from(expenses)
+          .where(
+            and(
+              eq(expenses.userId, userId),
+              active,
+              sql`substr(${expenses.expenseDate}, 1, 7) = ${key}`
+            )
+          );
+        return Number(row?.total ?? 0);
+      };
+
+      return {
+        period: { total: Number(periodRow?.total ?? 0), count: Number(periodRow?.count ?? 0) },
+        thisMonthTotal: await monthTotal(month),
+        prevMonthTotal: await monthTotal(prevMonth),
+        bestMonth: bestRow ? { ym: bestRow.ym, total: Number(bestRow.total) } : null,
+        monthly: monthlyRows.map((r) => ({ ym: r.ym, total: Number(r.total) })),
+        bySource: bySourceRows.map((r) => ({
+          categoryName: r.categoryName,
+          total: Number(r.total),
+          count: Number(r.count),
+        })),
       };
     },
 

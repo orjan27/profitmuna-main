@@ -39,6 +39,25 @@ export const createIncomeCategorySchema = z.object({
 /** Schema for renaming an income category. */
 export const updateIncomeCategorySchema = createIncomeCategorySchema;
 
+/**
+ * Query params for the analytics aggregate. `from`/`to` scope the in-view
+ * period; `year`/`month`/`prevMonth` are resolved Asia/Manila-side and drive
+ * the monthly series and the month-over-month comparison.
+ */
+export const incomeStatsQuerySchema = z.object({
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  year: z.string().regex(/^\d{4}$/),
+  month: z.string().regex(/^\d{4}-\d{2}$/),
+  prevMonth: z.string().regex(/^\d{4}-\d{2}$/),
+});
+
 /** Schema for list/filter query params. */
 export const incomeQuerySchema = z.object({
   page: z.coerce.number().int().min(0).default(0),
