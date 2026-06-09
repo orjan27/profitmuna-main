@@ -106,7 +106,7 @@ export function RecurringIncomeList({ templates, categories }: RecurringIncomeLi
             <Repeat aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-faint" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {template.categoryName}
+                {template.description?.trim() || template.categoryName}
                 {!template.active ? (
                   <span className="ml-2 text-xs font-normal text-ink-faint">Paused</span>
                 ) : null}
