@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers';
 
 import { resolveOverviewRange } from '@/lib/overview-date-presets';
-import { PfContent } from './_components/pf-content';
-import { PfFilters, type CategoryOption } from './_components/pf-filters';
+import { PmContent } from './_components/pm-content';
+import { PmFilters, type CategoryOption } from './_components/pm-filters';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,10 +28,10 @@ interface SummaryResponse {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 /**
- * RSC page for /profit-first.
+ * RSC page for /profit-muna.
  *
  * Reads URL searchParams directly (not via nuqs — Pitfall 5 guard: nuqs hooks
- * are called only in client components PfFilters and PfContent).
+ * are called only in client components PmFilters and PmContent).
  *
  * SSR-fetches the summary DIRECT to the Workers API base URL using the
  * access_token Bearer header — not through the BFF proxy, which is reserved
@@ -41,7 +41,7 @@ interface SummaryResponse {
  * Auth is enforced by middleware.ts which redirects unauthenticated users to
  * /login before this page renders (T-03-09).
  */
-export default async function ProfitFirstPage({
+export default async function ProfitMunaPage({
   searchParams,
 }: {
   searchParams: Promise<{ from?: string; to?: string; categoryIds?: string }>;
@@ -66,7 +66,7 @@ export default async function ProfitFirstPage({
 
   // Server-side: direct to API base (NOT through BFF proxy — server-to-server)
   const apiBaseUrl = process.env.API_BASE_URL ?? 'http://localhost:8793';
-  const summaryUrl = `${apiBaseUrl}/api/profit-first/summary${qs ? `?${qs}` : ''}`;
+  const summaryUrl = `${apiBaseUrl}/api/profit-muna/summary${qs ? `?${qs}` : ''}`;
 
   let totalIncome = 0;
   let accounts: SummaryAccount[] = [];
@@ -99,7 +99,7 @@ export default async function ProfitFirstPage({
       {/* Page header — title + jar metaphor tagline, with a live jar count pill */}
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Profit First</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Profit Muna</h1>
           <p className="mt-1 text-sm text-ink-soft">Pour your income into jars</p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs font-semibold text-ink-soft ring-1 ring-hairline">
@@ -109,13 +109,13 @@ export default async function ProfitFirstPage({
       </header>
 
       {/* Filter bar — client component (nuqs hooks — Pitfall 5) */}
-      <PfFilters categoryOptions={categoryOptions} />
+      <PmFilters categoryOptions={categoryOptions} />
 
       {/*
-       * PfContent: client component that owns amount-visibility state and
+       * PmContent: client component that owns amount-visibility state and
        * renders hero total → row of jars → funded-status banner.
        */}
-      <PfContent accounts={accounts} totalIncome={totalIncome} />
+      <PmContent accounts={accounts} totalIncome={totalIncome} />
     </div>
   );
 }

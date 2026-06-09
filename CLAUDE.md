@@ -155,9 +155,9 @@ Verify setup: `npx wrangler whoami` (Cloudflare auth)
 
 **Profitmuna**
 
-A personal finance app that automatically applies Profit First percentage allocations to your income for proper budgeting. Users record income and expenses, configure allocation percentages across accounts (Profit, Owner Pay, Tax, Operating Expenses, plus custom), and track money across wallets with computed balances. Single-user — each user manages their own finances.
+A personal finance app that automatically applies Profit Muna percentage allocations to your income for proper budgeting. Users record income and expenses, configure allocation percentages across accounts (Profit, Owner Pay, Tax, Operating Expenses, plus custom), and track money across wallets with computed balances. Single-user — each user manages their own finances.
 
-**Core Value:** When income is recorded as received, it is automatically split across the user's Profit First allocation percentages — the user always knows exactly how much belongs to each bucket.
+**Core Value:** When income is recorded as received, it is automatically split across the user's Profit Muna allocation percentages — the user always knows exactly how much belongs to each bucket.
 
 ### Constraints
 

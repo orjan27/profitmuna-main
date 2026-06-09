@@ -13,7 +13,7 @@ export interface RecurringIncomeInput {
   /** Decimal pesos; undefined = "amount set on receive" */
   amountPesos?: number;
   description?: string | null;
-  profitFirstAllocated?: boolean;
+  profitMunaAllocated?: boolean;
   active?: boolean;
   frequency: RecurFrequency;
   dayOfWeek?: number | null;
@@ -49,8 +49,8 @@ export async function updateRecurringIncomeAction(
         categoryId: input.categoryId,
         amount: input.amountPesos !== undefined ? toCents(input.amountPesos) : null,
         description: input.description ?? null,
-        ...(input.profitFirstAllocated !== undefined && {
-          profitFirstAllocated: input.profitFirstAllocated,
+        ...(input.profitMunaAllocated !== undefined && {
+          profitMunaAllocated: input.profitMunaAllocated,
         }),
         ...(input.active !== undefined && { active: input.active }),
         frequency: input.frequency,

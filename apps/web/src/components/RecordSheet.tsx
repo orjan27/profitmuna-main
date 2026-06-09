@@ -414,13 +414,13 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
   const [incomeDate, setIncomeDate] = useState(todayLocal());
   const [description, setDescription] = useState('');
   const [expectedReleaseDate, setExpectedReleaseDate] = useState('');
-  const [pfAllocated, setPfAllocated] = useState(true);
+  const [pmAllocated, setPmAllocated] = useState(true);
   const [recurrence, setRecurrence] = useState<RecurrenceValue>(NO_RECURRENCE);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const amountPesos = Number(amount);
   const amountCents = Number.isFinite(amountPesos) && amountPesos > 0 ? toCents(amountPesos) : 0;
-  const showPreview = pfAllocated && amountCents > 0 && data.accounts.length > 0;
+  const showPreview = pmAllocated && amountCents > 0 && data.accounts.length > 0;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -436,7 +436,7 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
         incomeDate,
         description: description.trim() || undefined,
         expectedReleaseDate: expectedReleaseDate || undefined,
-        profitFirstAllocated: pfAllocated,
+        profitMunaAllocated: pmAllocated,
         recurrence: toRecurrenceInput(recurrence),
       });
       if ('error' in result) {
@@ -552,15 +552,15 @@ function IncomeEntryForm({ data, onDone }: EntryFormProps): React.JSX.Element {
           stays visible instead of hiding under Advanced options. */}
       <div className="flex items-center justify-between gap-4 rounded-lg bg-raised/40 px-4 py-3.5">
         <div>
-          <Label htmlFor="record-income-pf">Include in Profit First</Label>
+          <Label htmlFor="record-income-pf">Include in Profit Muna</Label>
           <p className="mt-0.5 text-xs text-ink-faint">
             When off, this income won&apos;t be split across your buckets.
           </p>
         </div>
         <Switch
           id="record-income-pf"
-          checked={pfAllocated}
-          onCheckedChange={setPfAllocated}
+          checked={pmAllocated}
+          onCheckedChange={setPmAllocated}
           className="data-[state=checked]:bg-income"
         />
       </div>

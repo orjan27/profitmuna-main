@@ -281,7 +281,7 @@ async function generateRecurringEntries(
         moneyStatus: 'PENDING',
         expectedReleaseDate: parts.dateStr,
         receivedDate: null,
-        profitFirstAllocated: template.profitFirstAllocated,
+        profitMunaAllocated: template.profitMunaAllocated,
         userId: template.userId,
       });
       await db

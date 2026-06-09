@@ -3,7 +3,7 @@ interface JarGlyphProps {
 }
 
 /**
- * A mason-jar glyph used across the Profit First surface. Reads as a jar
+ * A mason-jar glyph used across the Profit Muna surface. Reads as a jar
  * through three cues: a lid that overhangs the mouth, shoulders that flare
  * from a narrow neck out to a wider body, and a rounded base. Drawn as strokes
  * so it inherits `currentColor` and sizes via `className` like a lucide icon.

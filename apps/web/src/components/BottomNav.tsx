@@ -16,7 +16,7 @@ const NAV_ITEMS: readonly BottomNavItem[] = [
   { label: 'Overview', href: '/overview', icon: House },
   { label: 'Income', href: '/income', icon: Banknote },
   { label: 'Expenses', href: '/expenses', icon: Receipt },
-  { label: 'Profit First', href: '/profit-first', icon: Percent },
+  { label: 'Profit Muna', href: '/profit-muna', icon: Percent },
   { label: 'Wallets', href: '/wallets', icon: Wallet },
 ] as const;
 

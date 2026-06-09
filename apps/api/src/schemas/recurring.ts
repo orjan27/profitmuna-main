@@ -81,7 +81,7 @@ export const createRecurringIncomeSchema = z
     categoryId: z.number().int().positive(),
     amount: z.number().int().positive().optional().nullable(),
     description: z.string().max(500).optional().nullable(),
-    profitFirstAllocated: z.boolean().default(true),
+    profitMunaAllocated: z.boolean().default(true),
     lastGeneratedDate: dateString.optional().nullable(),
     ...recurrenceFields,
   })
@@ -96,7 +96,7 @@ export const updateRecurringIncomeSchema = z
     categoryId: z.number().int().positive().optional(),
     amount: z.number().int().positive().optional().nullable(),
     description: z.string().max(500).optional().nullable(),
-    profitFirstAllocated: z.boolean().optional(),
+    profitMunaAllocated: z.boolean().optional(),
     active: z.boolean().optional(),
     ...recurrenceFields,
   })

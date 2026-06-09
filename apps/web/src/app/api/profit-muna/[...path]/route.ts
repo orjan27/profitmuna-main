@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-// BFF catch-all proxy for Profit First allocation routes.
+// BFF catch-all proxy for Profit Muna allocation routes.
 // Forwards server-to-server to the Workers API with the user's Bearer token.
 // No transparent-refresh or Set-Cookie relay needed: PF routes are authenticated
 // and set no cookies; middleware.ts already redirects unauthenticated users to /login.
@@ -23,7 +23,7 @@ async function proxy(request: NextRequest, path: string[]): Promise<NextResponse
   // Forward the Bearer token for requireAuth middleware on the API
   if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
 
-  const url = `${apiBaseUrl}/api/profit-first/${path.join('/')}${request.nextUrl.search}`;
+  const url = `${apiBaseUrl}/api/profit-muna/${path.join('/')}${request.nextUrl.search}`;
   const apiRes = await fetch(url, {
     method: request.method,
     headers,

@@ -29,7 +29,7 @@ export interface CategoryOption {
   label: string;
 }
 
-interface PfFiltersProps {
+interface PmFiltersProps {
   /** Category options derived from distinct IDs in the summary response. */
   categoryOptions?: CategoryOption[];
 }
@@ -46,7 +46,7 @@ interface PfFiltersProps {
  * NOTE: nuqs hooks may only be called in client components (Pitfall 5).
  * This component is 'use client' — page.tsx reads searchParams directly.
  */
-export function PfFilters({ categoryOptions = [] }: PfFiltersProps) {
+export function PmFilters({ categoryOptions = [] }: PmFiltersProps) {
   const router = useRouter();
 
   const [selectedCategories, setSelectedCategories] = useQueryState(

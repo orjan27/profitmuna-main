@@ -2,7 +2,7 @@
 // Use interface for extensible shapes; type for unions/aliases
 
 export type WalletTransactionType = 'DEPOSIT' | 'WITHDRAWAL';
-export type ProfitFirstAccountType = 'PROFIT' | 'OWNERS_PAY' | 'TAX' | 'OPEX' | 'CUSTOM';
+export type ProfitMunaAccountType = 'PROFIT' | 'OWNERS_PAY' | 'TAX' | 'OPEX' | 'CUSTOM';
 
 export interface WalletListItem {
   id: number;
@@ -11,7 +11,7 @@ export interface WalletListItem {
   sortOrder: number;
   /** Derived balance in cents — never stored */
   balanceCents: number;
-  profitFirstAccountId: number | null;
+  profitMunaAccountId: number | null;
   /** Count of non-deleted wallet_transactions (for delete impact dialog) */
   transactionCount: number;
   /** Count of income category mappings (for delete impact dialog) */
@@ -42,7 +42,7 @@ export interface WalletTransaction {
 export interface WalletDetailResponse {
   wallet: WalletListItem;
   breakdown: {
-    pfAllocationCents: number;
+    pmAllocationCents: number;
     mappedIncomeCents: number;
     mappedExpensesCents: number;
     depositsCents: number;
@@ -57,7 +57,7 @@ export interface WalletDetailResponse {
 
 export interface CreateWalletInput {
   name: string;
-  profitFirstAccountId?: number | null;
+  profitMunaAccountId?: number | null;
   color?: string;
   sortOrder?: number;
   incomeCategoryIds?: number[];
@@ -76,10 +76,10 @@ export type UpdateTransactionInput = Partial<CreateTransactionInput>;
 
 // Supporting shapes used by the new-wallet form props
 
-export interface PfAccount {
+export interface PmAccount {
   id: number;
   name: string;
-  accountType: ProfitFirstAccountType;
+  accountType: ProfitMunaAccountType;
   color: string;
   targetPercentage: number;
 }

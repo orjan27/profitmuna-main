@@ -12,9 +12,9 @@ export const createIncomeSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional()
     .nullable(),
-  profitFirstAllocated: z.boolean().default(true),
+  profitMunaAllocated: z.boolean().default(true),
   // Direct wallet top-up: when set, the income is added straight to this wallet
-  // (service forces profitFirstAllocated=false). Omitted for normal income.
+  // (service forces profitMunaAllocated=false). Omitted for normal income.
   walletId: z.number().int().positive().optional().nullable(),
 });
 
@@ -22,7 +22,7 @@ export const createIncomeSchema = z.object({
 export const updateIncomeSchema = createIncomeSchema.partial();
 
 /**
- * Schema for marking income as received (never touches profitFirstAllocated — T-02-08).
+ * Schema for marking income as received (never touches profitMunaAllocated — T-02-08).
  * amount (integer cents) is optional: required by the service when the stored
  * amount is 0 (recurring "amount set on receive" incomes).
  */

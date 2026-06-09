@@ -9,7 +9,7 @@ import { createTestDb, seedUser } from './helpers/db';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function seedPfAccount(
+function seedPmAccount(
   db: ReturnType<typeof createTestDb>['db'],
   userId: number,
   overrides: Partial<{
@@ -21,7 +21,7 @@ function seedPfAccount(
   }> = {}
 ) {
   const [row] = db
-    .insert(schema.profitFirstAccounts)
+    .insert(schema.profitMunaAccounts)
     .values({
       userId,
       name: overrides.name ?? 'Profit',
@@ -77,7 +77,7 @@ function seedIncome(
       amount,
       incomeDate: '2026-01-01',
       moneyStatus,
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     })
     .returning()
     .all();
@@ -121,17 +121,17 @@ describe('wallets service', () => {
     it('creates a PF-linked wallet linked to a PF account', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal01a@test.com', name: 'User A', emailVerified: true });
-      const pfAccount = seedPfAccount(db, user.id);
+      const pmAccount = seedPmAccount(db, user.id);
 
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'Profit Wallet',
-        profitFirstAccountId: pfAccount.id,
+        profitMunaAccountId: pmAccount.id,
         color: '#10b981',
       });
 
       expect(wallet.name).toBe('Profit Wallet');
-      expect(wallet.profitFirstAccountId).toBe(pfAccount.id);
+      expect(wallet.profitMunaAccountId).toBe(pmAccount.id);
       expect(wallet.userId).toBe(user.id);
     });
 
@@ -146,25 +146,25 @@ describe('wallets service', () => {
       });
 
       expect(wallet.name).toBe('Blank Wallet');
-      expect(wallet.profitFirstAccountId).toBeNull();
+      expect(wallet.profitMunaAccountId).toBeNull();
     });
 
     it('returns 409 when the same PF account is already linked to another wallet', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal01c@test.com', name: 'User C', emailVerified: true });
-      const pfAccount = seedPfAccount(db, user.id);
+      const pmAccount = seedPmAccount(db, user.id);
 
       const svc = createWalletService(dbD1);
       await svc.create(user.id, {
         name: 'First Wallet',
-        profitFirstAccountId: pfAccount.id,
+        profitMunaAccountId: pmAccount.id,
         color: '#10b981',
       });
 
       await expect(
         svc.create(user.id, {
           name: 'Second Wallet',
-          profitFirstAccountId: pfAccount.id,
+          profitMunaAccountId: pmAccount.id,
           color: '#8b5cf6',
         })
       ).rejects.toMatchObject({ status: 409, message: 'wallet_pf_account_already_linked' });
@@ -234,14 +234,14 @@ describe('wallets service', () => {
     it('soft-delete unlinks income mappings and nulls the PF link so both re-link freely', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal01g@test.com', name: 'User G', emailVerified: true });
-      const pfAccount = seedPfAccount(db, user.id);
+      const pmAccount = seedPmAccount(db, user.id);
       const incCat = seedIncomeCategory(db, user.id, 'Consulting');
 
       const svc = createWalletService(dbD1);
       // PF-linked wallets skip income mapping (D-08), so map income on a separate standalone wallet
-      const pfWallet = await svc.create(user.id, {
+      const pmWallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        profitFirstAccountId: pfAccount.id,
+        profitMunaAccountId: pmAccount.id,
         color: '#10b981',
       });
       const incomeWallet = await svc.create(user.id, {
@@ -259,14 +259,14 @@ describe('wallets service', () => {
         .all();
       expect(incMappings).toHaveLength(0);
 
-      // Delete the PF wallet → profitFirstAccountId is nulled
-      await svc.remove(pfWallet.id, user.id);
-      const pfRow = db
+      // Delete the PF wallet → profitMunaAccountId is nulled
+      await svc.remove(pmWallet.id, user.id);
+      const pmRow = db
         .select()
         .from(schema.wallets)
-        .where(eq(schema.wallets.id, pfWallet.id))
+        .where(eq(schema.wallets.id, pmWallet.id))
         .all()[0];
-      expect(pfRow.profitFirstAccountId).toBeNull();
+      expect(pmRow.profitMunaAccountId).toBeNull();
 
       // The freed income category can be remapped to a new wallet
       const relinked = await svc.create(user.id, {
@@ -424,13 +424,13 @@ describe('wallets service', () => {
     it('PF-linked wallet does not apply income mappings (D-08)', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal02k@test.com', name: 'User K', emailVerified: true });
-      const pfAccount = seedPfAccount(db, user.id);
+      const pmAccount = seedPmAccount(db, user.id);
       const incCat = seedIncomeCategory(db, user.id, 'Salary');
 
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        profitFirstAccountId: pfAccount.id,
+        profitMunaAccountId: pmAccount.id,
         color: '#10b981',
         incomeCategoryIds: [incCat.id], // should be ignored for PF wallets
       });
@@ -453,7 +453,7 @@ describe('wallets service', () => {
       const user = seedUser(db, { email: 'wal03a@test.com', name: 'User A', emailVerified: true });
 
       // PF account with 10% (1000 bp)
-      const pfAccount = seedPfAccount(db, user.id, { targetPercentage: 1000 });
+      const pmAccount = seedPmAccount(db, user.id, { targetPercentage: 1000 });
       const incCat = seedIncomeCategory(db, user.id);
       const expCat = seedExpenseCategory(db, user.id);
 
@@ -463,7 +463,7 @@ describe('wallets service', () => {
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        profitFirstAccountId: pfAccount.id,
+        profitMunaAccountId: pmAccount.id,
         color: '#10b981',
       });
 
@@ -473,7 +473,7 @@ describe('wallets service', () => {
       const wallets = await svc.list(user.id);
       const listed = wallets.find((w) => w.id === wallet.id)!;
 
-      // pfAllocation = Math.round(10000 * 1000 / 10000) = 1000
+      // pmAllocation = Math.round(10000 * 1000 / 10000) = 1000
       // mappedExpenses (by walletId) = 500
       // balance = 1000 + 0 - 500 + 0 - 0 = 500
       expect(listed.balanceCents).toBe(500);
@@ -553,33 +553,33 @@ describe('wallets service', () => {
       expect(listed.balanceCents).toBe(-3000);
     });
 
-    it('pfAllocation is basis-point ratio of total RECEIVED income for PF-linked wallet', async () => {
+    it('pmAllocation is basis-point ratio of total RECEIVED income for PF-linked wallet', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal03c@test.com', name: 'User C', emailVerified: true });
 
-      const pfAccount = seedPfAccount(db, user.id, { targetPercentage: 500 }); // 5%
+      const pmAccount = seedPmAccount(db, user.id, { targetPercentage: 500 }); // 5%
       const incCat = seedIncomeCategory(db, user.id);
 
       // 100000 cents received
       seedIncome(db, user.id, incCat.id, 100000, 'RECEIVED');
-      // This one is PENDING — should NOT contribute to pfAllocation
+      // This one is PENDING — should NOT contribute to pmAllocation
       seedIncome(db, user.id, incCat.id, 50000, 'PENDING');
 
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        profitFirstAccountId: pfAccount.id,
+        profitMunaAccountId: pmAccount.id,
         color: '#10b981',
       });
 
       const wallets = await svc.list(user.id);
       const listed = wallets.find((w) => w.id === wallet.id)!;
 
-      // pfAllocation = Math.round(100000 * 500 / 10000) = 5000
+      // pmAllocation = Math.round(100000 * 500 / 10000) = 5000
       expect(listed.balanceCents).toBe(5000);
     });
 
-    it('BLANK wallet has pfAllocation=0 regardless of income records', async () => {
+    it('BLANK wallet has pmAllocation=0 regardless of income records', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal03d@test.com', name: 'User D', emailVerified: true });
 
@@ -670,12 +670,12 @@ describe('wallets service', () => {
     it('blocks manual DEPOSIT on a PF-linked wallet (manual_deposit_blocked_pf_wallet)', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal04a@test.com', name: 'User A', emailVerified: true });
-      const pfAccount = seedPfAccount(db, user.id);
+      const pmAccount = seedPmAccount(db, user.id);
 
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Wallet',
-        profitFirstAccountId: pfAccount.id,
+        profitMunaAccountId: pmAccount.id,
         color: '#10b981',
       });
 
@@ -712,12 +712,12 @@ describe('wallets service', () => {
     it('allows manual WITHDRAWAL on a PF-linked wallet (withdrawal guard dropped)', async () => {
       const { dbD1, db } = createTestDb();
       const user = seedUser(db, { email: 'wal04e@test.com', name: 'User E', emailVerified: true });
-      const pfAccount = seedPfAccount(db, user.id);
+      const pmAccount = seedPmAccount(db, user.id);
 
       const svc = createWalletService(dbD1);
       const wallet = await svc.create(user.id, {
         name: 'PF Withdrawal Wallet',
-        profitFirstAccountId: pfAccount.id,
+        profitMunaAccountId: pmAccount.id,
         color: '#10b981',
       });
 
@@ -1010,7 +1010,7 @@ describe('wallets service', () => {
             amount: i * 100,
             incomeDate: `2026-01-${day}`,
             moneyStatus: 'RECEIVED',
-            profitFirstAllocated: true,
+            profitMunaAllocated: true,
           })
           .returning()
           .all();
@@ -1103,30 +1103,30 @@ describe('wallets service', () => {
 
   // ─── WAL: direct wallet income (PF allocation top-up) ───────────────────────
   describe('WAL: direct wallet income (PF allocation top-up)', () => {
-    it('records a PF-wallet top-up as income with Profit First forced off', async () => {
+    it('records a PF-wallet top-up as income with Profit Muna forced off', async () => {
       const { db, dbD1 } = createTestDb();
       const user = seedUser(db, { email: 'wdi-a@test.com', name: 'User A', emailVerified: true });
-      const pf = seedPfAccount(db, user.id, { targetPercentage: 500 });
+      const pf = seedPmAccount(db, user.id, { targetPercentage: 500 });
       const cat = seedIncomeCategory(db, user.id, 'Bonus');
       const walletSvc = createWalletService(dbD1);
       const incomeSvc = createIncomeService(dbD1);
 
       const wallet = await walletSvc.create(user.id, {
         name: 'Profit',
-        profitFirstAccountId: pf.id,
+        profitMunaAccountId: pf.id,
       });
 
-      // Caller passes profitFirstAllocated:true — the service must force it off.
+      // Caller passes profitMunaAllocated:true — the service must force it off.
       const income = await incomeSvc.create(user.id, {
         categoryId: cat.id,
         amount: 100000,
         incomeDate: '2026-03-01',
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
         walletId: wallet.id,
       });
 
-      expect(income.profitFirstAllocated).toBe(false);
+      expect(income.profitMunaAllocated).toBe(false);
       expect(income.walletId).toBe(wallet.id);
       expect(income.walletName).toBe('Profit');
     });
@@ -1134,14 +1134,14 @@ describe('wallets service', () => {
     it('credits the PF wallet as Income without splitting across allocations', async () => {
       const { db, dbD1 } = createTestDb();
       const user = seedUser(db, { email: 'wdi-b@test.com', name: 'User B', emailVerified: true });
-      const pf = seedPfAccount(db, user.id, { targetPercentage: 500 });
+      const pf = seedPmAccount(db, user.id, { targetPercentage: 500 });
       const cat = seedIncomeCategory(db, user.id, 'Bonus');
       const walletSvc = createWalletService(dbD1);
       const incomeSvc = createIncomeService(dbD1);
 
       const wallet = await walletSvc.create(user.id, {
         name: 'Profit',
-        profitFirstAccountId: pf.id,
+        profitMunaAccountId: pf.id,
       });
       await incomeSvc.create(user.id, {
         categoryId: cat.id,
@@ -1155,7 +1155,7 @@ describe('wallets service', () => {
 
       // Full amount lands in this wallet; PF allocation pool stays 0 (income is PF-off).
       expect(detail.breakdown.directIncomeCents).toBe(100000);
-      expect(detail.breakdown.pfAllocationCents).toBe(0);
+      expect(detail.breakdown.pmAllocationCents).toBe(0);
       expect(detail.wallet.balanceCents).toBe(100000);
 
       const incomeRows = detail.transactions.filter((t) => t.type === 'INCOME');
@@ -1166,14 +1166,14 @@ describe('wallets service', () => {
     it('does not double-count wallet-linked income into a category-mapped wallet', async () => {
       const { db, dbD1 } = createTestDb();
       const user = seedUser(db, { email: 'wdi-c@test.com', name: 'User C', emailVerified: true });
-      const pf = seedPfAccount(db, user.id, { targetPercentage: 500 });
+      const pf = seedPmAccount(db, user.id, { targetPercentage: 500 });
       const cat = seedIncomeCategory(db, user.id, 'Bonus');
       const walletSvc = createWalletService(dbD1);
       const incomeSvc = createIncomeService(dbD1);
 
-      const pfWallet = await walletSvc.create(user.id, {
+      const pmWallet = await walletSvc.create(user.id, {
         name: 'Profit',
-        profitFirstAccountId: pf.id,
+        profitMunaAccountId: pf.id,
       });
       // Standalone wallet mapped to the SAME category the top-up uses.
       const mapped = await walletSvc.create(user.id, {
@@ -1186,7 +1186,7 @@ describe('wallets service', () => {
         amount: 100000,
         incomeDate: '2026-03-01',
         moneyStatus: 'RECEIVED',
-        walletId: pfWallet.id,
+        walletId: pmWallet.id,
       });
 
       const wallets = await walletSvc.list(user.id);

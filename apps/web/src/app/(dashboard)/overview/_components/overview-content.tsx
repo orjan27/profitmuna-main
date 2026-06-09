@@ -71,12 +71,12 @@ function paydayMessage(days: number): string {
 // ── Stella's profit-distribution countdown ────────────────────────────────────
 
 /** End of the current calendar quarter (Asia/Manila) as YYYY-MM-DD — the
- * Profit First quarterly distribution anchor. */
+ * Profit Muna quarterly distribution anchor. */
 function quarterEndManila(): string {
   return format(endOfQuarter(new TZDate(new Date(), 'Asia/Manila')), 'yyyy-MM-dd');
 }
 
-/** Caption line for the quarterly profit distribution (Profit First cadence). */
+/** Caption line for the quarterly profit distribution (Profit Muna cadence). */
 function distributionMessage(days: number): string {
   if (days <= 0) return "It's profit distribution day!";
   if (days === 1) return '1 day until your profit distribution.';
@@ -126,7 +126,7 @@ function SavingsDonut({ ratePercent }: SavingsDonutProps): React.JSX.Element {
 
 /**
  * Client half of the Overview home (Playful Bento layout). Owns
- * amount-visibility state (shared localStorage key with the Profit First
+ * amount-visibility state (shared localStorage key with the Profit Muna
  * page), the Record sheet hooks, and the feed's Load-more pagination (client
  * useState — never a URL param, Pitfall 5; URL params re-render the RSC and
  * would reset the feed).
@@ -154,7 +154,7 @@ export function OverviewContent({
   const [feedPage, setFeedPage] = useState(summary?.feedPagination.page ?? 0);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const accounts = summary?.profitFirstAccounts ?? [];
+  const accounts = summary?.profitMunaAccounts ?? [];
   const walletBalanceCents = summary?.totalWalletBalanceCents ?? 0;
   const netIncomeCents = summary?.netIncomeCents ?? 0;
   const receivedCents = summary?.totalIncomeReceivedCents ?? 0;
@@ -272,8 +272,8 @@ export function OverviewContent({
         onAdd={() => openRecordSheet('income')}
       />
 
-      {/* Hero card: the Profit First wallet's standing balance — "take your
-          profit first". All-time, NOT governed by the period filter below. */}
+      {/* Hero card: the Profit Muna wallet's standing balance — "take your
+          profit muna". All-time, NOT governed by the period filter below. */}
       <section
         aria-label="Profit set aside"
         className="relative mt-6 rounded-3xl bg-gradient-to-br from-tint-income via-tint-income/60 to-tint-income/20 p-6"
@@ -374,10 +374,10 @@ export function OverviewContent({
               Your split
             </h2>
             <Link
-              href="/profit-first"
+              href="/profit-muna"
               className="rounded-full bg-tint-income px-3 py-1 text-xs font-semibold text-income transition-opacity hover:opacity-80"
             >
-              Profit First
+              Profit Muna
             </Link>
           </div>
           <div

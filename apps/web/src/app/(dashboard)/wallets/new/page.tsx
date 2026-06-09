@@ -2,12 +2,12 @@ import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/auth';
 import { apiFetch, ApiError } from '@/server/api';
-import type { PfAccount, IncomeCategory, WalletListItem } from '@/types/wallet';
+import type { PmAccount, IncomeCategory, WalletListItem } from '@/types/wallet';
 import { NewWalletForm } from './_components/NewWalletForm';
 
-type PfSummaryResponse = {
+type PmSummaryResponse = {
   data: {
-    accounts: PfAccount[];
+    accounts: PmAccount[];
   };
 };
 
@@ -28,11 +28,11 @@ export default async function NewWalletPage({
   if (!session) redirect('/login');
 
   const params = await searchParams;
-  const prefilledPfAccountId = params.pfAccountId ? Number(params.pfAccountId) : undefined;
+  const prefilledPmAccountId = params.pmAccountId ? Number(params.pmAccountId) : undefined;
 
   // Fetch PF accounts, income categories, and wallet list in parallel
-  const [pfSummary, incomeCategoriesRes, walletsRes] = await Promise.all([
-    apiFetch<PfSummaryResponse>('/api/profit-first/summary').catch((err) => {
+  const [pmSummary, incomeCategoriesRes, walletsRes] = await Promise.all([
+    apiFetch<PmSummaryResponse>('/api/profit-muna/summary').catch((err) => {
       if (err instanceof ApiError && err.status === 404) return { data: { accounts: [] } };
       throw err;
     }),
@@ -40,14 +40,14 @@ export default async function NewWalletPage({
     apiFetch<WalletListResponse>('/api/wallets').catch(() => ({ data: [] as WalletListItem[] })),
   ]);
 
-  const pfAccounts = pfSummary.data.accounts ?? [];
+  const pmAccounts = pmSummary.data.accounts ?? [];
   const wallets = walletsRes.data ?? [];
 
-  // Filter to unlinked PF accounts — wallets with a profitFirstAccountId already claimed
-  const linkedPfAccountIds = new Set(
+  // Filter to unlinked PF accounts — wallets with a profitMunaAccountId already claimed
+  const linkedPmAccountIds = new Set(
     wallets
-      .filter((w) => w.profitFirstAccountId != null)
-      .map((w) => w.profitFirstAccountId as number)
+      .filter((w) => w.profitMunaAccountId != null)
+      .map((w) => w.profitMunaAccountId as number)
   );
 
   // D-06: income categories already mapped to another wallet appear disabled in the picker
@@ -57,10 +57,10 @@ export default async function NewWalletPage({
     <div className="mx-auto max-w-lg px-4 py-8">
       <h1 className="mb-6 text-xl font-semibold">Create Wallet</h1>
       <NewWalletForm
-        pfAccounts={pfAccounts}
-        linkedPfAccountIds={linkedPfAccountIds}
+        pmAccounts={pmAccounts}
+        linkedPmAccountIds={linkedPmAccountIds}
         incomeCategories={incomeCategoriesRes.data ?? []}
-        prefilledPfAccountId={prefilledPfAccountId}
+        prefilledPmAccountId={prefilledPmAccountId}
         mappedIncomeCategoryIds={mappedIncomeCategoryIds}
       />
     </div>

@@ -26,12 +26,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import { deleteWalletAction } from '../_actions/wallet-actions';
-import type { PfAccount, WalletListItem } from '@/types/wallet';
+import type { PmAccount, WalletListItem } from '@/types/wallet';
 
 interface WalletCardProps {
   wallet: WalletListItem;
-  /** Linked Profit First account — null for standalone wallets */
-  pfAccount: PfAccount | null;
+  /** Linked Profit Muna account — null for standalone wallets */
+  pmAccount: PmAccount | null;
 }
 
 /**
@@ -42,7 +42,7 @@ interface WalletCardProps {
  * The big balance follows the shared amount-visibility toggle so hiding the
  * hero total also hides every card balance.
  */
-export function WalletCard({ wallet, pfAccount }: WalletCardProps) {
+export function WalletCard({ wallet, pmAccount }: WalletCardProps) {
   const router = useRouter();
   const { visible, mounted } = useAmountVisibility();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -98,7 +98,7 @@ export function WalletCard({ wallet, pfAccount }: WalletCardProps) {
         <div className="flex items-start justify-between gap-3">
           <div className="mt-8 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-white/20 px-3 py-1.5 text-[10px] leading-none font-bold tracking-[0.08em] uppercase">
-              {sourceLabel(wallet.profitFirstAccountId)}
+              {sourceLabel(wallet.profitMunaAccountId)}
             </span>
             {/* Icon + label together — meaning never rides on color alone */}
             {wallet.balanceCents < 0 && (
@@ -157,9 +157,9 @@ export function WalletCard({ wallet, pfAccount }: WalletCardProps) {
 
         {/* Allocation footer — hidden under the next card's overlap on all
             but the last (fully visible) card */}
-        {pfAccount && (
+        {pmAccount && (
           <p className="mt-auto truncate text-xs font-medium text-white/85">
-            {pfAccount.name} · {pfAccount.targetPercentage}% allocation
+            {pmAccount.name} · {pmAccount.targetPercentage}% allocation
           </p>
         )}
       </div>

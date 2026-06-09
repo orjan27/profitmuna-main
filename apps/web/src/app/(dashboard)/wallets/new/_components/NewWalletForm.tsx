@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/command';
 
 import { createWalletAction } from '../../_actions/wallet-actions';
-import type { PfAccount, IncomeCategory } from '@/types/wallet';
+import type { PmAccount, IncomeCategory } from '@/types/wallet';
 
 // 8 preset color swatches per D-15 and UI-SPEC
 const COLOR_SWATCHES = [
@@ -46,19 +46,19 @@ const COLOR_SWATCHES = [
 ] as const;
 
 interface NewWalletFormProps {
-  pfAccounts: PfAccount[];
-  linkedPfAccountIds: Set<number>;
+  pmAccounts: PmAccount[];
+  linkedPmAccountIds: Set<number>;
   incomeCategories: IncomeCategory[];
-  prefilledPfAccountId?: number;
+  prefilledPmAccountId?: number;
   /** D-06: categories already mapped to another wallet appear disabled in the picker */
   mappedIncomeCategoryIds: Set<number>;
 }
 
 export function NewWalletForm({
-  pfAccounts,
-  linkedPfAccountIds,
+  pmAccounts,
+  linkedPmAccountIds,
   incomeCategories,
-  prefilledPfAccountId,
+  prefilledPmAccountId,
   mappedIncomeCategoryIds,
 }: NewWalletFormProps) {
   const router = useRouter();
@@ -70,12 +70,12 @@ export function NewWalletForm({
   // Form state
   const [name, setName] = useState('');
   // Allocation account drives PF-ness: a chosen account = PF wallet, STANDALONE sentinel = standalone.
-  // D-04: a quick-create link arriving with ?pfAccountId pre-selects that account.
-  const [pfAccountId, setPfAccountId] = useState<string>(
-    prefilledPfAccountId ? String(prefilledPfAccountId) : STANDALONE
+  // D-04: a quick-create link arriving with ?pmAccountId pre-selects that account.
+  const [pmAccountId, setPmAccountId] = useState<string>(
+    prefilledPmAccountId ? String(prefilledPmAccountId) : STANDALONE
   );
-  // Non-sentinel selection means the wallet is funded by a Profit First allocation
-  const isPf = pfAccountId !== STANDALONE;
+  // Non-sentinel selection means the wallet is funded by a Profit Muna allocation
+  const isPm = pmAccountId !== STANDALONE;
   const [color, setColor] = useState<string>(COLOR_SWATCHES[0].hex);
   const [selectedIncomeCategoryIds, setSelectedIncomeCategoryIds] = useState<number[]>([]);
 
@@ -105,9 +105,9 @@ export function NewWalletForm({
     try {
       const result = await createWalletAction({
         name: name.trim(),
-        profitFirstAccountId: isPf ? Number(pfAccountId) : null,
+        profitMunaAccountId: isPm ? Number(pmAccountId) : null,
         color,
-        incomeCategoryIds: !isPf ? selectedIncomeCategoryIds : undefined,
+        incomeCategoryIds: !isPm ? selectedIncomeCategoryIds : undefined,
       });
 
       // createWalletAction redirects on success — result only arrives on error
@@ -149,13 +149,13 @@ export function NewWalletForm({
         />
       </div>
 
-      {/* Allocation Account — optional; blank (Standalone) means no Profit First funding */}
+      {/* Allocation Account — optional; blank (Standalone) means no Profit Muna funding */}
       <div className="space-y-2">
         <Label htmlFor="allocation-account">Allocation Account</Label>
         <Select
-          value={pfAccountId}
+          value={pmAccountId}
           onValueChange={(v) => {
-            setPfAccountId(v);
+            setPmAccountId(v);
             // Income-category mappings are not valid for PF-funded wallets (D-08) — clear on switch to PF
             if (v !== STANDALONE) setSelectedIncomeCategoryIds([]);
           }}
@@ -166,8 +166,8 @@ export function NewWalletForm({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={STANDALONE}>Standalone (no allocation)</SelectItem>
-            {pfAccounts.map((account) => {
-              const isLinked = linkedPfAccountIds.has(account.id);
+            {pmAccounts.map((account) => {
+              const isLinked = linkedPmAccountIds.has(account.id);
               return (
                 <SelectItem key={account.id} value={String(account.id)} disabled={isLinked}>
                   {account.name}
@@ -206,7 +206,7 @@ export function NewWalletForm({
 
       {/* Income Categories — hidden for PF-funded wallets (D-08); separator lives
           inside the conditional so hiding the section doesn't stack two hairlines */}
-      {!isPf && (
+      {!isPm && (
         <>
           <Separator />
           <div className="space-y-2">

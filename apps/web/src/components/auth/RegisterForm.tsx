@@ -62,7 +62,7 @@ export function RegisterForm() {
     <div className="w-full">
       <h1 className="text-3xl font-bold tracking-tight text-ink">Create your account</h1>
       <p className="mt-2 text-base text-ink-soft">
-        Start allocating your income the Profit First way.
+        Start allocating your income the Profit Muna way.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-5" noValidate>

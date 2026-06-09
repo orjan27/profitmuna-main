@@ -59,7 +59,7 @@ export async function updateIncomeAction(
     incomeDate: formData.get('incomeDate') as string,
     moneyStatus: formData.get('moneyStatus') as 'PENDING' | 'RECEIVED',
     expectedReleaseDate: (formData.get('expectedReleaseDate') as string) || undefined,
-    profitFirstAllocated: formData.get('profitFirstAllocated') === 'true',
+    profitMunaAllocated: formData.get('profitMunaAllocated') === 'true',
   };
 
   try {
@@ -91,7 +91,7 @@ export async function deleteIncomeAction(id: number): Promise<{ error: string } 
 
 /**
  * Mark a PENDING income as RECEIVED with an optional backdated received date.
- * Does NOT change profitFirstAllocated (T-02-08 — API enforces this too).
+ * Does NOT change profitMunaAllocated (T-02-08 — API enforces this too).
  *
  * Optional amountPesos (decimal pesos, converted to cents here) sets the
  * actual amount at receive time — required by the API when the stored amount

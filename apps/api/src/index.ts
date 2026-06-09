@@ -12,7 +12,7 @@ import { expenseCategoriesRouter } from '@/routes/expense-categories';
 import { recurringIncomesRouter } from '@/routes/recurring-incomes';
 import { recurringExpensesRouter } from '@/routes/recurring-expenses';
 import { adminRouter } from '@/routes/admin';
-import { profitFirstRouter } from '@/routes/profit-first';
+import { profitMunaRouter } from '@/routes/profit-muna';
 import { walletsRouter } from '@/routes/wallets';
 import { dashboardRouter } from '@/routes/dashboard';
 import { settingsRouter } from '@/routes/settings';
@@ -87,8 +87,8 @@ app.route('/api/recurring-expenses', recurringExpensesRouter);
 app.use('/api/admin/*', requireAuth, requireAdmin);
 app.route('/api/admin', adminRouter);
 
-// Profit First allocation routes — auth guard applied inside profitFirstRouter via .use('/*', requireAuth)
-app.route('/api/profit-first', profitFirstRouter);
+// Profit Muna allocation routes — auth guard applied inside profitMunaRouter via .use('/*', requireAuth)
+app.route('/api/profit-muna', profitMunaRouter);
 
 // Wallet routes — auth guard applied inside walletsRouter via .use('/*', requireAuth) (T-04-01)
 app.route('/api/wallets', walletsRouter);

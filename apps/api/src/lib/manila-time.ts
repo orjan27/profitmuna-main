@@ -112,3 +112,45 @@ export function scheduleMatchesToday(spec: ScheduleSpec, parts: ManilaParts): bo
       return false;
   }
 }
+
+/** Manila parts for `dateStr` (YYYY-MM-DD) shifted forward by `offsetDays`. */
+function partsForOffset(dateStr: string, offsetDays: number): ManilaParts {
+  const base = new Date(dateStr + 'T00:00:00Z').getTime();
+  // UTC getters on a UTC-midnight instant read the intended calendar date back
+  // — no timezone shift needed since the candidate is already a Manila date.
+  return getManilaPartsFromUtcMidnight(base + offsetDays * 86_400_000);
+}
+
+/** Reads Manila parts off a UTC-midnight instant (used for date-only math). */
+function getManilaPartsFromUtcMidnight(ms: number): ManilaParts {
+  const d = new Date(ms);
+  const year = d.getUTCFullYear();
+  const month0 = d.getUTCMonth();
+  const day = d.getUTCDate();
+  return {
+    hour: 0,
+    dayOfWeek: d.getUTCDay(),
+    dayOfMonth: day,
+    dateStr: `${year}-${String(month0 + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  };
+}
+
+/**
+ * Next Manila date (YYYY-MM-DD) the schedule fires, counting `parts` (today).
+ *
+ * Iterates day-by-day for up to a year and returns the first date where
+ * {@link scheduleMatchesToday} is true — so the result matches exactly what the
+ * cron generator will fire on (day-31 clamp, BIWEEKLY two-day logic). Returns
+ * null if no day matches within 366 days (e.g. a WEEKLY spec with a null
+ * dayOfWeek), so callers can skip malformed templates defensively.
+ *
+ * @param spec  The frequency + day fields (unused days may be null)
+ * @param parts Manila time parts for "today" — the search origin
+ */
+export function nextOccurrence(spec: ScheduleSpec, parts: ManilaParts): string | null {
+  for (let offset = 0; offset <= 366; offset++) {
+    const candidate = partsForOffset(parts.dateStr, offset);
+    if (scheduleMatchesToday(spec, candidate)) return candidate.dateStr;
+  }
+  return null;
+}

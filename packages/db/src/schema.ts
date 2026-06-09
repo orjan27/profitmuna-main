@@ -106,8 +106,8 @@ export const incomes = sqliteTable(
       .default('PENDING'),
     expectedReleaseDate: text('expected_release_date'),
     receivedDate: text('received_date'),
-    // Default true: Profit First allocation applied by default (D-14)
-    profitFirstAllocated: integer('profit_first_allocated', { mode: 'boolean' })
+    // Default true: Profit Muna allocation applied by default (D-14)
+    profitMunaAllocated: integer('profit_first_allocated', { mode: 'boolean' })
       .notNull()
       .default(true),
     // Direct wallet top-up: non-null = income added straight to this wallet (PF off,
@@ -129,7 +129,7 @@ export const incomes = sqliteTable(
   (t) => [
     index('incomes_user_status_idx').on(t.userId, t.moneyStatus),
     index('incomes_user_date_idx').on(t.userId, t.incomeDate),
-    index('incomes_user_status_pf_idx').on(t.userId, t.moneyStatus, t.profitFirstAllocated),
+    index('incomes_user_status_pf_idx').on(t.userId, t.moneyStatus, t.profitMunaAllocated),
     index('incomes_user_category_idx').on(t.userId, t.categoryId),
     index('incomes_user_wallet_idx').on(t.userId, t.walletId),
   ]
@@ -153,16 +153,16 @@ export const expenseCategories = sqliteTable(
   ]
 );
 
-// ─── Phase 3: Profit First Allocation tables ─────────────────────────────────
+// ─── Phase 3: Profit Muna Allocation tables ──────────────────────────────────
 
-export const profitFirstAccounts = sqliteTable(
+export const profitMunaAccounts = sqliteTable(
   'profit_first_accounts',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     name: text('name').notNull(),
     /** Basis points (0–10000). 500 = 5.00% */
     targetPercentage: integer('target_percentage').notNull(),
-    /** Hex color from PF_DEFAULT_COLORS palette */
+    /** Hex color from PM_DEFAULT_COLORS palette */
     color: text('color').notNull(),
     sortOrder: integer('sort_order').notNull().default(0),
     accountType: text('account_type', {
@@ -227,11 +227,9 @@ export const wallets = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    // Nullable — non-null = PF wallet (auto-funded by its allocation); null = standalone.
-    // Sole PF discriminator; no cascade so delete-guard can block (D-01)
-    profitFirstAccountId: integer('profit_first_account_id').references(
-      () => profitFirstAccounts.id
-    ),
+    // Nullable — non-null = PM wallet (auto-funded by its allocation); null = standalone.
+    // Sole PM discriminator; no cascade so delete-guard can block (D-01)
+    profitMunaAccountId: integer('profit_first_account_id').references(() => profitMunaAccounts.id),
     // Undeletable per-user "Default" wallet flag
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
     // Soft delete: null = active; ISO string = soft-deleted
@@ -246,8 +244,8 @@ export const wallets = sqliteTable(
   },
   (table) => [
     index('wallets_user_idx').on(table.userId),
-    // Enforces one wallet per PF account per user (D-01 of WAL-01)
-    uniqueIndex('wallets_user_pf_account_unique').on(table.userId, table.profitFirstAccountId),
+    // Enforces one wallet per PM account per user (D-01 of WAL-01)
+    uniqueIndex('wallets_user_pf_account_unique').on(table.userId, table.profitMunaAccountId),
   ]
 );
 
@@ -357,7 +355,7 @@ export const recurringIncomes = sqliteTable(
     dayOfMonth: integer('day_of_month'),
     // 1–31; second day for BIWEEKLY; null otherwise
     dayOfMonth2: integer('day_of_month_2'),
-    profitFirstAllocated: integer('profit_first_allocated', { mode: 'boolean' })
+    profitMunaAllocated: integer('profit_first_allocated', { mode: 'boolean' })
       .notNull()
       .default(true),
     // Pause/resume without losing the schedule
