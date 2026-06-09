@@ -66,13 +66,13 @@ import type {
   WalletDetailResponse,
   WalletTransaction,
   IncomeCategory,
-  PfAccount,
+  PmAccount,
 } from '@/types/wallet';
 
 // ── Copywriting Contract ──────────────────────────────────────────────────────
 const BLOCKING_COPY = {
   pf_deposit:
-    'Profit First wallets do not accept manual deposits — they derive their allocation from received income.',
+    'Profit Muna wallets do not accept manual deposits — they derive their allocation from received income.',
   income_mapped:
     'This wallet auto-credits matching income. Manual deposits would double-count — record the income instead.',
   expense_mapped:
@@ -93,12 +93,12 @@ function isMoneyIn(type: WalletTransaction['type']): boolean {
 }
 
 /** Plain-language activity row title, PF-aware for withdrawals */
-function transactionTitle(tx: WalletTransaction, pfAccount: PfAccount | null): string {
+function transactionTitle(tx: WalletTransaction, pmAccount: PmAccount | null): string {
   switch (tx.type) {
     case 'DEPOSIT':
       return 'Deposit';
     case 'WITHDRAWAL':
-      return withdrawalLabel(pfAccount ? pfAccount.id : null, pfAccount?.accountType ?? null);
+      return withdrawalLabel(pmAccount ? pmAccount.id : null, pmAccount?.accountType ?? null);
     case 'INCOME_AUTO':
       return 'Income allocation';
     case 'INCOME':
@@ -116,8 +116,8 @@ function todayIso(): string {
 
 interface WalletDetailProps {
   detail: WalletDetailResponse;
-  /** Linked Profit First account — null for standalone wallets */
-  pfAccount: PfAccount | null;
+  /** Linked Profit Muna account — null for standalone wallets */
+  pmAccount: PmAccount | null;
   incomeCategories: IncomeCategory[];
   /** D-06: income category ids already mapped to a DIFFERENT wallet */
   mappedIncomeCategoryIds: Set<number>;
@@ -275,7 +275,7 @@ interface AddIncomeDialogProps {
 }
 
 /**
- * "Add money" for PF allocation wallets: records a real income with Profit First
+ * "Add money" for PF allocation wallets: records a real income with Profit Muna
  * OFF, linked directly to this wallet. Credits the wallet without splitting across
  * allocations. Editing/deleting these entries lives in the Income section.
  */
@@ -331,7 +331,7 @@ function AddIncomeDialog({ open, walletId, categories, onClose }: AddIncomeDialo
         <DialogHeader>
           <DialogTitle>Add money</DialogTitle>
           <DialogDescription>
-            Recorded as income for this wallet, excluded from Profit First allocations.
+            Recorded as income for this wallet, excluded from Profit Muna allocations.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
@@ -508,7 +508,7 @@ function ActionTile({ icon, label, blocked, className, ...props }: ActionTilePro
 
 export function WalletDetail({
   detail,
-  pfAccount,
+  pmAccount,
   incomeCategories,
   mappedIncomeCategoryIds,
   initialEditOpen,
@@ -577,8 +577,8 @@ export function WalletDetail({
   // PF allocation wallets "Add money" as a direct income (PF off) — never blocked.
   // Income-mapped (non-PF) wallets still block manual deposits to avoid double-count;
   // mapping PRESENCE blocks, not amounts (a mapped category with zero spend still blocks).
-  const isPfWallet = wallet.profitFirstAccountId != null;
-  const depositBlocked = !isPfWallet && wallet.incomeCategoryIds.length > 0;
+  const isPmWallet = wallet.profitMunaAccountId != null;
+  const depositBlocked = !isPmWallet && wallet.incomeCategoryIds.length > 0;
   const depositBlockReason = BLOCKING_COPY.income_mapped;
 
   // Withdrawals are allowed on all wallets — the expense-mapping guard was dropped.
@@ -587,7 +587,7 @@ export function WalletDetail({
 
   // Money in / money out summary tiles, derived from the same breakdown D-02 exposes
   const moneyInCents =
-    breakdown.pfAllocationCents +
+    breakdown.pmAllocationCents +
     breakdown.mappedIncomeCents +
     breakdown.depositsCents +
     breakdown.directIncomeCents;
@@ -636,7 +636,7 @@ export function WalletDetail({
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/20 px-3 py-1.5 text-[10px] leading-none font-bold tracking-[0.08em] uppercase">
-                {sourceLabel(wallet.profitFirstAccountId)}
+                {sourceLabel(wallet.profitMunaAccountId)}
               </span>
               {/* Icon + label together — meaning never rides on color alone */}
               {wallet.balanceCents < 0 && (
@@ -663,9 +663,9 @@ export function WalletDetail({
             className="mt-1.5 text-[32px] leading-none font-bold tracking-tight tabular-nums"
           />
 
-          {pfAccount && (
+          {pmAccount && (
             <p className="mt-auto truncate text-xs font-medium text-white/85">
-              {pfAccount.name} · {pfAccount.targetPercentage}% allocation
+              {pmAccount.name} · {pmAccount.targetPercentage}% allocation
             </p>
           )}
         </div>
@@ -678,7 +678,7 @@ export function WalletDetail({
           label="Add money"
           blocked={depositBlocked}
           onClick={() => {
-            if (isPfWallet) {
+            if (isPmWallet) {
               setIncomeDialogOpen(true);
             } else if (depositBlocked) {
               toast.error(depositBlockReason);
@@ -762,11 +762,11 @@ export function WalletDetail({
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="space-y-2 pt-1 pb-2 pl-6 text-sm">
-              {breakdown.pfAllocationCents !== 0 && (
+              {breakdown.pmAllocationCents !== 0 && (
                 <div className="flex justify-between">
-                  <span className="text-ink-soft">Profit First allocation</span>
+                  <span className="text-ink-soft">Profit Muna allocation</span>
                   <span className="tabular-nums">
-                    {formatCurrency(breakdown.pfAllocationCents)}
+                    {formatCurrency(breakdown.pmAllocationCents)}
                   </span>
                 </div>
               )}
@@ -850,7 +850,7 @@ export function WalletDetail({
 
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
-                      {transactionTitle(tx, pfAccount)}
+                      {transactionTitle(tx, pmAccount)}
                     </p>
                     <p className="truncate text-[13px] text-ink-faint">
                       {tx.description ? `${tx.description} · ` : ''}

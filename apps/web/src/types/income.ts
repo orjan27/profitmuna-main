@@ -9,7 +9,7 @@ export interface Income {
   moneyStatus: 'RECEIVED' | 'PENDING';
   expectedReleaseDate: string | null;
   receivedDate: string | null;
-  profitFirstAllocated: boolean;
+  profitMunaAllocated: boolean;
   /** Direct wallet top-up: set when this income was added straight to a wallet (PF off). */
   walletId: number | null;
   walletName: string | null;

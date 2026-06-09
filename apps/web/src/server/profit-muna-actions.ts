@@ -36,7 +36,7 @@ async function extractErrorMessage(res: Response): Promise<string> {
 // ── Exported actions ──────────────────────────────────────────────────────────
 
 /**
- * Creates a new Profit First account.
+ * Creates a new Profit Muna account.
  *
  * @param input.targetPercentage - Whole-number percent from the UI (e.g. 5 for 5%).
  *   Converted to basis points (× 100) before sending to the API.
@@ -48,7 +48,7 @@ export async function createAccountAction(input: {
   color: string;
 }): Promise<ActionResult> {
   const token = await getAccessToken();
-  const res = await fetch(`${API_BASE_URL}/api/profit-first/accounts`, {
+  const res = await fetch(`${API_BASE_URL}/api/profit-muna/accounts`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -68,7 +68,7 @@ export async function createAccountAction(input: {
 }
 
 /**
- * Updates an existing Profit First account.
+ * Updates an existing Profit Muna account.
  *
  * @param input.targetPercentage - Whole-number percent (0–100), converted to bp before send.
  */
@@ -90,7 +90,7 @@ export async function updateAccountAction(
     payload.targetPercentage = Math.round(input.targetPercentage * 100);
   }
 
-  const res = await fetch(`${API_BASE_URL}/api/profit-first/accounts/${id}`, {
+  const res = await fetch(`${API_BASE_URL}/api/profit-muna/accounts/${id}`, {
     method: 'PATCH',
     headers: {
       'content-type': 'application/json',
@@ -106,11 +106,11 @@ export async function updateAccountAction(
 }
 
 /**
- * Deletes a Profit First account (CUSTOM accounts only — server enforces this).
+ * Deletes a Profit Muna account (CUSTOM accounts only — server enforces this).
  */
 export async function deleteAccountAction(id: number): Promise<ActionResult> {
   const token = await getAccessToken();
-  const res = await fetch(`${API_BASE_URL}/api/profit-first/accounts/${id}`, {
+  const res = await fetch(`${API_BASE_URL}/api/profit-muna/accounts/${id}`, {
     method: 'DELETE',
     headers: {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -134,7 +134,7 @@ export async function updatePercentagesAction(
   items: { id: number; targetPercentage: number }[]
 ): Promise<ActionResult> {
   const token = await getAccessToken();
-  const res = await fetch(`${API_BASE_URL}/api/profit-first/percentages`, {
+  const res = await fetch(`${API_BASE_URL}/api/profit-muna/percentages`, {
     method: 'PUT',
     headers: {
       'content-type': 'application/json',

@@ -20,7 +20,7 @@ export interface RecurringIncome extends RecurrenceSchedule {
   /** Integer cents; null = "amount set on receive" */
   amount: number | null;
   description: string | null;
-  profitFirstAllocated: boolean;
+  profitMunaAllocated: boolean;
   active: boolean;
   lastGeneratedDate: string | null;
   userId: number;

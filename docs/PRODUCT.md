@@ -8,13 +8,13 @@ brand
 
 ## Users
 
-Individuals managing their own money with the Profit First method. Single-user: each person sees only their own finances. They arrive in everyday contexts — on a laptop or phone, often right after getting paid or making a purchase — wanting one thing fast: record the money and see exactly how it splits across their buckets (Profit, Owner Pay, Tax, Operating Expenses, custom).
+Individuals managing their own money with the Profit Muna method. Single-user: each person sees only their own finances. They arrive in everyday contexts — on a laptop or phone, often right after getting paid or making a purchase — wanting one thing fast: record the money and see exactly how it splits across their buckets (Profit, Owner Pay, Tax, Operating Expenses, custom).
 
-They are not accountants. They chose Profit First because it removes math and willpower from budgeting. The interface must do the same: the job to be done is "log it and trust the split," not "analyze my finances."
+They are not accountants. They chose Profit Muna because it removes math and willpower from budgeting. The interface must do the same: the job to be done is "log it and trust the split," not "analyze my finances."
 
 ## Product Purpose
 
-Profitmuna automatically applies Profit First percentage allocations to recorded income. Users record income and expenses, configure allocation percentages across accounts, and track money across wallets with computed balances. Success looks like: a user records income in seconds and immediately, without interpretation, knows how much belongs to each bucket.
+Profitmuna automatically applies Profit Muna percentage allocations to recorded income. Users record income and expenses, configure allocation percentages across accounts, and track money across wallets with computed balances. Success looks like: a user records income in seconds and immediately, without interpretation, knows how much belongs to each bucket.
 
 The marketing surface exists to make that promise feel as calm and effortless as the product delivers it.
 

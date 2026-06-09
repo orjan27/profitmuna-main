@@ -35,13 +35,13 @@ describe('income service — INC-01 create', () => {
       amount: 150000, // already cents
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     expect(result.amount).toBe(150000);
     expect(result.categoryName).toBe('Consulting');
     expect(result.moneyStatus).toBe('PENDING');
-    expect(result.profitFirstAllocated).toBe(true);
+    expect(result.profitMunaAllocated).toBe(true);
     expect(result.id).toBeGreaterThan(0);
   });
 
@@ -63,7 +63,7 @@ describe('income service — INC-01 create', () => {
         amount: 100000,
         incomeDate: today(),
         moneyStatus: 'PENDING',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
       })
     ).rejects.toMatchObject({ status: 400, message: 'invalid_category' });
   });
@@ -87,14 +87,14 @@ describe('income service — INC-02 list', () => {
       amount: 100000,
       incomeDate: '2026-01-10',
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
     await svc.create(userA.id, {
       categoryId: cat!.id,
       amount: 200000,
       incomeDate: '2026-01-15',
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     const result = await svc.list(userA.id, { page: 0, limit: 20 });
@@ -119,14 +119,14 @@ describe('income service — INC-02 list', () => {
       amount: 50000,
       incomeDate: today(),
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
     await svc.create(userA.id, {
       categoryId: cat!.id,
       amount: 75000,
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     const pending = await svc.list(userA.id, { page: 0, limit: 20, moneyStatus: 'PENDING' });
@@ -150,7 +150,7 @@ describe('income service — INC-02 list', () => {
       incomeDate: today(),
       moneyStatus: 'PENDING',
       description: 'Client A project',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
     await svc.create(userA.id, {
       categoryId: cat!.id,
@@ -158,7 +158,7 @@ describe('income service — INC-02 list', () => {
       incomeDate: today(),
       moneyStatus: 'PENDING',
       description: 'Other work',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     const result = await svc.list(userA.id, { page: 0, limit: 20, search: 'Client A' });
@@ -181,21 +181,21 @@ describe('income service — INC-02 list', () => {
       amount: 10000,
       incomeDate: '2026-01-01',
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
     await svc.create(userA.id, {
       categoryId: cat!.id,
       amount: 20000,
       incomeDate: '2026-03-15',
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
     await svc.create(userA.id, {
       categoryId: cat!.id,
       amount: 30000,
       incomeDate: '2026-06-01',
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     const result = await svc.list(userA.id, {
@@ -227,7 +227,7 @@ describe('income service — INC-03 update', () => {
       amount: 100000,
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     const updated = await svc.update(created.id, userA.id, {
@@ -235,12 +235,12 @@ describe('income service — INC-03 update', () => {
       amount: 200000,
       incomeDate: today(),
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: false,
+      profitMunaAllocated: false,
     });
 
     expect(updated.amount).toBe(200000);
     expect(updated.moneyStatus).toBe('RECEIVED');
-    expect(updated.profitFirstAllocated).toBe(false);
+    expect(updated.profitMunaAllocated).toBe(false);
   });
 
   it("throws 404 not_found when updating another user's income", async () => {
@@ -259,7 +259,7 @@ describe('income service — INC-03 update', () => {
       amount: 100000,
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     // userB tries to update userA's income — IDOR prevention
@@ -269,7 +269,7 @@ describe('income service — INC-03 update', () => {
         amount: 999999,
         incomeDate: today(),
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
       })
     ).rejects.toMatchObject({ status: 404, message: 'not_found' });
   });
@@ -293,7 +293,7 @@ describe('income service — INC-04 delete', () => {
       amount: 50000,
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     await svc.delete(created.id, userA.id);
@@ -318,7 +318,7 @@ describe('income service — INC-04 delete', () => {
       amount: 50000,
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     await expect(svc.delete(created.id, userB.id)).rejects.toMatchObject({
@@ -331,7 +331,7 @@ describe('income service — INC-04 delete', () => {
 // ─── INC-05: Receive income ───────────────────────────────────────────────────
 
 describe('income service — INC-05 receive', () => {
-  it('sets moneyStatus to RECEIVED and sets receivedDate, does NOT change profitFirstAllocated', async () => {
+  it('sets moneyStatus to RECEIVED and sets receivedDate, does NOT change profitMunaAllocated', async () => {
     const { db } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
@@ -346,15 +346,15 @@ describe('income service — INC-05 receive', () => {
       amount: 80000,
       incomeDate: '2026-05-01',
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true, // should remain true after receive
+      profitMunaAllocated: true, // should remain true after receive
     });
 
     const received = await svc.receive(created.id, userA.id, '2026-05-15');
 
     expect(received.moneyStatus).toBe('RECEIVED');
     expect(received.receivedDate).toBe('2026-05-15');
-    // T-02-08: receive() must NOT modify profitFirstAllocated
-    expect(received.profitFirstAllocated).toBe(true);
+    // T-02-08: receive() must NOT modify profitMunaAllocated
+    expect(received.profitMunaAllocated).toBe(true);
   });
 
   it('uses today as receivedDate when not provided', async () => {
@@ -372,7 +372,7 @@ describe('income service — INC-05 receive', () => {
       amount: 50000,
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     const received = await svc.receive(created.id, userA.id);
@@ -397,7 +397,7 @@ describe('income service — INC-05 receive', () => {
       amount: 50000,
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     // userB cannot receive userA's income
@@ -407,7 +407,7 @@ describe('income service — INC-05 receive', () => {
     });
   });
 
-  it('updates the amount when provided at receive time, leaving profitFirstAllocated untouched', async () => {
+  it('updates the amount when provided at receive time, leaving profitMunaAllocated untouched', async () => {
     const { db } = createTestDb();
     const userA = seedUser(db, { email: USER_A_EMAIL, name: 'User A' })!;
 
@@ -422,14 +422,14 @@ describe('income service — INC-05 receive', () => {
       amount: 100000, // estimated
       incomeDate: today(),
       moneyStatus: 'PENDING',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     const received = await svc.receive(created.id, userA.id, today(), 123456);
 
     expect(received.moneyStatus).toBe('RECEIVED');
     expect(received.amount).toBe(123456);
-    expect(received.profitFirstAllocated).toBe(true);
+    expect(received.profitMunaAllocated).toBe(true);
   });
 
   it('throws 422 amount_required when receiving a 0-amount income without an amount', async () => {

@@ -13,7 +13,7 @@ export interface CreateRecurringIncomeInput {
   /** Integer cents; null = "amount set on receive" */
   amount?: number | null;
   description?: string | null;
-  profitFirstAllocated?: boolean;
+  profitMunaAllocated?: boolean;
   frequency: RecurFrequency;
   dayOfWeek?: number | null;
   dayOfMonth?: number | null;
@@ -26,7 +26,7 @@ export interface UpdateRecurringIncomeInput {
   categoryId?: number;
   amount?: number | null;
   description?: string | null;
-  profitFirstAllocated?: boolean;
+  profitMunaAllocated?: boolean;
   active?: boolean;
   frequency: RecurFrequency;
   dayOfWeek?: number | null;
@@ -46,7 +46,7 @@ export interface RecurringIncomeRecord {
   dayOfWeek: number | null;
   dayOfMonth: number | null;
   dayOfMonth2: number | null;
-  profitFirstAllocated: boolean;
+  profitMunaAllocated: boolean;
   active: boolean;
   lastGeneratedDate: string | null;
   userId: number;
@@ -65,7 +65,7 @@ function toRecord(row: typeof recurringIncomes.$inferSelect): RecurringIncomeRec
     dayOfWeek: row.dayOfWeek ?? null,
     dayOfMonth: row.dayOfMonth ?? null,
     dayOfMonth2: row.dayOfMonth2 ?? null,
-    profitFirstAllocated: !!row.profitFirstAllocated,
+    profitMunaAllocated: !!row.profitMunaAllocated,
     active: !!row.active,
     lastGeneratedDate: row.lastGeneratedDate ?? null,
     userId: row.userId,
@@ -131,7 +131,7 @@ export function createRecurringIncomeService(db: ReturnType<typeof createDb>) {
           description: input.description ?? null,
           frequency: input.frequency,
           ...normalizeDays(input),
-          profitFirstAllocated: input.profitFirstAllocated ?? true,
+          profitMunaAllocated: input.profitMunaAllocated ?? true,
           lastGeneratedDate: input.lastGeneratedDate ?? null,
           userId,
         })
@@ -173,8 +173,8 @@ export function createRecurringIncomeService(db: ReturnType<typeof createDb>) {
           ...(input.categoryId !== undefined && { categoryId: input.categoryId, categoryName }),
           ...(input.amount !== undefined && { amount: input.amount }),
           ...(input.description !== undefined && { description: input.description }),
-          ...(input.profitFirstAllocated !== undefined && {
-            profitFirstAllocated: input.profitFirstAllocated,
+          ...(input.profitMunaAllocated !== undefined && {
+            profitMunaAllocated: input.profitMunaAllocated,
           }),
           ...(input.active !== undefined && { active: input.active }),
           frequency: input.frequency,

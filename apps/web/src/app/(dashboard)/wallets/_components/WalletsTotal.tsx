@@ -10,7 +10,7 @@ interface WalletsTotalProps {
 
 /**
  * Client island for the wallets page header total. Owns amount-visibility
- * state (shared localStorage key with Overview/Profit First) so the hero
+ * state (shared localStorage key with Overview/Profit Muna) so the hero
  * total masks consistently across pages, with the eye toggle anchored to
  * the total it masks.
  */

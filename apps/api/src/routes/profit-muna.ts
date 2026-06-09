@@ -2,23 +2,23 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 
 import { requireAuth } from '@/middleware/auth';
-import { createProfitFirstService } from '@/services/profit-first-service';
+import { createProfitMunaService } from '@/services/profit-muna-service';
 import {
   createAccountSchema,
   updateAccountSchema,
   updatePercentagesSchema,
   summaryQuerySchema,
-} from '@/schemas/profit-first';
+} from '@/schemas/profit-muna';
 import { createDb } from '@app/db';
 import type { Bindings, Variables } from '@/types';
 
-const profitFirstRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+const profitMunaRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // T-03-09: every route behind requireAuth — no unauthenticated access to PF endpoints
-profitFirstRouter.use('/*', requireAuth);
+profitMunaRouter.use('/*', requireAuth);
 
 // GET /summary — allocation summary with optional date range + category filters
-profitFirstRouter.get(
+profitMunaRouter.get(
   '/summary',
   zValidator('query', summaryQuerySchema, (result, c) => {
     if (!result.success) {
@@ -31,7 +31,7 @@ profitFirstRouter.get(
   async (c) => {
     const query = c.req.valid('query');
     const db = createDb(c.env.DB);
-    const svc = createProfitFirstService(db);
+    const svc = createProfitMunaService(db);
     const userId = c.get('userId');
 
     // Parse comma-separated categoryIds to number[]
@@ -53,7 +53,7 @@ profitFirstRouter.get(
 );
 
 // POST /accounts — create a new custom allocation account
-profitFirstRouter.post(
+profitMunaRouter.post(
   '/accounts',
   zValidator('json', createAccountSchema, (result, c) => {
     if (!result.success) {
@@ -63,7 +63,7 @@ profitFirstRouter.post(
   async (c) => {
     const input = c.req.valid('json');
     const db = createDb(c.env.DB);
-    const svc = createProfitFirstService(db);
+    const svc = createProfitMunaService(db);
     const userId = c.get('userId');
 
     const account = await svc.createAccount(userId, input);
@@ -72,7 +72,7 @@ profitFirstRouter.post(
 );
 
 // PATCH /accounts/:id — partial update of a custom or default account
-profitFirstRouter.patch(
+profitMunaRouter.patch(
   '/accounts/:id',
   zValidator('json', updateAccountSchema, (result, c) => {
     if (!result.success) {
@@ -82,7 +82,7 @@ profitFirstRouter.patch(
   async (c) => {
     const input = c.req.valid('json');
     const db = createDb(c.env.DB);
-    const svc = createProfitFirstService(db);
+    const svc = createProfitMunaService(db);
     const userId = c.get('userId');
 
     const accountId = parseInt(c.req.param('id'), 10);
@@ -96,9 +96,9 @@ profitFirstRouter.patch(
 );
 
 // DELETE /accounts/:id — delete a CUSTOM allocation account
-profitFirstRouter.delete('/accounts/:id', async (c) => {
+profitMunaRouter.delete('/accounts/:id', async (c) => {
   const db = createDb(c.env.DB);
-  const svc = createProfitFirstService(db);
+  const svc = createProfitMunaService(db);
   const userId = c.get('userId');
 
   const accountId = parseInt(c.req.param('id'), 10);
@@ -111,7 +111,7 @@ profitFirstRouter.delete('/accounts/:id', async (c) => {
 });
 
 // PUT /percentages — bulk update of targetPercentage; must sum to exactly 10000 bp
-profitFirstRouter.put(
+profitMunaRouter.put(
   '/percentages',
   zValidator('json', updatePercentagesSchema, (result, c) => {
     if (!result.success) {
@@ -121,7 +121,7 @@ profitFirstRouter.put(
   async (c) => {
     const input = c.req.valid('json');
     const db = createDb(c.env.DB);
-    const svc = createProfitFirstService(db);
+    const svc = createProfitMunaService(db);
     const userId = c.get('userId');
 
     const accounts = await svc.updatePercentages(userId, input);
@@ -129,4 +129,4 @@ profitFirstRouter.put(
   }
 );
 
-export { profitFirstRouter };
+export { profitMunaRouter };

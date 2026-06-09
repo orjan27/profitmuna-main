@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { schema } from '@app/db';
 
 import { register, upsertGoogleUser } from '@/services/auth-service';
-import { createProfitFirstService } from '@/services/profit-first-service';
+import { createProfitMunaService } from '@/services/profit-muna-service';
 import { createTestDb, mockEnv, seedUser } from './helpers/db';
 
 // Minimal Resend mock so auth-service email calls don't throw
@@ -18,9 +18,9 @@ vi.mock('resend', () => ({
   })),
 }));
 
-// ─── PF-01: Profit First account seeding ────────────────────────────────────
+// ─── PM-01: Profit Muna account seeding ────────────────────────────────────
 
-describe('PF-01: seedProfitFirstAccounts', () => {
+describe('PM-01: seedProfitMunaAccounts', () => {
   it('seeds default accounts on register', async () => {
     const { d1, db } = createTestDb();
     const env = mockEnv({}, d1);
@@ -40,8 +40,8 @@ describe('PF-01: seedProfitFirstAccounts', () => {
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, users[0].id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, users[0].id))
       .all();
 
     expect(accounts).toHaveLength(4);
@@ -86,8 +86,8 @@ describe('PF-01: seedProfitFirstAccounts', () => {
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, userId))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, userId))
       .all();
 
     expect(accounts).toHaveLength(4);
@@ -117,8 +117,8 @@ describe('PF-01: seedProfitFirstAccounts', () => {
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, userId))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, userId))
       .all();
 
     // Still exactly 4 — no duplicates
@@ -126,20 +126,20 @@ describe('PF-01: seedProfitFirstAccounts', () => {
   });
 });
 
-// ─── PF-02: Profit First CRUD ────────────────────────────────────────────────
+// ─── PM-02: Profit Muna CRUD ────────────────────────────────────────────────
 
-describe('PF-02: profit first account CRUD', () => {
+describe('PM-02: profit muna account CRUD', () => {
   it('rejects account creation that exceeds 100%', async () => {
     // Default accounts total 500+5000+1500+3000 = 10000 bp — adding any new one fails
     const { d1, db } = createTestDb();
     const user = seedUser(db, { email: 'crud@pf.test', name: 'CRUD User', emailVerified: true });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
     // Seed the 4 defaults (500+5000+1500+3000 = 10000 bp)
-    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
-    await seedProfitFirstAccounts(drizzleDb, user.id);
+    const { seedProfitMunaAccounts } = await import('@/services/profit-muna-service');
+    await seedProfitMunaAccounts(drizzleDb, user.id);
 
     // Any addition now exceeds 10000
     await expect(
@@ -156,15 +156,15 @@ describe('PF-02: profit first account CRUD', () => {
     const user = seedUser(db, { email: 'del@pf.test', name: 'Del User', emailVerified: true });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
-    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
-    await seedProfitFirstAccounts(drizzleDb, user.id);
+    const { seedProfitMunaAccounts } = await import('@/services/profit-muna-service');
+    await seedProfitMunaAccounts(drizzleDb, user.id);
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
 
     const profitAccount = accounts.find((a) => a.accountType === 'PROFIT');
@@ -184,10 +184,10 @@ describe('PF-02: profit first account CRUD', () => {
     });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
     // Insert a CUSTOM account directly (defaults total 10000, so reduce one first)
-    db.insert(schema.profitFirstAccounts)
+    db.insert(schema.profitMunaAccounts)
       .values({
         name: 'Savings',
         targetPercentage: 0,
@@ -200,8 +200,8 @@ describe('PF-02: profit first account CRUD', () => {
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
 
     const customAccount = accounts.find((a) => a.accountType === 'CUSTOM');
@@ -211,8 +211,8 @@ describe('PF-02: profit first account CRUD', () => {
 
     const remaining = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
 
     expect(remaining.find((a) => a.id === customAccount!.id)).toBeUndefined();
@@ -224,10 +224,10 @@ describe('PF-02: profit first account CRUD', () => {
     const user2 = seedUser(db, { email: 'u2@pf.test', name: 'User 2', emailVerified: true });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
     // Create a CUSTOM account for user1
-    db.insert(schema.profitFirstAccounts)
+    db.insert(schema.profitMunaAccounts)
       .values({
         name: 'User1 Account',
         targetPercentage: 0,
@@ -240,8 +240,8 @@ describe('PF-02: profit first account CRUD', () => {
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user1.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user1.id))
       .all();
 
     // user2 trying to delete user1's account — should get 404
@@ -249,23 +249,23 @@ describe('PF-02: profit first account CRUD', () => {
   });
 });
 
-// ─── PF-03: Percentage update (sum-to-100% validation) ───────────────────────
+// ─── PM-03: Percentage update (sum-to-100% validation) ───────────────────────
 
-describe('PF-03: percentage update (sum-to-100% validation)', () => {
+describe('PM-03: percentage update (sum-to-100% validation)', () => {
   it('rejects percentages not summing to 10000', async () => {
     const { d1, db } = createTestDb();
     const user = seedUser(db, { email: 'pct@pf.test', name: 'Pct User', emailVerified: true });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
-    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
-    await seedProfitFirstAccounts(drizzleDb, user.id);
+    const { seedProfitMunaAccounts } = await import('@/services/profit-muna-service');
+    await seedProfitMunaAccounts(drizzleDb, user.id);
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
 
     // Submit percentages totaling 9700 bp (not 10000): Profit 200 + OwnerPay 5000 + Tax 1500 + OPEX 3000 = 9700
@@ -284,15 +284,15 @@ describe('PF-03: percentage update (sum-to-100% validation)', () => {
     const user = seedUser(db, { email: 'pctok@pf.test', name: 'Pct OK User', emailVerified: true });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
-    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
-    await seedProfitFirstAccounts(drizzleDb, user.id);
+    const { seedProfitMunaAccounts } = await import('@/services/profit-muna-service');
+    await seedProfitMunaAccounts(drizzleDb, user.id);
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
 
     // Redistribute: 1000+4500+1500+3000 = 10000 bp
@@ -318,15 +318,15 @@ describe('PF-03: percentage update (sum-to-100% validation)', () => {
     });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
-    const { seedProfitFirstAccounts } = await import('@/services/profit-first-service');
-    await seedProfitFirstAccounts(drizzleDb, user.id);
+    const { seedProfitMunaAccounts } = await import('@/services/profit-muna-service');
+    await seedProfitMunaAccounts(drizzleDb, user.id);
 
     const accounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
 
     const profitAccount = accounts.find((a) => a.accountType === 'PROFIT');
@@ -343,17 +343,17 @@ describe('PF-03: percentage update (sum-to-100% validation)', () => {
     // Assert no partial write occurred — OWNERS_PAY must still have its seeded value (5000 bp)
     const afterAttempt = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
     const ownersPayAfter = afterAttempt.find((a) => a.accountType === 'OWNERS_PAY');
     expect(ownersPayAfter?.targetPercentage).toBe(5000);
   });
 });
 
-// ─── PF-04: Allocation summary ───────────────────────────────────────────────
+// ─── PM-04: Allocation summary ───────────────────────────────────────────────
 
-describe('PF-04: allocation summary', () => {
+describe('PM-04: allocation summary', () => {
   it('computes balance with integer math', async () => {
     // 100000 cents income * 500 bp / 10000 = Math.round(5000) = 5000 cents
     const { d1, db } = createTestDb();
@@ -364,10 +364,10 @@ describe('PF-04: allocation summary', () => {
     });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
     // Seed profit account at 500 bp (5%)
-    db.insert(schema.profitFirstAccounts)
+    db.insert(schema.profitMunaAccounts)
       .values({
         name: 'Profit',
         targetPercentage: 500,
@@ -385,7 +385,7 @@ describe('PF-04: allocation summary', () => {
       .returning()
       .all();
 
-    // Insert RECEIVED + profitFirstAllocated income: 100000 cents
+    // Insert RECEIVED + profitMunaAllocated income: 100000 cents
     db.insert(schema.incomes)
       .values({
         categoryId: cat.id,
@@ -393,7 +393,7 @@ describe('PF-04: allocation summary', () => {
         amount: 100000,
         incomeDate: '2026-01-15',
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
         userId: user.id,
       })
       .run();
@@ -416,9 +416,9 @@ describe('PF-04: allocation summary', () => {
     });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
-    db.insert(schema.profitFirstAccounts)
+    db.insert(schema.profitMunaAccounts)
       .values({
         name: 'Profit',
         targetPercentage: 500,
@@ -443,12 +443,12 @@ describe('PF-04: allocation summary', () => {
         amount: 200000,
         incomeDate: '2026-01-15',
         moneyStatus: 'PENDING',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
         userId: user.id,
       })
       .run();
 
-    // RECEIVED but profitFirstAllocated=false — should NOT count
+    // RECEIVED but profitMunaAllocated=false — should NOT count
     db.insert(schema.incomes)
       .values({
         categoryId: cat.id,
@@ -456,7 +456,7 @@ describe('PF-04: allocation summary', () => {
         amount: 50000,
         incomeDate: '2026-01-15',
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: false,
+        profitMunaAllocated: false,
         userId: user.id,
       })
       .run();
@@ -477,9 +477,9 @@ describe('PF-04: allocation summary', () => {
     });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
-    db.insert(schema.profitFirstAccounts)
+    db.insert(schema.profitMunaAccounts)
       .values({
         name: 'Profit',
         targetPercentage: 500,
@@ -504,7 +504,7 @@ describe('PF-04: allocation summary', () => {
         amount: 100000,
         incomeDate: '2026-01-15',
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
         userId: user.id,
       })
       .run();
@@ -517,7 +517,7 @@ describe('PF-04: allocation summary', () => {
         amount: 200000,
         incomeDate: '2026-02-15',
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
         userId: user.id,
       })
       .run();
@@ -544,10 +544,10 @@ describe('PF-04: allocation summary', () => {
     });
     const { createDb } = await import('@app/db');
     const drizzleDb = createDb(d1);
-    const svc = createProfitFirstService(drizzleDb);
+    const svc = createProfitMunaService(drizzleDb);
 
     // Seed a PF account so getSummary has accounts to return
-    db.insert(schema.profitFirstAccounts)
+    db.insert(schema.profitMunaAccounts)
       .values({
         name: 'Profit',
         targetPercentage: 500,
@@ -571,7 +571,7 @@ describe('PF-04: allocation summary', () => {
       .returning()
       .all();
 
-    // Two RECEIVED + profitFirstAllocated incomes under different categories
+    // Two RECEIVED + profitMunaAllocated incomes under different categories
     db.insert(schema.incomes)
       .values({
         categoryId: catSales.id,
@@ -579,7 +579,7 @@ describe('PF-04: allocation summary', () => {
         amount: 50000,
         incomeDate: '2026-01-15',
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
         userId: user.id,
       })
       .run();
@@ -591,7 +591,7 @@ describe('PF-04: allocation summary', () => {
         amount: 80000,
         incomeDate: '2026-02-10',
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: true,
+        profitMunaAllocated: true,
         userId: user.id,
       })
       .run();

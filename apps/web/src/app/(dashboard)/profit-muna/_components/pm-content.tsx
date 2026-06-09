@@ -9,23 +9,23 @@ import { Button } from '@/components/ui/button';
 import { useAmountVisibility, AmountToggle } from '@/components/amount-visibility';
 import { useCurrency } from '@/components/CurrencyProvider';
 import { formatCurrencyParts } from '@/lib/format-currency';
-import { PfOverview, type PfAccount } from './pf-overview';
-import { PfAccountForm } from './pf-account-form';
-import { PfPercentageEditor } from './pf-percentage-editor';
+import { PmOverview, type PmAccount } from './pm-overview';
+import { PmAccountForm } from './pm-account-form';
+import { PmPercentageEditor } from './pm-percentage-editor';
 
-interface PfContentProps {
-  accounts: PfAccount[];
+interface PmContentProps {
+  accounts: PmAccount[];
   totalIncome: number;
 }
 
 /**
- * Client boundary for /profit-first. Owns amount-visibility state and the
+ * Client boundary for /profit-muna. Owns amount-visibility state and the
  * mutation entry points (add-jar dialog, inline percentage editor).
  *
  * Composition: hero total (received income to allocate) → row of jars (the
  * split is the picture) → funded-status banner → quiet foot actions.
  */
-export function PfContent({ accounts, totalIncome }: PfContentProps) {
+export function PmContent({ accounts, totalIncome }: PmContentProps) {
   const { visible, toggle, mounted } = useAmountVisibility();
   const [addOpen, setAddOpen] = useState(false);
   const [editingPercents, setEditingPercents] = useState(false);
@@ -44,10 +44,10 @@ export function PfContent({ accounts, totalIncome }: PfContentProps) {
 
       {/* The jars, or the inline bulk percentage editor while editing */}
       {editingPercents ? (
-        <PfPercentageEditor accounts={accounts} onCancel={() => setEditingPercents(false)} />
+        <PmPercentageEditor accounts={accounts} onCancel={() => setEditingPercents(false)} />
       ) : (
         <>
-          <PfOverview accounts={accounts} visible={visible} mounted={mounted} />
+          <PmOverview accounts={accounts} visible={visible} mounted={mounted} />
 
           <StatusBanner accounts={accounts} totalIncome={totalIncome} />
 
@@ -88,7 +88,7 @@ export function PfContent({ accounts, totalIncome }: PfContentProps) {
       )}
 
       {/* Create jar dialog */}
-      <PfAccountForm open={addOpen} onOpenChange={setAddOpen} />
+      <PmAccountForm open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
 }
@@ -137,7 +137,7 @@ function HeroAmount({ cents, visible, mounted }: HeroAmountProps) {
 // ── Funded-status banner ──────────────────────────────────────────────────────
 
 interface StatusBannerProps {
-  accounts: PfAccount[];
+  accounts: PmAccount[];
   totalIncome: number;
 }
 
@@ -145,7 +145,7 @@ interface StatusBannerProps {
  * One-line readout of allocation health beneath the jars:
  * - allocations ≠ 100%  → warning, nudge to fix the percentages
  * - 100% but no income  → neutral hint, the split is ready
- * - 100% and income in   → success, the profit-first promise is kept
+ * - 100% and income in   → success, the profit-muna promise is kept
  */
 function StatusBanner({ accounts, totalIncome }: StatusBannerProps) {
   if (accounts.length === 0) return null;

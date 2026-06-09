@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { schema } from '@app/db';
 
 import { createDashboardService } from '@/services/dashboard-service';
-import { seedProfitFirstAccounts } from '@/services/profit-first-service';
+import { seedProfitMunaAccounts } from '@/services/profit-muna-service';
 import { createTestDb, seedUser } from './helpers/db';
 
 // ─── Seeding helpers (raw inserts — bypass the API) ──────────────────────────
@@ -30,7 +30,7 @@ function seedIncome(
     amount: number;
     incomeDate: string;
     moneyStatus?: 'RECEIVED' | 'PENDING';
-    profitFirstAllocated?: boolean;
+    profitMunaAllocated?: boolean;
     expectedReleaseDate?: string | null;
   }
 ) {
@@ -42,8 +42,40 @@ function seedIncome(
       amount: input.amount,
       incomeDate: input.incomeDate,
       moneyStatus: input.moneyStatus ?? 'RECEIVED',
-      profitFirstAllocated: input.profitFirstAllocated ?? true,
+      profitMunaAllocated: input.profitMunaAllocated ?? true,
       expectedReleaseDate: input.expectedReleaseDate ?? null,
+      userId: input.userId,
+    })
+    .returning()
+    .all();
+  return row;
+}
+
+function seedRecurringIncome(
+  db: TestDb,
+  input: {
+    userId: number;
+    categoryId: number;
+    categoryName: string;
+    amount?: number | null;
+    frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+    dayOfWeek?: number | null;
+    dayOfMonth?: number | null;
+    dayOfMonth2?: number | null;
+    active?: boolean;
+  }
+) {
+  const [row] = db
+    .insert(schema.recurringIncomes)
+    .values({
+      categoryId: input.categoryId,
+      categoryName: input.categoryName,
+      amount: input.amount ?? null,
+      frequency: input.frequency,
+      dayOfWeek: input.dayOfWeek ?? null,
+      dayOfMonth: input.dayOfMonth ?? null,
+      dayOfMonth2: input.dayOfMonth2 ?? null,
+      active: input.active ?? true,
       userId: input.userId,
     })
     .returning()
@@ -85,7 +117,7 @@ function seedWallet(
   input: {
     userId: number;
     name: string;
-    profitFirstAccountId?: number | null;
+    profitMunaAccountId?: number | null;
   }
 ) {
   const [row] = db
@@ -93,7 +125,7 @@ function seedWallet(
     .values({
       userId: input.userId,
       name: input.name,
-      profitFirstAccountId: input.profitFirstAccountId ?? null,
+      profitMunaAccountId: input.profitMunaAccountId ?? null,
       color: '#0ea5e9',
     })
     .returning()
@@ -295,10 +327,10 @@ describe('dashboard service — getSummary', () => {
     expect(summary.netIncomeCents).toBe(7_000 - 1_500);
   });
 
-  it('returns profitFirstAccounts with computedBalance from the PF summary', async () => {
+  it('returns profitMunaAccounts with computedBalance from the PF summary', async () => {
     const { db, dbD1 } = createTestDb();
     const user = seedUser(db, { email: 'pf@dash.test', name: 'PF User' });
-    await seedProfitFirstAccounts(dbD1, user.id);
+    await seedProfitMunaAccounts(dbD1, user.id);
     const cat = seedIncomeCategory(db, user.id, 'Salary');
 
     seedIncome(db, {
@@ -308,38 +340,38 @@ describe('dashboard service — getSummary', () => {
       amount: 100_000,
       incomeDate: '2026-06-10',
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
 
     const summary = await createDashboardService(dbD1).getSummary(user.id);
 
-    expect(summary.profitFirstAccounts).toHaveLength(4);
-    const profit = summary.profitFirstAccounts.find((a) => a.accountType === 'PROFIT');
+    expect(summary.profitMunaAccounts).toHaveLength(4);
+    const profit = summary.profitMunaAccounts.find((a) => a.accountType === 'PROFIT');
     // Profit defaults to 500 bp (5%) → 5% of 100,000 cents
     expect(profit?.computedBalance).toBe(5_000);
-    const ownerPay = summary.profitFirstAccounts.find((a) => a.accountType === 'OWNERS_PAY');
+    const ownerPay = summary.profitMunaAccounts.find((a) => a.accountType === 'OWNERS_PAY');
     expect(ownerPay?.computedBalance).toBe(50_000);
   });
 
   it('computes a period-scoped totalWalletBalanceCents, not all-time', async () => {
     const { db, dbD1 } = createTestDb();
     const user = seedUser(db, { email: 'wallet@dash.test', name: 'Wallet User' });
-    await seedProfitFirstAccounts(dbD1, user.id);
+    await seedProfitMunaAccounts(dbD1, user.id);
     const cat = seedIncomeCategory(db, user.id, 'Salary');
 
-    const pfAccounts = db
+    const pmAccounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
-    const profitAccount = pfAccounts.find((a) => a.accountType === 'PROFIT');
+    const profitAccount = pmAccounts.find((a) => a.accountType === 'PROFIT');
     expect(profitAccount).toBeDefined();
 
     // PF-linked wallet: allocation = 5% (500 bp) of received income
     seedWallet(db, {
       userId: user.id,
       name: 'Profit Vault',
-      profitFirstAccountId: profitAccount!.id,
+      profitMunaAccountId: profitAccount!.id,
     });
     // Standalone wallet with manual transactions
     const blank = seedWallet(db, { userId: user.id, name: 'Cash' });
@@ -351,7 +383,7 @@ describe('dashboard service — getSummary', () => {
       amount: 100_000,
       incomeDate: '2026-06-10',
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
     seedWalletTx(db, {
       userId: user.id,
@@ -371,7 +403,7 @@ describe('dashboard service — getSummary', () => {
     const svc = createDashboardService(dbD1);
 
     // June range includes everything:
-    // pfAllocation(5% of 100,000 = 5,000) + deposits(5,000) - withdrawals(2,000)
+    // pmAllocation(5% of 100,000 = 5,000) + deposits(5,000) - withdrawals(2,000)
     const june = await svc.getSummary(user.id, { from: '2026-06-01', to: '2026-06-30' });
     expect(june.totalWalletBalanceCents).toBe(5_000 + 5_000 - 2_000);
 
@@ -573,7 +605,7 @@ describe('dashboard service — getSummary', () => {
     });
 
     // User B's data — must never surface for A
-    await seedProfitFirstAccounts(dbD1, userB.id);
+    await seedProfitMunaAccounts(dbD1, userB.id);
     const incomeCatB = seedIncomeCategory(db, userB.id, 'Intruder Income');
     const expenseCatB = seedExpenseCategory(db, userB.id, 'Intruder Expense');
     seedIncome(db, {
@@ -604,7 +636,7 @@ describe('dashboard service — getSummary', () => {
     expect(summaryA.totalIncomeReceivedCents).toBe(10_000);
     expect(summaryA.totalExpensesCents).toBe(0);
     expect(summaryA.totalWalletBalanceCents).toBe(0);
-    expect(summaryA.profitFirstAccounts).toHaveLength(0);
+    expect(summaryA.profitMunaAccounts).toHaveLength(0);
     expect(summaryA.recentTransactions).toHaveLength(1);
     expect(
       summaryA.recentTransactions.some(
@@ -843,13 +875,157 @@ describe('dashboard service — nextPendingIncome', () => {
 
     expect(summary.nextPendingIncome).toBeNull();
   });
+
+  it('projects the next occurrence of an active recurring income when no pending row exists', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'recur@dash.test', name: 'Recur User' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedRecurringIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 60_000,
+      frequency: 'MONTHLY',
+      dayOfMonth: 15, // next 15th from 2026-06-10 is 2026-06-15
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toEqual({
+      expectedReleaseDate: '2026-06-15',
+      amountCents: 60_000,
+      categoryName: 'Salary',
+    });
+  });
+
+  it('uses 0 cents for a recurring template whose amount is set on receive', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'recur-noamt@dash.test', name: 'No Amount' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedRecurringIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: null,
+      frequency: 'MONTHLY',
+      dayOfMonth: 20, // next is 2026-06-20
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toEqual({
+      expectedReleaseDate: '2026-06-20',
+      amountCents: 0,
+      categoryName: 'Salary',
+    });
+  });
+
+  it('surfaces the recurring occurrence when it is earlier than the next pending row', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'recur-wins@dash.test', name: 'Recur Wins' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 50_000,
+      incomeDate: '2026-06-01',
+      moneyStatus: 'PENDING',
+      expectedReleaseDate: '2026-07-07',
+    });
+    seedRecurringIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 60_000,
+      frequency: 'MONTHLY',
+      dayOfMonth: 15, // 2026-06-15 — earlier than the 2026-07-07 pending row
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toEqual({
+      expectedReleaseDate: '2026-06-15',
+      amountCents: 60_000,
+      categoryName: 'Salary',
+    });
+  });
+
+  it('surfaces the pending row when it is earlier than the next recurring occurrence', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'pending-wins@dash.test', name: 'Pending Wins' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 30_000,
+      incomeDate: '2026-06-01',
+      moneyStatus: 'PENDING',
+      expectedReleaseDate: '2026-06-12',
+    });
+    seedRecurringIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 60_000,
+      frequency: 'MONTHLY',
+      dayOfMonth: 15, // 2026-06-15 — later than the 2026-06-12 pending row
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toEqual({
+      expectedReleaseDate: '2026-06-12',
+      amountCents: 30_000,
+      categoryName: 'Salary',
+    });
+  });
+
+  it('ignores paused (inactive) recurring income templates', async () => {
+    const { db, dbD1 } = createTestDb();
+    const user = seedUser(db, { email: 'paused@dash.test', name: 'Paused User' });
+    const cat = seedIncomeCategory(db, user.id, 'Salary');
+    seedRecurringIncome(db, {
+      userId: user.id,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      amount: 60_000,
+      frequency: 'MONTHLY',
+      dayOfMonth: 15,
+      active: false,
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(user.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toBeNull();
+  });
+
+  it("never surfaces another user's recurring income", async () => {
+    const { db, dbD1 } = createTestDb();
+    const userA = seedUser(db, { email: 'mine-recur@dash.test', name: 'User A' });
+    const userB = seedUser(db, { email: 'theirs-recur@dash.test', name: 'User B' });
+    const catB = seedIncomeCategory(db, userB.id, 'Intruder Salary');
+    seedRecurringIncome(db, {
+      userId: userB.id,
+      categoryId: catB.id,
+      categoryName: catB.name,
+      amount: 99_999,
+      frequency: 'MONTHLY',
+      dayOfMonth: 15,
+    });
+
+    const summary = await createDashboardService(dbD1).getSummary(userA.id, undefined, 0, 20, NOW);
+
+    expect(summary.nextPendingIncome).toBeNull();
+  });
 });
 
 describe('dashboard service — profitWalletBalanceCents', () => {
   it('is null when no wallet is linked to the Profit account', async () => {
     const { db, dbD1 } = createTestDb();
     const user = seedUser(db, { email: 'nopfwallet@dash.test', name: 'No PF Wallet' });
-    await seedProfitFirstAccounts(dbD1, user.id);
+    await seedProfitMunaAccounts(dbD1, user.id);
     // A standalone wallet exists, but none is linked to the Profit account
     seedWallet(db, { userId: user.id, name: 'Cash' });
 
@@ -861,21 +1037,21 @@ describe('dashboard service — profitWalletBalanceCents', () => {
   it("reflects the linked Profit wallet's all-time balance, independent of the period filter", async () => {
     const { db, dbD1 } = createTestDb();
     const user = seedUser(db, { email: 'pfwallet@dash.test', name: 'PF Wallet User' });
-    await seedProfitFirstAccounts(dbD1, user.id);
+    await seedProfitMunaAccounts(dbD1, user.id);
     const cat = seedIncomeCategory(db, user.id, 'Salary');
 
-    const pfAccounts = db
+    const pmAccounts = db
       .select()
-      .from(schema.profitFirstAccounts)
-      .where(eq(schema.profitFirstAccounts.userId, user.id))
+      .from(schema.profitMunaAccounts)
+      .where(eq(schema.profitMunaAccounts.userId, user.id))
       .all();
-    const profitAccount = pfAccounts.find((a) => a.accountType === 'PROFIT');
+    const profitAccount = pmAccounts.find((a) => a.accountType === 'PROFIT');
     expect(profitAccount).toBeDefined();
 
     const profitWallet = seedWallet(db, {
       userId: user.id,
       name: 'Profit Vault',
-      profitFirstAccountId: profitAccount!.id,
+      profitMunaAccountId: profitAccount!.id,
     });
 
     // Profit allocation = 5% (500 bp) of 100,000 received+allocated income = 5,000
@@ -886,7 +1062,7 @@ describe('dashboard service — profitWalletBalanceCents', () => {
       amount: 100_000,
       incomeDate: '2026-06-10',
       moneyStatus: 'RECEIVED',
-      profitFirstAllocated: true,
+      profitMunaAllocated: true,
     });
     // A withdrawal off the Profit wallet (allowed on PF wallets) → 5,000 - 1,000
     seedWalletTx(db, {

@@ -14,7 +14,7 @@ export interface CreateIncomeInput {
   incomeDate: string;
   moneyStatus: 'RECEIVED' | 'PENDING';
   expectedReleaseDate?: string | null;
-  profitFirstAllocated?: boolean;
+  profitMunaAllocated?: boolean;
   /** Direct wallet top-up: when set, income is added straight to this wallet (PF forced off). */
   walletId?: number | null;
 }
@@ -26,7 +26,7 @@ export interface UpdateIncomeInput {
   incomeDate?: string;
   moneyStatus?: 'RECEIVED' | 'PENDING';
   expectedReleaseDate?: string | null;
-  profitFirstAllocated?: boolean;
+  profitMunaAllocated?: boolean;
 }
 
 export interface IncomeListParams {
@@ -84,7 +84,7 @@ export interface IncomeRecord {
   moneyStatus: 'RECEIVED' | 'PENDING';
   expectedReleaseDate: string | null;
   receivedDate: string | null;
-  profitFirstAllocated: boolean;
+  profitMunaAllocated: boolean;
   walletId: number | null;
   walletName: string | null;
   userId: number;
@@ -103,7 +103,7 @@ function toRecord(row: typeof incomes.$inferSelect): IncomeRecord {
     moneyStatus: row.moneyStatus as 'RECEIVED' | 'PENDING',
     expectedReleaseDate: row.expectedReleaseDate ?? null,
     receivedDate: row.receivedDate ?? null,
-    profitFirstAllocated: !!row.profitFirstAllocated,
+    profitMunaAllocated: !!row.profitMunaAllocated,
     walletId: row.walletId ?? null,
     walletName: row.walletName ?? null,
     userId: row.userId,
@@ -259,7 +259,7 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
       // amount credits this wallet directly instead of feeding the allocation pool.
       let walletId: number | null = null;
       let walletName: string | null = null;
-      let profitFirstAllocated = input.profitFirstAllocated ?? true;
+      let profitMunaAllocated = input.profitMunaAllocated ?? true;
       if (input.walletId != null) {
         const wallet = await db.query.wallets.findFirst({
           where: and(eq(wallets.id, input.walletId), eq(wallets.userId, userId)),
@@ -269,7 +269,7 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
         }
         walletId = wallet.id;
         walletName = wallet.name;
-        profitFirstAllocated = false;
+        profitMunaAllocated = false;
       }
 
       const [inserted] = await db
@@ -283,7 +283,7 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
           moneyStatus: input.moneyStatus,
           expectedReleaseDate: input.expectedReleaseDate ?? null,
           receivedDate: input.moneyStatus === 'RECEIVED' ? input.incomeDate : null,
-          profitFirstAllocated,
+          profitMunaAllocated,
           walletId,
           walletName,
           userId,
@@ -355,8 +355,8 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
         ...(input.expectedReleaseDate !== undefined && {
           expectedReleaseDate: input.expectedReleaseDate,
         }),
-        ...(input.profitFirstAllocated !== undefined && {
-          profitFirstAllocated: input.profitFirstAllocated,
+        ...(input.profitMunaAllocated !== undefined && {
+          profitMunaAllocated: input.profitMunaAllocated,
         }),
         receivedDate,
       };
@@ -371,7 +371,7 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
     },
 
     /**
-     * INC-05: Mark income as received. Does NOT modify profitFirstAllocated (T-02-08).
+     * INC-05: Mark income as received. Does NOT modify profitMunaAllocated (T-02-08).
      * Uses provided receivedDate or defaults to today.
      *
      * Optional `amount` updates the stored amount at receive time; it is
@@ -399,7 +399,7 @@ export function createIncomeService(db: ReturnType<typeof createDb>) {
       const date = receivedDate ?? format(new Date(), 'yyyy-MM-dd');
 
       // T-02-08: Only set moneyStatus + receivedDate (+ amount when provided) —
-      // never touch profitFirstAllocated
+      // never touch profitMunaAllocated
       const [updated] = await db
         .update(incomes)
         .set({

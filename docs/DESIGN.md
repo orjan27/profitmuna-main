@@ -1,6 +1,6 @@
 ---
 name: Profitmuna
-description: Calm, monochrome Profit First budgeting — the split is the hero.
+description: Calm, monochrome Profit Muna budgeting — the split is the hero.
 ---
 
 <!-- SEED — re-run $impeccable document once there's code to capture the actual tokens and components. -->
@@ -11,7 +11,7 @@ description: Calm, monochrome Profit First budgeting — the split is the hero.
 
 **Creative North Star: "The Calm Envelope"**
 
-Profit First is envelope budgeting without the math. Profitmuna's design system is that promise made visual: a calm, warm-gray surface where money is sorted, labeled, and at rest. The personality is Airbnb-grade hospitality expressed through Linear-grade restraint, with Mercury as proof that money software can feel editorial and calm instead of corporate. The standard posture is a warm dark gray (the Claude.ai dark-surface family) on every page: quiet, low-glare, and easy on the eyes whether the user checks their split at noon or at midnight.
+Profit Muna is envelope budgeting without the math. Profitmuna's design system is that promise made visual: a calm, warm-gray surface where money is sorted, labeled, and at rest. The personality is Airbnb-grade hospitality expressed through Linear-grade restraint, with Mercury as proof that money software can feel editorial and calm instead of corporate. The standard posture is a warm dark gray (the Claude.ai dark-surface family) on every page: quiet, low-glare, and easy on the eyes whether the user checks their split at noon or at midnight.
 
 > **Auth-surface exception (confirmed 2026-06-08).** The public auth entry — login, register, forgot/reset password, email verification — runs in the LIGHT theme as a deliberate marketing-grade exception, the one documented departure from the all-pages dark posture. It is a split-screen: a warm off-white form column beside a peach→cream→sage gradient panel previewing a sample balance. This surface also permits warm brand accents (a coral cross-link, the gradient panel, the multi-color Google glyph) beyond the "color means money" rule, because here design serves the brand register, not the in-app product. Implemented in `apps/web/src/components/AuthShell.tsx`; the `light` class on its root flips the shared shadcn controls to dark-on-light.
 

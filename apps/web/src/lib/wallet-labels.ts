@@ -1,19 +1,19 @@
 // Pure utility — no React imports, no framework coupling (CLAUDE.md: lib/ for framework-agnostic utils)
-import type { ProfitFirstAccountType } from '@/types/wallet';
+import type { ProfitMunaAccountType } from '@/types/wallet';
 
 /**
  * Returns the appropriate label for a withdrawal from a wallet.
  * For PF-linked wallets, maps the account type to a descriptive action name.
  *
- * @param profitFirstAccountId - The wallet's PF link (non-null = PF wallet, null = standalone)
+ * @param profitMunaAccountId - The wallet's PF link (non-null = PF wallet, null = standalone)
  * @param accountType - The linked PF account type (only relevant for PF wallets)
  * @returns Human-readable withdrawal label
  */
 export function withdrawalLabel(
-  profitFirstAccountId: number | null,
-  accountType: ProfitFirstAccountType | null
+  profitMunaAccountId: number | null,
+  accountType: ProfitMunaAccountType | null
 ): string {
-  if (profitFirstAccountId != null) {
+  if (profitMunaAccountId != null) {
     switch (accountType) {
       case 'PROFIT':
         return 'Profit Distribution';
@@ -33,9 +33,9 @@ export function withdrawalLabel(
 /**
  * Returns a human-readable label for the wallet's funding source.
  *
- * @param profitFirstAccountId - The wallet's PF link (non-null = PF wallet, null = standalone)
+ * @param profitMunaAccountId - The wallet's PF link (non-null = PF wallet, null = standalone)
  * @returns Display label string
  */
-export function sourceLabel(profitFirstAccountId: number | null): string {
-  return profitFirstAccountId != null ? 'Profit First' : 'Standalone';
+export function sourceLabel(profitMunaAccountId: number | null): string {
+  return profitMunaAccountId != null ? 'Profit Muna' : 'Standalone';
 }

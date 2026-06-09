@@ -15,17 +15,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { PF_DEFAULT_COLORS } from '@/lib/constants';
-import { createAccountAction, updateAccountAction } from '@/server/profit-first-actions';
-import type { PfAccount } from './pf-overview';
+import { PM_DEFAULT_COLORS } from '@/lib/constants';
+import { createAccountAction, updateAccountAction } from '@/server/profit-muna-actions';
+import type { PmAccount } from './pm-overview';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface PfAccountFormProps {
+interface PmAccountFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Provide an account to edit; omit for create mode */
-  account?: PfAccount;
+  account?: PmAccount;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -37,13 +37,13 @@ interface PfAccountFormProps {
  * - Create: no `account` prop; title "Add Account"
  * - Edit:   `account` prop supplied; title "Edit Account"; fields pre-filled
  *
- * Color selection uses PF_DEFAULT_COLORS as preset swatches only (D-08).
+ * Color selection uses PM_DEFAULT_COLORS as preset swatches only (D-08).
  * No free hex input — API z.enum enforces the preset palette server-side (T-03-11).
  *
  * T-03-06: account name rendered as text content / input value — no
  * dangerouslySetInnerHTML.
  */
-export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProps) {
+export function PmAccountForm({ open, onOpenChange, account }: PmAccountFormProps) {
   const router = useRouter();
   const isEdit = account !== undefined;
 
@@ -51,7 +51,7 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
   const [targetPercent, setTargetPercent] = useState(
     account ? String(account.targetPercentage) : ''
   );
-  const [color, setColor] = useState<string>(account?.color ?? PF_DEFAULT_COLORS[0]);
+  const [color, setColor] = useState<string>(account?.color ?? PM_DEFAULT_COLORS[0]);
   const [submitting, setSubmitting] = useState(false);
 
   // Reset form state when dialog opens for a new context
@@ -61,7 +61,7 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
       setTimeout(() => {
         setName(account?.name ?? '');
         setTargetPercent(account ? String(account.targetPercentage) : '');
-        setColor(account?.color ?? PF_DEFAULT_COLORS[0]);
+        setColor(account?.color ?? PM_DEFAULT_COLORS[0]);
         setSubmitting(false);
       }, 200);
     }
@@ -127,9 +127,9 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* Account Name */}
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="pf-account-name">Jar name</Label>
+            <Label htmlFor="pm-account-name">Jar name</Label>
             <Input
-              id="pf-account-name"
+              id="pm-account-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -142,10 +142,10 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
 
           {/* Target % */}
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="pf-account-percent">Target %</Label>
+            <Label htmlFor="pm-account-percent">Target %</Label>
             <div className="flex items-center gap-1.5">
               <Input
-                id="pf-account-percent"
+                id="pm-account-percent"
                 type="number"
                 min={0}
                 max={100}
@@ -164,7 +164,7 @@ export function PfAccountForm({ open, onOpenChange, account }: PfAccountFormProp
           <div className="flex flex-col gap-1.5">
             <Label>Color</Label>
             <div className="flex gap-1.5 flex-wrap">
-              {PF_DEFAULT_COLORS.map((hex) => (
+              {PM_DEFAULT_COLORS.map((hex) => (
                 <button
                   key={hex}
                   type="button"

@@ -24,8 +24,8 @@ export async function createIncomeAction(formData: FormData): Promise<{ error: s
     incomeDate: formData.get('incomeDate') as string,
     moneyStatus: formData.get('moneyStatus') as 'PENDING' | 'RECEIVED',
     expectedReleaseDate: (formData.get('expectedReleaseDate') as string) || undefined,
-    // Pitfall 5: profitFirstAllocated defaults true; switch sends 'true'/'false' string
-    profitFirstAllocated: formData.get('profitFirstAllocated') === 'true',
+    // Pitfall 5: profitMunaAllocated defaults true; switch sends 'true'/'false' string
+    profitMunaAllocated: formData.get('profitMunaAllocated') === 'true',
   };
 
   try {
@@ -56,7 +56,7 @@ export async function createIncomeAction(formData: FormData): Promise<{ error: s
           categoryId: body.categoryId,
           amount: body.amount,
           description: body.description,
-          profitFirstAllocated: body.profitFirstAllocated,
+          profitMunaAllocated: body.profitMunaAllocated,
           frequency: recurrenceFrequency,
           dayOfWeek: dayField('recurrenceDayOfWeek'),
           dayOfMonth: dayField('recurrenceDayOfMonth'),

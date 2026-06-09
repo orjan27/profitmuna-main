@@ -6,7 +6,7 @@ import { apiFetch } from '@/server/api';
 import { Button } from '@/components/ui/button';
 import { StellaSprite } from '@/components/Stella';
 import { WalletFab } from '@/components/WalletFab';
-import type { WalletListItem, PfAccount } from '@/types/wallet';
+import type { WalletListItem, PmAccount } from '@/types/wallet';
 import { WalletCard } from './_components/WalletCard';
 import { WalletsTotal } from './_components/WalletsTotal';
 
@@ -14,9 +14,9 @@ type WalletListResponse = {
   data: WalletListItem[];
 };
 
-type PfSummaryResponse = {
+type PmSummaryResponse = {
   data: {
-    accounts: PfAccount[];
+    accounts: PmAccount[];
   };
 };
 
@@ -25,27 +25,27 @@ export default async function WalletsPage() {
   if (!session) redirect('/login');
 
   // Fetch wallet list and PF accounts in parallel
-  const [walletsRes, pfSummaryRes] = await Promise.all([
+  const [walletsRes, pmSummaryRes] = await Promise.all([
     apiFetch<WalletListResponse>('/api/wallets').catch(() => ({ data: [] as WalletListItem[] })),
-    apiFetch<PfSummaryResponse>('/api/profit-first/summary').catch(() => ({
-      data: { accounts: [] as PfAccount[] },
+    apiFetch<PmSummaryResponse>('/api/profit-muna/summary').catch(() => ({
+      data: { accounts: [] as PmAccount[] },
     })),
   ]);
 
   const wallets = walletsRes.data ?? [];
-  const pfAccounts = pfSummaryRes.data?.accounts ?? [];
+  const pmAccounts = pmSummaryRes.data?.accounts ?? [];
   const totalBalanceCents = wallets.reduce((sum, w) => sum + w.balanceCents, 0);
 
   // Determine which PF accounts are unlinked (no wallet yet) for the empty-state quick-create
-  const linkedPfAccountIds = new Set(
+  const linkedPmAccountIds = new Set(
     wallets
-      .filter((w) => w.profitFirstAccountId != null)
-      .map((w) => w.profitFirstAccountId as number)
+      .filter((w) => w.profitMunaAccountId != null)
+      .map((w) => w.profitMunaAccountId as number)
   );
-  const unlinkedPfAccounts = pfAccounts.filter((a) => !linkedPfAccountIds.has(a.id));
+  const unlinkedPmAccounts = pmAccounts.filter((a) => !linkedPmAccountIds.has(a.id));
 
   // Card footers show the linked account's name and allocation percentage
-  const pfAccountById = new Map(pfAccounts.map((a) => [a.id, a]));
+  const pmAccountById = new Map(pmAccounts.map((a) => [a.id, a]));
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-7">
@@ -77,9 +77,9 @@ export default async function WalletsPage() {
             <WalletCard
               key={wallet.id}
               wallet={wallet}
-              pfAccount={
-                wallet.profitFirstAccountId != null
-                  ? (pfAccountById.get(wallet.profitFirstAccountId) ?? null)
+              pmAccount={
+                wallet.profitMunaAccountId != null
+                  ? (pmAccountById.get(wallet.profitMunaAccountId) ?? null)
                   : null
               }
             />
@@ -94,15 +94,15 @@ export default async function WalletsPage() {
             Track where your money actually sits by creating a wallet for each allocation account.
           </p>
 
-          {unlinkedPfAccounts.length > 0 && (
+          {unlinkedPmAccounts.length > 0 && (
             <div className="mt-8">
               <p className="text-xs font-medium tracking-[0.12em] text-ink-faint uppercase">
                 Quick-create from your buckets
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
-                {unlinkedPfAccounts.map((account) => (
+                {unlinkedPmAccounts.map((account) => (
                   <Button key={account.id} variant="outline" size="sm" asChild>
-                    <Link href={`/wallets/new?pfAccountId=${account.id}`}>+ {account.name}</Link>
+                    <Link href={`/wallets/new?pmAccountId=${account.id}`}>+ {account.name}</Link>
                   </Button>
                 ))}
               </div>

@@ -203,7 +203,7 @@ function EditRecurringIncomeDialog({
   const [amount, setAmount] = useState(
     template.amount !== null ? (template.amount / 100).toFixed(2) : ''
   );
-  const [pfAllocated, setPfAllocated] = useState(template.profitFirstAllocated);
+  const [pmAllocated, setPmAllocated] = useState(template.profitMunaAllocated);
   const [recurrence, setRecurrence] = useState<RecurrenceValue>({
     frequency: template.frequency,
     dayOfWeek: template.dayOfWeek,
@@ -229,7 +229,7 @@ function EditRecurringIncomeDialog({
         categoryId: Number(categoryId),
         amountPesos: amount === '' ? undefined : parsedAmount,
         description: template.description,
-        profitFirstAllocated: pfAllocated,
+        profitMunaAllocated: pmAllocated,
         frequency,
         dayOfWeek: recurrence.dayOfWeek,
         dayOfMonth: recurrence.dayOfMonth,
@@ -294,15 +294,15 @@ function EditRecurringIncomeDialog({
 
           <div className="flex items-center justify-between gap-4">
             <div>
-              <Label htmlFor="recurring-income-pf">Include in Profit First</Label>
+              <Label htmlFor="recurring-income-pf">Include in Profit Muna</Label>
               <p className="mt-0.5 text-xs text-ink-faint">
                 When off, generated incomes won&apos;t be split across your buckets.
               </p>
             </div>
             <Switch
               id="recurring-income-pf"
-              checked={pfAllocated}
-              onCheckedChange={setPfAllocated}
+              checked={pmAllocated}
+              onCheckedChange={setPmAllocated}
             />
           </div>
         </div>

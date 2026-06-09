@@ -7,16 +7,17 @@ import {
   wallets,
   walletIncomeCategoryMappings,
   walletTransactions,
-  profitFirstAccounts,
+  profitMunaAccounts,
+  recurringIncomes,
 } from '@app/db/schema';
 
 import {
-  createProfitFirstService,
+  createProfitMunaService,
   type DateRange,
   type AccountSummaryItem,
-} from '@/services/profit-first-service';
+} from '@/services/profit-muna-service';
 import { createWalletService } from '@/services/wallet-service';
-import { getManilaParts } from '@/lib/manila-time';
+import { getManilaParts, nextOccurrence, type ManilaParts } from '@/lib/manila-time';
 
 import type { AnyColumn } from 'drizzle-orm';
 
@@ -75,7 +76,7 @@ export type DashboardSummary = {
   profitWalletBalanceCents: number | null;
   /** Total received + allocated income in cents (PF summary passthrough) */
   totalIncome: number;
-  profitFirstAccounts: AccountSummaryItem[];
+  profitMunaAccounts: AccountSummaryItem[];
   recentTransactions: RecentTransaction[];
   feedPagination: FeedPagination;
   /** Earliest PENDING income due today or later (Manila) — null when none */
@@ -86,22 +87,22 @@ export type DashboardSummary = {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-/** Balance formula (locked, same as wallet-service): pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals */
+/** Balance formula (locked, same as wallet-service): pmAllocation + mappedIncome - mappedExpenses + deposits - withdrawals */
 function computeBalanceCents({
-  pfAllocation,
+  pmAllocation,
   mappedIncome,
   mappedExpenses,
   deposits,
   withdrawals,
 }: {
-  pfAllocation: number;
+  pmAllocation: number;
   mappedIncome: number;
   mappedExpenses: number;
   deposits: number;
   withdrawals: number;
 }): number {
   // Never clamp — negative balances are valid (D-13)
-  return pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals;
+  return pmAllocation + mappedIncome - mappedExpenses + deposits - withdrawals;
 }
 
 /**
@@ -192,7 +193,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
    *
    * Reimplements the wallet-service balance assembly with every input filtered
    * to the date range — deliberately NOT the wallet service's list(), which is
-   * all-time (Pitfall 1). pfAllocation uses targetPercentage in BASIS POINTS.
+   * all-time (Pitfall 1). pmAllocation uses targetPercentage in BASIS POINTS.
    */
   async function getPeriodScopedWalletBalance(
     userId: number,
@@ -200,7 +201,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
   ): Promise<number> {
     const [
       walletRows,
-      pfAccountRows,
+      pmAccountRows,
       incomeMappings,
       totalReceivedIncomeRows,
       incomeByCategoryRows,
@@ -211,7 +212,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
         .select()
         .from(wallets)
         .where(and(eq(wallets.userId, userId), isNull(wallets.deletedAt))),
-      db.select().from(profitFirstAccounts).where(eq(profitFirstAccounts.userId, userId)),
+      db.select().from(profitMunaAccounts).where(eq(profitMunaAccounts.userId, userId)),
       db
         .select({
           walletId: walletIncomeCategoryMappings.walletId,
@@ -227,7 +228,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
           and(
             eq(incomes.userId, userId),
             eq(incomes.moneyStatus, 'RECEIVED'),
-            eq(incomes.profitFirstAllocated, true),
+            eq(incomes.profitMunaAllocated, true),
             ...dateConditions(incomes.incomeDate, dateRange)
           )
         ),
@@ -281,7 +282,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
     ]);
 
     const totalReceivedIncome = Number(totalReceivedIncomeRows[0]?.total ?? 0);
-    const pfAccountMap = new Map(pfAccountRows.map((a) => [a.id, a]));
+    const pmAccountMap = new Map(pmAccountRows.map((a) => [a.id, a]));
 
     const incomeByCategory = new Map(
       incomeByCategoryRows.map((r) => [r.categoryId, Number(r.total ?? 0)])
@@ -318,12 +319,12 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
       };
       const tx = txByWallet.get(wallet.id) ?? { deposits: 0, withdrawals: 0 };
 
-      let pfAllocation = 0;
-      if (wallet.profitFirstAccountId != null) {
-        const pfAccount = pfAccountMap.get(wallet.profitFirstAccountId);
-        if (pfAccount) {
+      let pmAllocation = 0;
+      if (wallet.profitMunaAccountId != null) {
+        const pmAccount = pmAccountMap.get(wallet.profitMunaAccountId);
+        if (pmAccount) {
           // targetPercentage is BASIS POINTS here (raw table value)
-          pfAllocation = Math.round((totalReceivedIncome * pfAccount.targetPercentage) / 10000);
+          pmAllocation = Math.round((totalReceivedIncome * pmAccount.targetPercentage) / 10000);
         }
       }
 
@@ -337,7 +338,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
       return (
         sum +
         computeBalanceCents({
-          pfAllocation,
+          pmAllocation,
           mappedIncome,
           mappedExpenses,
           deposits: tx.deposits,
@@ -359,17 +360,17 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
     const [walletList, profitAccountRows] = await Promise.all([
       createWalletService(db).list(userId),
       db
-        .select({ id: profitFirstAccounts.id })
-        .from(profitFirstAccounts)
+        .select({ id: profitMunaAccounts.id })
+        .from(profitMunaAccounts)
         .where(
-          and(eq(profitFirstAccounts.userId, userId), eq(profitFirstAccounts.accountType, 'PROFIT'))
+          and(eq(profitMunaAccounts.userId, userId), eq(profitMunaAccounts.accountType, 'PROFIT'))
         ),
     ]);
 
     const profitAccountId = profitAccountRows[0]?.id;
     if (profitAccountId == null) return null;
 
-    const profitWallet = walletList.find((w) => w.profitFirstAccountId === profitAccountId);
+    const profitWallet = walletList.find((w) => w.profitMunaAccountId === profitAccountId);
     return profitWallet ? profitWallet.balanceCents : null;
   }
 
@@ -486,15 +487,22 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
   }
 
   /**
-   * Earliest PENDING income with an expected release date today or later
-   * (Manila). Deliberately NOT period-filtered — "payday" is about the
-   * future regardless of the selected overview range.
+   * The next upcoming "payday" today or later (Manila), whichever comes first
+   * between a dated PENDING income row and the next occurrence of an active
+   * recurring income template. Recurring templates only materialize an income
+   * row when the cron fires on their due day, so a future Salary would be
+   * invisible to the pending-row query alone — we project it here.
+   *
+   * Deliberately NOT period-filtered — "payday" is about the future regardless
+   * of the selected overview range.
    */
   async function getNextPendingIncome(
     userId: number,
-    todayStr: string
+    parts: ManilaParts
   ): Promise<NextPendingIncome | null> {
-    const rows = await db
+    const todayStr = parts.dateStr;
+
+    const pendingRows = await db
       .select({
         expectedReleaseDate: incomes.expectedReleaseDate,
         amountCents: incomes.amount,
@@ -512,13 +520,52 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
       .orderBy(asc(incomes.expectedReleaseDate), asc(incomes.id))
       .limit(1);
 
-    const row = rows[0];
-    if (!row?.expectedReleaseDate) return null;
-    return {
-      expectedReleaseDate: row.expectedReleaseDate,
-      amountCents: row.amountCents,
-      categoryName: row.categoryName,
-    };
+    const pendingRow = pendingRows[0];
+    const candidates: NextPendingIncome[] = [];
+    if (pendingRow?.expectedReleaseDate) {
+      candidates.push({
+        expectedReleaseDate: pendingRow.expectedReleaseDate,
+        amountCents: pendingRow.amountCents,
+        categoryName: pendingRow.categoryName,
+      });
+    }
+
+    // Project the next occurrence of each active recurring income template.
+    const templates = await db
+      .select({
+        categoryName: recurringIncomes.categoryName,
+        amount: recurringIncomes.amount,
+        frequency: recurringIncomes.frequency,
+        dayOfWeek: recurringIncomes.dayOfWeek,
+        dayOfMonth: recurringIncomes.dayOfMonth,
+        dayOfMonth2: recurringIncomes.dayOfMonth2,
+      })
+      .from(recurringIncomes)
+      .where(and(eq(recurringIncomes.userId, userId), eq(recurringIncomes.active, true)));
+
+    for (const t of templates) {
+      const date = nextOccurrence(
+        {
+          frequency: t.frequency,
+          dayOfWeek: t.dayOfWeek,
+          dayOfMonth: t.dayOfMonth,
+          dayOfMonth2: t.dayOfMonth2,
+        },
+        parts
+      );
+      if (!date) continue;
+      candidates.push({
+        expectedReleaseDate: date,
+        amountCents: t.amount ?? 0,
+        categoryName: t.categoryName,
+      });
+    }
+
+    if (candidates.length === 0) return null;
+    // Earliest date wins; YYYY-MM-DD sorts lexically.
+    return candidates.reduce((earliest, c) =>
+      c.expectedReleaseDate < earliest.expectedReleaseDate ? c : earliest
+    );
   }
 
   return {
@@ -546,7 +593,7 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
       const [
         incomeTotals,
         expenseTotal,
-        pfSummary,
+        pmSummary,
         walletBalance,
         profitWalletBalance,
         feed,
@@ -555,11 +602,11 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
       ] = await Promise.all([
         getIncomeTotals(userId, dateRange),
         getExpenseTotal(userId, dateRange),
-        createProfitFirstService(db).getSummary(userId, dateRange),
+        createProfitMunaService(db).getSummary(userId, dateRange),
         getPeriodScopedWalletBalance(userId, dateRange),
         getProfitWalletBalance(userId),
         getRecentTransactions(userId, dateRange, feedPage, feedSize),
-        getNextPendingIncome(userId, getManilaParts(now).dateStr),
+        getNextPendingIncome(userId, getManilaParts(now)),
         prevRange
           ? getPeriodScopedWalletBalance(userId, { from: prevRange.prevFrom, to: prevRange.prevTo })
           : Promise.resolve(null),
@@ -572,8 +619,8 @@ export function createDashboardService(db: ReturnType<typeof createDb>) {
         netIncomeCents: incomeTotals.received - expenseTotal,
         totalWalletBalanceCents: walletBalance,
         profitWalletBalanceCents: profitWalletBalance,
-        totalIncome: pfSummary.totalIncome,
-        profitFirstAccounts: pfSummary.accounts,
+        totalIncome: pmSummary.totalIncome,
+        profitMunaAccounts: pmSummary.accounts,
         recentTransactions: feed.transactions,
         feedPagination: feed.pagination,
         nextPendingIncome,

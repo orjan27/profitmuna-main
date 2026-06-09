@@ -19,7 +19,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'Profitmuna',
   description:
-    'Profit First budgeting, applied automatically. Record income and it splits across your buckets the moment it lands.',
+    'Profit Muna budgeting, applied automatically. Record income and it splits across your buckets the moment it lands.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

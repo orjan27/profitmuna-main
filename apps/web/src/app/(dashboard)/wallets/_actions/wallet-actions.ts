@@ -94,8 +94,8 @@ export async function createTransactionAction(
 }
 
 /**
- * Adds money to a PF allocation wallet as a real income record with Profit First
- * OFF (profitFirstAllocated=false) and linked directly to the wallet (walletId).
+ * Adds money to a PF allocation wallet as a real income record with Profit Muna
+ * OFF (profitMunaAllocated=false) and linked directly to the wallet (walletId).
  * The amount credits this wallet only and is never split across allocations.
  * Caller converts pesos → cents via toCents before passing input.amount.
  */
@@ -112,7 +112,7 @@ export async function createWalletIncomeAction(
         incomeDate: input.incomeDate,
         description: input.description,
         moneyStatus: 'RECEIVED',
-        profitFirstAllocated: false,
+        profitMunaAllocated: false,
         walletId,
       }),
     });

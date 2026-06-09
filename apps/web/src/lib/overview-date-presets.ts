@@ -88,12 +88,12 @@ export const CUSTOM_LABEL = 'Custom';
 export type PresetLabel = (typeof DATE_PRESETS)[number]['label'] | typeof CUSTOM_LABEL;
 
 /** Default overview period: This Month in Asia/Manila (D-08). Still the default
- * for the dashboard ledgers (income, expenses, profit-first). */
+ * for the dashboard ledgers (income, expenses, profit-muna). */
 export function getDefaultOverviewRange(): { from: string; to: string } {
   return DATE_PRESETS[0].getRange();
 }
 
-/** Overview hero default: Quarter to Date — the Profit First distribution
+/** Overview hero default: Quarter to Date — the Profit Muna distribution
  * window, so "ready to distribute this quarter" reads true out of the box. */
 export function getDefaultOverviewHeroRange(): { from: string; to: string } {
   return quarterToDateRange();

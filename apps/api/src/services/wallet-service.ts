@@ -7,7 +7,7 @@ import {
   walletIncomeCategoryMappings,
   walletTransactions,
   incomeCategories,
-  profitFirstAccounts,
+  profitMunaAccounts,
   incomes,
   expenses,
 } from '@app/db/schema';
@@ -31,12 +31,12 @@ const DEFAULT_WALLET = {
   isDefault: true,
   color: '#10b981',
   sortOrder: 0,
-  profitFirstAccountId: null,
+  profitMunaAccountId: null,
 } as const;
 
 /**
  * Seeds the undeletable "Default" wallet for a newly created user.
- * Mirrors seedProfitFirstAccounts; call after it in register + Google new-user branch.
+ * Mirrors seedProfitMunaAccounts; call after it in register + Google new-user branch.
  */
 export async function seedDefaultWallet(
   db: ReturnType<typeof createDb>,
@@ -46,18 +46,18 @@ export async function seedDefaultWallet(
 }
 
 /**
- * Balance formula: pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals + directIncome
+ * Balance formula: pmAllocation + mappedIncome - mappedExpenses + deposits - withdrawals + directIncome
  * directIncome = RECEIVED income added straight to this wallet (incomes.walletId set, PF off).
  */
 function computeBalanceCents({
-  pfAllocation,
+  pmAllocation,
   mappedIncome,
   mappedExpenses,
   deposits,
   withdrawals,
   directIncome,
 }: {
-  pfAllocation: number;
+  pmAllocation: number;
   mappedIncome: number;
   mappedExpenses: number;
   deposits: number;
@@ -65,7 +65,7 @@ function computeBalanceCents({
   directIncome: number;
 }): number {
   // Never clamp — D-13 negative balances are valid
-  return pfAllocation + mappedIncome - mappedExpenses + deposits - withdrawals + directIncome;
+  return pmAllocation + mappedIncome - mappedExpenses + deposits - withdrawals + directIncome;
 }
 
 /**
@@ -79,10 +79,10 @@ function assertCanInsertTransaction(
   mappings: { incomeCategories: number[] }
 ): void {
   const incomeAuto = mappings.incomeCategories.length > 0;
-  const hasPf = !!wallet.profitFirstAccountId;
+  const hasPm = !!wallet.profitMunaAccountId;
 
   if (type === 'DEPOSIT') {
-    if (hasPf) throw new HTTPException(400, { message: 'manual_deposit_blocked_pf_wallet' });
+    if (hasPm) throw new HTTPException(400, { message: 'manual_deposit_blocked_pf_wallet' });
     if (incomeAuto)
       throw new HTTPException(400, { message: 'manual_deposit_blocked_income_mapped' });
   }
@@ -93,17 +93,17 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
    * Checks whether the user already has a wallet linked to the given PF account.
    * Used for conflict-detection in create().
    */
-  async function hasWalletForPfAccount(userId: number, pfAccountId: number): Promise<boolean> {
+  async function hasWalletForPmAccount(userId: number, pmAccountId: number): Promise<boolean> {
     const rows = await db
       .select({ id: wallets.id })
       .from(wallets)
-      .where(and(eq(wallets.userId, userId), eq(wallets.profitFirstAccountId, pfAccountId)));
+      .where(and(eq(wallets.userId, userId), eq(wallets.profitMunaAccountId, pmAccountId)));
     return rows.length > 0;
   }
 
   /**
    * Returns the total received income in cents for the user.
-   * Only RECEIVED incomes with profitFirstAllocated=true are included.
+   * Only RECEIVED incomes with profitMunaAllocated=true are included.
    */
   async function getTotalReceivedIncomeCents(userId: number): Promise<number> {
     const rows = await db
@@ -113,7 +113,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         and(
           eq(incomes.userId, userId),
           eq(incomes.moneyStatus, 'RECEIVED'),
-          eq(incomes.profitFirstAllocated, true)
+          eq(incomes.profitMunaAllocated, true)
         )
       );
     return Number(rows[0]?.total ?? 0);
@@ -291,11 +291,11 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
   async function setIncomeCategoryMappings(
     walletId: number,
     userId: number,
-    profitFirstAccountId: number | null,
+    profitMunaAccountId: number | null,
     ids: number[]
   ): Promise<void> {
     // D-08: PF-linked wallets skip income-category mapping
-    if (profitFirstAccountId != null) return;
+    if (profitMunaAccountId != null) return;
     if (ids.length === 0) {
       // Just clear existing mappings
       await db
@@ -374,7 +374,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         incomeByCategory,
         expenseByWallet,
         directIncomeByWallet,
-        pfAccountRows,
+        pmAccountRows,
       ] = await Promise.all([
         db
           .select()
@@ -387,10 +387,10 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         getReceivedIncomeByCategoryCents(userId),
         getExpensesByWalletCents(userId),
         getDirectIncomeByWalletCents(userId),
-        db.select().from(profitFirstAccounts).where(eq(profitFirstAccounts.userId, userId)),
+        db.select().from(profitMunaAccounts).where(eq(profitMunaAccounts.userId, userId)),
       ]);
 
-      const pfAccountMap = new Map(pfAccountRows.map((a) => [a.id, a]));
+      const pmAccountMap = new Map(pmAccountRows.map((a) => [a.id, a]));
 
       return walletRows.map((wallet) => {
         const mappings = mappingsByWallet.get(wallet.id) ?? {
@@ -402,12 +402,12 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           activeCount: 0,
         };
 
-        // pfAllocation: only for PF-linked wallets
-        let pfAllocation = 0;
-        if (wallet.profitFirstAccountId != null) {
-          const pfAccount = pfAccountMap.get(wallet.profitFirstAccountId);
-          if (pfAccount) {
-            pfAllocation = Math.round((totalReceivedIncome * pfAccount.targetPercentage) / 10000);
+        // pmAllocation: only for PF-linked wallets
+        let pmAllocation = 0;
+        if (wallet.profitMunaAccountId != null) {
+          const pmAccount = pmAccountMap.get(wallet.profitMunaAccountId);
+          if (pmAccount) {
+            pmAllocation = Math.round((totalReceivedIncome * pmAccount.targetPercentage) / 10000);
           }
         }
 
@@ -424,7 +424,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         const directIncome = directIncomeByWallet.get(wallet.id) ?? 0;
 
         const balanceCents = computeBalanceCents({
-          pfAllocation,
+          pmAllocation,
           mappedIncome,
           mappedExpenses,
           deposits: txImpact.deposits,
@@ -445,7 +445,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       });
     },
 
-    hasWalletForPfAccount,
+    hasWalletForPmAccount,
 
     /**
      * Creates a new wallet for the user. Validates PF link uniqueness.
@@ -453,8 +453,8 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
      */
     async create(userId: number, input: CreateWalletInput) {
       // Validate PF link uniqueness (WAL-01)
-      if (input.profitFirstAccountId != null) {
-        const alreadyLinked = await hasWalletForPfAccount(userId, input.profitFirstAccountId);
+      if (input.profitMunaAccountId != null) {
+        const alreadyLinked = await hasWalletForPmAccount(userId, input.profitMunaAccountId);
         if (alreadyLinked) {
           throw new HTTPException(409, { message: 'wallet_pf_account_already_linked' });
         }
@@ -475,7 +475,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         .values({
           userId,
           name: input.name,
-          profitFirstAccountId: input.profitFirstAccountId ?? null,
+          profitMunaAccountId: input.profitMunaAccountId ?? null,
           color: input.color ?? '#10b981',
           sortOrder,
         })
@@ -486,7 +486,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         await setIncomeCategoryMappings(
           created.id,
           userId,
-          created.profitFirstAccountId,
+          created.profitMunaAccountId,
           input.incomeCategoryIds
         );
       }
@@ -528,7 +528,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
         await setIncomeCategoryMappings(
           walletId,
           userId,
-          wallet.profitFirstAccountId,
+          wallet.profitMunaAccountId,
           input.incomeCategoryIds
         );
       }
@@ -542,7 +542,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
 
     /**
      * Soft-deletes a wallet (sets deletedAt). The Default wallet cannot be deleted (409).
-     * On delete: hard-deletes its income-category mappings and nulls profitFirstAccountId so
+     * On delete: hard-deletes its income-category mappings and nulls profitMunaAccountId so
      * both can re-link to other wallets. Past expenses keep pointing at this wallet (denormalized
      * wallet_name renders without a join). Returns impact counts from before the delete (D-16).
      */
@@ -587,7 +587,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       // Soft-delete the wallet and free its PF link
       await db
         .update(wallets)
-        .set({ deletedAt: new Date().toISOString(), profitFirstAccountId: null })
+        .set({ deletedAt: new Date().toISOString(), profitMunaAccountId: null })
         .where(and(eq(wallets.id, walletId), eq(wallets.userId, userId)));
 
       return { id: walletId, transactionCount, mappingCount };
@@ -627,22 +627,22 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
       // ── Breakdown (balance components) ────────────────────────────────────
       // These queries EXCLUDE soft-deleted transactions (Pitfall 4)
 
-      // pfAllocation: only for PF-linked wallets
-      let pfAllocationCents = 0;
-      if (wallet.profitFirstAccountId != null) {
-        const pfRows = await db
+      // pmAllocation: only for PF-linked wallets
+      let pmAllocationCents = 0;
+      if (wallet.profitMunaAccountId != null) {
+        const pmRows = await db
           .select()
-          .from(profitFirstAccounts)
+          .from(profitMunaAccounts)
           .where(
             and(
-              eq(profitFirstAccounts.id, wallet.profitFirstAccountId),
-              eq(profitFirstAccounts.userId, userId)
+              eq(profitMunaAccounts.id, wallet.profitMunaAccountId),
+              eq(profitMunaAccounts.userId, userId)
             )
           );
-        const pfAccount = pfRows[0];
-        if (pfAccount) {
+        const pmAccount = pmRows[0];
+        if (pmAccount) {
           const totalReceived = await getTotalReceivedIncomeCents(userId);
-          pfAllocationCents = Math.round((totalReceived * pfAccount.targetPercentage) / 10000);
+          pmAllocationCents = Math.round((totalReceived * pmAccount.targetPercentage) / 10000);
         }
       }
 
@@ -931,7 +931,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
 
       // Rebuild balanceCents using the same formula as list()
       const balanceCents = computeBalanceCents({
-        pfAllocation: pfAllocationCents,
+        pmAllocation: pmAllocationCents,
         mappedIncome: mappedIncomeCents,
         mappedExpenses: mappedExpensesCents,
         deposits: depositsCents,
@@ -949,7 +949,7 @@ export function createWalletService(db: ReturnType<typeof createDb>) {
           incomeCategoryIds: incomeCatIds,
         },
         breakdown: {
-          pfAllocationCents,
+          pmAllocationCents,
           mappedIncomeCents,
           mappedExpensesCents,
           depositsCents,

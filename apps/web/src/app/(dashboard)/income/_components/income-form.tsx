@@ -53,7 +53,7 @@ function todayLocal(): string {
 /**
  * Reusable income form used on /income/new and inside the edit dialog.
  * Amount field shows decimal pesos; the server action converts to cents (Pitfall 2).
- * profitFirstAllocated Switch initialized to true (Pitfall 5).
+ * profitMunaAllocated Switch initialized to true (Pitfall 5).
  */
 export function IncomeForm({
   categories,
@@ -64,8 +64,8 @@ export function IncomeForm({
   variant = 'page',
 }: IncomeFormProps) {
   const [isPending, startTransition] = useTransition();
-  // Pitfall 5: profitFirstAllocated defaults to true
-  const [pfAllocated, setPfAllocated] = useState(initialValues?.profitFirstAllocated ?? true);
+  // Pitfall 5: profitMunaAllocated defaults to true
+  const [pmAllocated, setPmAllocated] = useState(initialValues?.profitMunaAllocated ?? true);
   // Controlled so RecurrenceFields can seed day defaults from the entry date
   const [incomeDate, setIncomeDate] = useState(initialValues?.incomeDate ?? todayLocal());
   // Recurrence is create-time only — editing a past entry never creates a template
@@ -117,8 +117,8 @@ export function IncomeForm({
     }
     const form = e.currentTarget;
     const formData = new FormData(form);
-    // Inject pfAllocated as string — action checks === 'true'
-    formData.set('profitFirstAllocated', String(pfAllocated));
+    // Inject pmAllocated as string — action checks === 'true'
+    formData.set('profitMunaAllocated', String(pmAllocated));
     // Inject recurrence as hidden fields — the create action reads these
     if (!isEditing && recurrence.frequency !== 'NONE') {
       formData.set('recurrenceFrequency', recurrence.frequency);
@@ -289,20 +289,20 @@ export function IncomeForm({
         />
       ) : null}
 
-      {/* Profit First Allocated switch — Pitfall 5: default true */}
+      {/* Profit Muna Allocated switch — Pitfall 5: default true */}
       <div className="flex items-center justify-between rounded-lg border p-4">
         <div className="space-y-0.5">
-          <Label htmlFor="income-profitFirstAllocated" className="text-base">
-            Include in Profit First
+          <Label htmlFor="income-profitMunaAllocated" className="text-base">
+            Include in Profit Muna
           </Label>
           <p className="text-sm text-muted-foreground">
-            When off, this income won&apos;t be split across Profit First allocations.
+            When off, this income won&apos;t be split across Profit Muna allocations.
           </p>
         </div>
         <Switch
-          id="income-profitFirstAllocated"
-          checked={pfAllocated}
-          onCheckedChange={setPfAllocated}
+          id="income-profitMunaAllocated"
+          checked={pmAllocated}
+          onCheckedChange={setPmAllocated}
         />
       </div>
 

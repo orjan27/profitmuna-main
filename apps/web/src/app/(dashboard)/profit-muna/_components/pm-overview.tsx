@@ -22,13 +22,13 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { MaskedAmount } from '@/components/amount-visibility';
-import { deleteAccountAction } from '@/server/profit-first-actions';
-import { PfAccountForm } from './pf-account-form';
+import { deleteAccountAction } from '@/server/profit-muna-actions';
+import { PmAccountForm } from './pm-account-form';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-/** Shape returned by GET /api/profit-first/summary accounts array */
-export interface PfAccount {
+/** Shape returned by GET /api/profit-muna/summary accounts array */
+export interface PmAccount {
   id: number;
   name: string;
   /** Whole-number percent (e.g. 5 = 5%) — API returns bp/100 */
@@ -40,8 +40,8 @@ export interface PfAccount {
   computedBalance: number;
 }
 
-interface PfOverviewProps {
-  accounts: PfAccount[];
+interface PmOverviewProps {
+  accounts: PmAccount[];
   visible: boolean;
   mounted: boolean;
 }
@@ -57,7 +57,7 @@ interface PfOverviewProps {
  * T-03-06: account.name is always rendered as text content (never
  * dangerouslySetInnerHTML) to prevent stored XSS.
  */
-export function PfOverview({ accounts, visible, mounted }: PfOverviewProps) {
+export function PmOverview({ accounts, visible, mounted }: PmOverviewProps) {
   if (accounts.length === 0) {
     return (
       <div className="rounded-3xl bg-card py-16 text-center">
@@ -93,7 +93,7 @@ const GLASS_TOP = 8;
 const GLASS_BOTTOM = 48;
 
 interface JarCardProps {
-  account: PfAccount;
+  account: PmAccount;
   visible: boolean;
   mounted: boolean;
 }
@@ -249,7 +249,7 @@ function JarCard({ account, visible, mounted }: JarCardProps) {
       </div>
 
       {/* Edit dialog */}
-      <PfAccountForm open={editOpen} onOpenChange={setEditOpen} account={account} />
+      <PmAccountForm open={editOpen} onOpenChange={setEditOpen} account={account} />
 
       {/* Delete confirmation dialog (CUSTOM jars only) */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

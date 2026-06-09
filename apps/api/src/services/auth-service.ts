@@ -9,7 +9,7 @@ import {
   loginAttempts,
 } from '@app/db/schema';
 
-import { seedProfitFirstAccounts } from '@/services/profit-first-service';
+import { seedProfitMunaAccounts } from '@/services/profit-muna-service';
 import { seedDefaultWallet } from '@/services/wallet-service';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { generateSecureToken, sha256Hash } from '@/lib/token';
@@ -162,7 +162,7 @@ export async function register(
     .returning();
   const user = inserted[0];
 
-  await seedProfitFirstAccounts(db, user.id);
+  await seedProfitMunaAccounts(db, user.id);
   await seedDefaultWallet(db, user.id);
 
   const verifyUrl = await issueVerifyToken(db, user.id, appBaseUrl);
@@ -617,8 +617,8 @@ export async function upsertGoogleUser(
       verifiedAt: new Date().toISOString(),
     })
     .returning();
-  // Seed Profit First defaults for new Google users only (Pitfall 4 — branches 1/2 are returning users)
-  await seedProfitFirstAccounts(db, inserted[0].id);
+  // Seed Profit Muna defaults for new Google users only (Pitfall 4 — branches 1/2 are returning users)
+  await seedProfitMunaAccounts(db, inserted[0].id);
   await seedDefaultWallet(db, inserted[0].id);
   return inserted[0].id;
 }

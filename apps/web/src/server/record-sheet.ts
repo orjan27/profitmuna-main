@@ -82,7 +82,7 @@ export async function getRecordSheetData(): Promise<RecordSheetData> {
   const [incomeCategoriesRes, expenseCategoriesRes, summaryRes, walletsRes] = await Promise.all([
     apiFetch<{ data: IncomeCategory[] }>('/api/income-categories'),
     apiFetch<{ data: ExpenseCategoryOption[] }>('/api/expense-categories'),
-    apiFetch<SummaryResponse>('/api/profit-first/summary'),
+    apiFetch<SummaryResponse>('/api/profit-muna/summary'),
     apiFetch<WalletsResponse>('/api/wallets'),
   ]);
 
@@ -109,7 +109,7 @@ function revalidateMoneySurfaces(): void {
   revalidatePath('/overview');
   revalidatePath('/income');
   revalidatePath('/expenses');
-  revalidatePath('/profit-first');
+  revalidatePath('/profit-muna');
   revalidatePath('/wallets');
 }
 
@@ -130,7 +130,7 @@ export async function recordIncomeFromSheet(input: {
   incomeDate: string;
   description?: string;
   expectedReleaseDate?: string;
-  profitFirstAllocated: boolean;
+  profitMunaAllocated: boolean;
   recurrence?: RecurrenceInput;
 }): Promise<ActionResult> {
   if (!Number.isFinite(input.amountPesos) || input.amountPesos <= 0) {
@@ -150,7 +150,7 @@ export async function recordIncomeFromSheet(input: {
         incomeDate: input.incomeDate,
         moneyStatus: input.moneyStatus,
         expectedReleaseDate: input.expectedReleaseDate || undefined,
-        profitFirstAllocated: input.profitFirstAllocated,
+        profitMunaAllocated: input.profitMunaAllocated,
       }),
     });
   } catch (err) {
@@ -166,7 +166,7 @@ export async function recordIncomeFromSheet(input: {
           categoryId: input.categoryId,
           amount: toCents(input.amountPesos),
           description: input.description || undefined,
-          profitFirstAllocated: input.profitFirstAllocated,
+          profitMunaAllocated: input.profitMunaAllocated,
           frequency: input.recurrence.frequency,
           dayOfWeek: input.recurrence.dayOfWeek ?? null,
           dayOfMonth: input.recurrence.dayOfMonth ?? null,

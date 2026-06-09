@@ -67,7 +67,7 @@ export function EditWalletDialog({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
-  const isPfWallet = wallet.profitFirstAccountId != null;
+  const isPmWallet = wallet.profitMunaAccountId != null;
 
   // Form state — prefilled from the wallet's current values
   const [name, setName] = useState(wallet.name);
@@ -107,7 +107,7 @@ export function EditWalletDialog({
         name: name.trim(),
         color,
         // D-08: PF wallets never touch income mappings
-        incomeCategoryIds: isPfWallet ? undefined : selectedIncomeCategoryIds,
+        incomeCategoryIds: isPmWallet ? undefined : selectedIncomeCategoryIds,
       });
 
       if (result?.error) {
@@ -171,7 +171,7 @@ export function EditWalletDialog({
           <Separator />
 
           {/* Income Categories — hidden for PF-linked wallets (D-08) */}
-          {!isPfWallet && (
+          {!isPmWallet && (
             <div className="space-y-2">
               <div>
                 <p className="text-sm font-medium">Income Categories</p>

@@ -6,7 +6,7 @@ import type {
   WalletDetailResponse,
   WalletListItem,
   IncomeCategory,
-  PfAccount,
+  PmAccount,
 } from '@/types/wallet';
 
 import { WalletDetail } from './_components/WalletDetail';
@@ -27,7 +27,7 @@ export default async function WalletDetailPage({
   // Detail plus the supporting data the page needs, fetched in parallel:
   // income categories + sibling wallets for the edit dialog (D-06 disabled
   // states), PF summary for the hero card's allocation footer
-  const [detail, incomeCategoriesRes, walletsRes, pfSummaryRes] = await Promise.all([
+  const [detail, incomeCategoriesRes, walletsRes, pmSummaryRes] = await Promise.all([
     apiFetch<{ data: WalletDetailResponse }>(`/api/wallets/${walletId}?page=${page}&size=20`),
     apiFetch<{ data: IncomeCategory[] }>('/api/income-categories').catch(() => ({
       data: [] as IncomeCategory[],
@@ -35,8 +35,8 @@ export default async function WalletDetailPage({
     apiFetch<{ data: WalletListItem[] }>('/api/wallets').catch(() => ({
       data: [] as WalletListItem[],
     })),
-    apiFetch<{ data: { accounts: PfAccount[] } }>('/api/profit-first/summary').catch(() => ({
-      data: { accounts: [] as PfAccount[] },
+    apiFetch<{ data: { accounts: PmAccount[] } }>('/api/profit-muna/summary').catch(() => ({
+      data: { accounts: [] as PmAccount[] },
     })),
   ]);
 
@@ -45,16 +45,16 @@ export default async function WalletDetailPage({
   const mappedIncomeCategoryIds = new Set(otherWallets.flatMap((w) => w.incomeCategoryIds ?? []));
 
   // Linked PF account — hero footer shows its name and allocation percentage
-  const pfAccount =
-    detail.data.wallet.profitFirstAccountId != null
-      ? (pfSummaryRes.data.accounts.find((a) => a.id === detail.data.wallet.profitFirstAccountId) ??
+  const pmAccount =
+    detail.data.wallet.profitMunaAccountId != null
+      ? (pmSummaryRes.data.accounts.find((a) => a.id === detail.data.wallet.profitMunaAccountId) ??
         null)
       : null;
 
   return (
     <WalletDetail
       detail={detail.data}
-      pfAccount={pfAccount}
+      pmAccount={pmAccount}
       incomeCategories={incomeCategoriesRes.data ?? []}
       mappedIncomeCategoryIds={mappedIncomeCategoryIds}
       initialEditOpen={edit === '1'}

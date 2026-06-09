@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 
 /**
  * The hero demonstration: one recorded income, split across the four
- * default Profit First buckets. Bars are a monochrome ink ramp; the
+ * default Profit Muna buckets. Bars are a monochrome ink ramp; the
  * only color on the page is the income amount (paired with its sign).
  */
 const SPLIT = [
@@ -66,7 +66,7 @@ export default async function Home() {
               className="animate-rise mt-7 max-w-[52ch] text-lg leading-relaxed text-ink-soft motion-reduce:animate-none"
               style={{ animationDelay: '90ms' }}
             >
-              Profitmuna applies your Profit First percentages the moment you record income. Every
+              Profitmuna applies your Profit Muna percentages the moment you record income. Every
               bucket gets its share automatically, so you always know exactly how much belongs
               where.
             </p>
@@ -176,7 +176,7 @@ export default async function Home() {
               Pay yourself first. Spend what&rsquo;s left.
             </p>
             <p className="mt-6 max-w-[48ch] text-lg leading-[1.8] text-paper/65">
-              That&rsquo;s the whole Profit First method. Profitmuna just does it for you, in full,
+              That&rsquo;s the whole Profit Muna method. Profitmuna just does it for you, in full,
               every time you get paid.
             </p>
             <p className="mt-14 text-sm tracking-wide text-paper/45">
@@ -210,7 +210,7 @@ export default async function Home() {
           <div>
             <p className="font-bold tracking-tight">Profitmuna</p>
             <p className="mt-1 text-sm text-ink-faint">
-              Profit First budgeting, applied automatically.
+              Profit Muna budgeting, applied automatically.
             </p>
           </div>
           <p className="text-sm text-ink-faint">&copy; 2026 Profitmuna</p>

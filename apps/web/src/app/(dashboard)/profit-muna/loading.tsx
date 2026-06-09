@@ -1,10 +1,10 @@
 /**
- * Skeleton loading state for the /profit-first page.
+ * Skeleton loading state for the /profit-muna page.
  * Mirrors the real composition: header → segmented filter → hero total → row
  * of jars → status banner → foot actions. Skeletons over spinners (product
  * register).
  */
-export default function ProfitFirstLoading() {
+export default function ProfitMunaLoading() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       {/* Header: title + tagline, jar-count pill */}

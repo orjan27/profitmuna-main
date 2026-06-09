@@ -31,7 +31,7 @@ function greetingForNow(): string {
  *
  * The date filter lives in the URL (?from/?to, nuqs in the client component —
  * Pitfall 2: no nuqs here). Empty URL applies the Quarter to Date Manila
- * default (the Profit First distribution window); ?from=all marks an explicit
+ * default (the Profit Muna distribution window); ?from=all marks an explicit
  * All Time choice.
  */
 export default async function OverviewPage({

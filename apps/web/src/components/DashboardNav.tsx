@@ -22,7 +22,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Overview', href: '/overview' },
   { label: 'Income', href: '/income' },
   { label: 'Expenses', href: '/expenses' },
-  { label: 'Profit First', href: '/profit-first' },
+  { label: 'Profit Muna', href: '/profit-muna' },
   { label: 'Wallets', href: '/wallets' },
 ] as const;
 

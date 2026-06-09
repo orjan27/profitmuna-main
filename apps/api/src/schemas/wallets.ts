@@ -6,7 +6,7 @@ import { z } from 'zod';
 const walletBaseSchema = z.object({
   name: z.string().min(1).max(80),
   // Non-null = PF wallet (auto-funded by its allocation); omitted/null = standalone. Sole PF discriminator.
-  profitFirstAccountId: z.number().int().positive().optional().nullable(),
+  profitMunaAccountId: z.number().int().positive().optional().nullable(),
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)

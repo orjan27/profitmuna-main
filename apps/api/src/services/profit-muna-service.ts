@@ -2,10 +2,10 @@ import { eq, and, ne, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 
 import { createDb } from '@app/db';
-import { profitFirstAccounts, incomes } from '@app/db/schema';
+import { profitMunaAccounts, incomes } from '@app/db/schema';
 
 /**
- * Seeds the four canonical Profit First allocation accounts for a newly created user.
+ * Seeds the four canonical Profit Muna allocation accounts for a newly created user.
  *
  * Default values (D-03):
  * - Profit: 5% (500 bp), #10b981, sort 0
@@ -24,7 +24,7 @@ import { profitFirstAccounts, incomes } from '@app/db/schema';
  * @param db  Drizzle instance (pass createDb(c.env.DB) per request)
  * @param userId  Freshly inserted user.id — never client-supplied
  */
-export async function seedProfitFirstAccounts(
+export async function seedProfitMunaAccounts(
   db: ReturnType<typeof createDb>,
   userId: number
 ): Promise<void> {
@@ -59,7 +59,7 @@ export async function seedProfitFirstAccounts(
     },
   ] as const;
 
-  await db.insert(profitFirstAccounts).values(defaults.map((d) => ({ ...d, userId })));
+  await db.insert(profitMunaAccounts).values(defaults.map((d) => ({ ...d, userId })));
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -85,12 +85,12 @@ export type AccountSummaryItem = {
   computedBalance: number;
 };
 
-export type ProfitFirstSummary = {
+export type ProfitMunaSummary = {
   /** Total received + allocated income in cents */
   totalIncome: number;
   accounts: AccountSummaryItem[];
   /**
-   * Distinct income categories present in the user's RECEIVED + profitFirstAllocated income.
+   * Distinct income categories present in the user's RECEIVED + profitMunaAllocated income.
    * Always the full set regardless of active date/category filters — provides filter options.
    * Empty array when the user has no qualifying income.
    */
@@ -124,7 +124,7 @@ export type UpdatePercentagesInput = {
 // ─── Factory ───────────────────────────────────────────────────────────────
 
 /**
- * Factory for Profit First service methods.
+ * Factory for Profit Muna service methods.
  *
  * Receives a Drizzle db instance (created per-request in the route handler via
  * createDb(c.env.DB) — never at module scope, Pitfall 8).
@@ -133,9 +133,9 @@ export type UpdatePercentagesInput = {
  *
  * @param db  Drizzle instance created from c.env.DB binding
  */
-export function createProfitFirstService(db: ReturnType<typeof createDb>) {
+export function createProfitMunaService(db: ReturnType<typeof createDb>) {
   /**
-   * Computes the total received + Profit First allocated income for a user.
+   * Computes the total received + Profit Muna allocated income for a user.
    * Optionally filtered by date range and category IDs.
    *
    * @returns Total income in integer cents (COALESCE to 0 when no matching rows)
@@ -149,7 +149,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
     const conditions = [
       eq(incomes.userId, userId),
       eq(incomes.moneyStatus, 'RECEIVED'),
-      eq(incomes.profitFirstAllocated, true),
+      eq(incomes.profitMunaAllocated, true),
     ];
 
     if (dateRange?.from) {
@@ -179,7 +179,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
 
   /**
    * Returns the DISTINCT (categoryId, categoryName) pairs from the user's
-   * RECEIVED + profitFirstAllocated income, ordered by name.
+   * RECEIVED + profitMunaAllocated income, ordered by name.
    *
    * Intentionally does NOT apply date-range or categoryIds filters — the option
    * list must remain complete regardless of which filter is active (T-03-06-01:
@@ -196,7 +196,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
         and(
           eq(incomes.userId, userId),
           eq(incomes.moneyStatus, 'RECEIVED'),
-          eq(incomes.profitFirstAllocated, true)
+          eq(incomes.profitMunaAllocated, true)
         )
       )
       .orderBy(incomes.categoryName);
@@ -228,15 +228,15 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       userId: number,
       dateRange?: DateRange,
       filters?: SummaryFilters
-    ): Promise<ProfitFirstSummary> {
+    ): Promise<ProfitMunaSummary> {
       // Parallel queries to minimize D1 round-trips
       const [totalIncome, accounts, categories] = await Promise.all([
         getTotalReceivedIncome(userId, dateRange, filters),
         db
           .select()
-          .from(profitFirstAccounts)
-          .where(eq(profitFirstAccounts.userId, userId))
-          .orderBy(profitFirstAccounts.sortOrder),
+          .from(profitMunaAccounts)
+          .where(eq(profitMunaAccounts.userId, userId))
+          .orderBy(profitMunaAccounts.sortOrder),
         // Category list is always unfiltered — must show all options regardless of active filter
         getIncomeCategories(userId),
       ]);
@@ -258,7 +258,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
     },
 
     /**
-     * Creates a new custom Profit First account for the user.
+     * Creates a new custom Profit Muna account for the user.
      * Rejects if adding the new account would push total basis points over 10000.
      *
      * @throws HTTPException 400 if the total would exceed 10000 bp
@@ -268,13 +268,13 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       // Parallel fetch of current sum + max sortOrder
       const [sumRows, maxRows] = await Promise.all([
         db
-          .select({ total: sql<number>`COALESCE(SUM(${profitFirstAccounts.targetPercentage}), 0)` })
-          .from(profitFirstAccounts)
-          .where(eq(profitFirstAccounts.userId, userId)),
+          .select({ total: sql<number>`COALESCE(SUM(${profitMunaAccounts.targetPercentage}), 0)` })
+          .from(profitMunaAccounts)
+          .where(eq(profitMunaAccounts.userId, userId)),
         db
-          .select({ maxSort: sql<number>`COALESCE(MAX(${profitFirstAccounts.sortOrder}), -1)` })
-          .from(profitFirstAccounts)
-          .where(eq(profitFirstAccounts.userId, userId)),
+          .select({ maxSort: sql<number>`COALESCE(MAX(${profitMunaAccounts.sortOrder}), -1)` })
+          .from(profitMunaAccounts)
+          .where(eq(profitMunaAccounts.userId, userId)),
       ]);
 
       const currentSum = Number(sumRows[0]?.total ?? 0);
@@ -290,7 +290,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
 
       try {
         const inserted = await db
-          .insert(profitFirstAccounts)
+          .insert(profitMunaAccounts)
           .values({
             name: input.name,
             targetPercentage: input.targetPercentage,
@@ -313,7 +313,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
     },
 
     /**
-     * Partially updates a Profit First account owned by the user.
+     * Partially updates a Profit Muna account owned by the user.
      * If targetPercentage changes, validates that the new total stays within 10000 bp.
      *
      * @throws HTTPException 404 if the account does not exist or belongs to another user
@@ -323,8 +323,8 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       // Fetch existing row scoped to userId (IDOR guard)
       const rows = await db
         .select()
-        .from(profitFirstAccounts)
-        .where(and(eq(profitFirstAccounts.id, accountId), eq(profitFirstAccounts.userId, userId)));
+        .from(profitMunaAccounts)
+        .where(and(eq(profitMunaAccounts.id, accountId), eq(profitMunaAccounts.userId, userId)));
       const existing = rows[0];
 
       if (!existing) {
@@ -334,10 +334,10 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       // Validate percentage change does not exceed total budget
       if (input.targetPercentage !== undefined) {
         const sumRows = await db
-          .select({ total: sql<number>`COALESCE(SUM(${profitFirstAccounts.targetPercentage}), 0)` })
-          .from(profitFirstAccounts)
+          .select({ total: sql<number>`COALESCE(SUM(${profitMunaAccounts.targetPercentage}), 0)` })
+          .from(profitMunaAccounts)
           .where(
-            and(eq(profitFirstAccounts.userId, userId), ne(profitFirstAccounts.id, accountId))
+            and(eq(profitMunaAccounts.userId, userId), ne(profitMunaAccounts.id, accountId))
           );
         const otherSum = Number(sumRows[0]?.total ?? 0);
 
@@ -349,7 +349,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       }
 
       const updated = await db
-        .update(profitFirstAccounts)
+        .update(profitMunaAccounts)
         .set({
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.targetPercentage !== undefined
@@ -359,14 +359,14 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
           ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
           updatedAt: new Date().toISOString(),
         })
-        .where(and(eq(profitFirstAccounts.id, accountId), eq(profitFirstAccounts.userId, userId)))
+        .where(and(eq(profitMunaAccounts.id, accountId), eq(profitMunaAccounts.userId, userId)))
         .returning();
 
       return updated[0];
     },
 
     /**
-     * Deletes a CUSTOM Profit First account owned by the user.
+     * Deletes a CUSTOM Profit Muna account owned by the user.
      *
      * Guards:
      * 1. Account must exist and be owned by the caller (404 otherwise)
@@ -381,8 +381,8 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
     async deleteAccount(accountId: number, userId: number): Promise<void> {
       const rows = await db
         .select()
-        .from(profitFirstAccounts)
-        .where(and(eq(profitFirstAccounts.id, accountId), eq(profitFirstAccounts.userId, userId)));
+        .from(profitMunaAccounts)
+        .where(and(eq(profitMunaAccounts.id, accountId), eq(profitMunaAccounts.userId, userId)));
       const existing = rows[0];
 
       if (!existing) {
@@ -398,7 +398,7 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       //   .select()
       //   .from(wallets)
       //   .where(
-      //     and(eq(wallets.profitFirstAccountId, accountId), eq(wallets.userId, userId))
+      //     and(eq(wallets.profitMunaAccountId, accountId), eq(wallets.userId, userId))
       //   );
       // if (walletLinks.length > 0) {
       //   throw new HTTPException(400, {
@@ -407,8 +407,8 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       // }
 
       await db
-        .delete(profitFirstAccounts)
-        .where(and(eq(profitFirstAccounts.id, accountId), eq(profitFirstAccounts.userId, userId)));
+        .delete(profitMunaAccounts)
+        .where(and(eq(profitMunaAccounts.id, accountId), eq(profitMunaAccounts.userId, userId)));
     },
 
     /**
@@ -422,9 +422,9 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
     async updatePercentages(userId: number, input: UpdatePercentagesInput) {
       // Step 1 — Fetch all account IDs owned by this user (server-authoritative set)
       const owned = await db
-        .select({ id: profitFirstAccounts.id })
-        .from(profitFirstAccounts)
-        .where(eq(profitFirstAccounts.userId, userId));
+        .select({ id: profitMunaAccounts.id })
+        .from(profitMunaAccounts)
+        .where(eq(profitMunaAccounts.userId, userId));
       const ownedIds = new Set<number>(owned.map((a) => a.id));
 
       // Step 2 — Build the submitted ID set
@@ -456,18 +456,18 @@ export function createProfitFirstService(db: ReturnType<typeof createDb>) {
       await Promise.all(
         input.accounts.map((a) =>
           db
-            .update(profitFirstAccounts)
+            .update(profitMunaAccounts)
             .set({ targetPercentage: a.targetPercentage, updatedAt: new Date().toISOString() })
-            .where(and(eq(profitFirstAccounts.id, a.id), eq(profitFirstAccounts.userId, userId)))
+            .where(and(eq(profitMunaAccounts.id, a.id), eq(profitMunaAccounts.userId, userId)))
         )
       );
 
       // Return the updated accounts ordered by sortOrder
       return db
         .select()
-        .from(profitFirstAccounts)
-        .where(eq(profitFirstAccounts.userId, userId))
-        .orderBy(profitFirstAccounts.sortOrder);
+        .from(profitMunaAccounts)
+        .where(eq(profitMunaAccounts.userId, userId))
+        .orderBy(profitMunaAccounts.sortOrder);
     },
   };
 }

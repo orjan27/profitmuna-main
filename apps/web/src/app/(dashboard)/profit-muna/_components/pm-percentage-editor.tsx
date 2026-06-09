@@ -9,13 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { updatePercentagesAction } from '@/server/profit-first-actions';
-import type { PfAccount } from './pf-overview';
+import { updatePercentagesAction } from '@/server/profit-muna-actions';
+import type { PmAccount } from './pm-overview';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface PfPercentageEditorProps {
-  accounts: PfAccount[];
+interface PmPercentageEditorProps {
+  accounts: PmAccount[];
   onCancel: () => void;
 }
 
@@ -37,12 +37,12 @@ interface RowState {
  * Save button is disabled unless total === 100.
  *
  * On save: calls updatePercentagesAction (which converts each percent to basis
- * points before calling PUT /api/profit-first/percentages).
+ * points before calling PUT /api/profit-muna/percentages).
  *
  * CRITICAL: This component NEVER touches basis points (no 10000 check).
  * The total gate is always `total === 100` (Pitfall 3).
  */
-export function PfPercentageEditor({ accounts, onCancel }: PfPercentageEditorProps) {
+export function PmPercentageEditor({ accounts, onCancel }: PmPercentageEditorProps) {
   const router = useRouter();
   const [rows, setRows] = useState<RowState[]>(() =>
     accounts.map((a) => ({

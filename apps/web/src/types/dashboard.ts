@@ -1,4 +1,4 @@
-import type { PfAccount } from '@/app/(dashboard)/profit-first/_components/pf-overview';
+import type { PmAccount } from '@/app/(dashboard)/profit-muna/_components/pm-overview';
 
 /** Feed row source — matches the API dashboard-service RecentTransactionKind */
 export type RecentTransactionKind = 'income' | 'expense' | 'wallet_deposit' | 'wallet_withdrawal';
@@ -55,7 +55,7 @@ export interface DashboardSummary {
   profitWalletBalanceCents: number | null;
   /** Total received + allocated income in cents (PF summary passthrough) */
   totalIncome: number;
-  profitFirstAccounts: PfAccount[];
+  profitMunaAccounts: PmAccount[];
   recentTransactions: RecentTransaction[];
   feedPagination: FeedPagination;
   /** Earliest PENDING income due today or later (Manila) — null when none */
