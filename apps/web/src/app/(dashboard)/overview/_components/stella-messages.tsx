@@ -90,7 +90,7 @@ export function StellaMessages({
           >
             {messages[safeIndex]}
           </p>
-          <Button onClick={onAdd} className="shrink-0 rounded-full">
+          <Button onClick={onAdd} className="shrink-0 rounded-full max-md:hidden">
             <Plus aria-hidden="true" />
             Add
           </Button>
